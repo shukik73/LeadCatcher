@@ -1,0 +1,1489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lead Catcher - Market Analysis & Product Audit</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card-hover:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
+        .nav-link.active { border-bottom: 3px solid #667eea; color: #667eea; }
+        .metric-card { transition: all 0.3s ease; }
+        .metric-card:hover { transform: scale(1.02); }
+        .progress-bar { transition: width 1s ease-in-out; }
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .sticky-nav { position: sticky; top: 0; z-index: 50; backdrop-filter: blur(10px); background: rgba(255,255,255,0.9); }
+        .chart-container { position: relative; height: 300px; }
+        .severity-critical { background: #fef2f2; border-left: 4px solid #ef4444; }
+        .severity-high { background: #fff7ed; border-left: 4px solid #f97316; }
+        .severity-medium { background: #fefce8; border-left: 4px solid #eab308; }
+        .severity-low { background: #f0fdf4; border-left: 4px solid #22c55e; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav class="sticky-nav border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <div class="flex items-center gap-2">
+                        <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-2 rounded-lg">
+                            <i class="fas fa-phone-volume"></i>
+                        </div>
+                        <span class="font-bold text-xl text-gray-900">Lead Catcher</span>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-1 overflow-x-auto">
+                    <a href="#executive" class="nav-link active px-3 py-5 text-sm font-medium text-gray-600 hover:text-gray-900">Executive</a>
+                    <a href="#market" class="nav-link px-3 py-5 text-sm font-medium text-gray-600 hover:text-gray-900">Market</a>
+                    <a href="#icp" class="nav-link px-3 py-5 text-sm font-medium text-gray-600 hover:text-gray-900">ICP</a>
+                    <a href="#competitive" class="nav-link px-3 py-5 text-sm font-medium text-gray-600 hover:text-gray-900">Competitive</a>
+                    <a href="#funnel" class="nav-link px-3 py-5 text-sm font-medium text-gray-600 hover:text-gray-900">Funnel</a>
+                    <a href="#pricing" class="nav-link px-3 py-5 text-sm font-medium text-gray-600 hover:text-gray-900">Pricing</a>
+                    <a href="#roadmap" class="nav-link px-3 py-5 text-sm font-medium text-gray-600 hover:text-gray-900">Roadmap</a>
+                    <a href="#audit" class="nav-link px-3 py-5 text-sm font-medium text-gray-600 hover:text-gray-900">Audit</a>
+                    <a href="#features" class="nav-link px-3 py-5 text-sm font-medium text-gray-600 hover:text-gray-900">Features</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section id="executive" class="gradient-bg text-white py-20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center">
+                <h1 class="text-4xl md:text-5xl font-bold mb-4">Market Analysis & Product Audit</h1>
+                <p class="text-xl text-blue-100 mb-8">B2B SaaS Platform: Missed-Call Text Back to AI Call Answering</p>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
+                    <div class="bg-white/10 backdrop-blur rounded-xl p-4">
+                        <div class="text-3xl font-bold">$4.2B</div>
+                        <div class="text-blue-200 text-sm">TAM (2024)</div>
+                    </div>
+                    <div class="bg-white/10 backdrop-blur rounded-xl p-4">
+                        <div class="text-3xl font-bold">62%</div>
+                        <div class="text-blue-200 text-sm">Calls Go Unanswered</div>
+                    </div>
+                    <div class="bg-white/10 backdrop-blur rounded-xl p-4">
+                        <div class="text-3xl font-bold">$1,200</div>
+                        <div class="text-blue-200 text-sm">Avg Lost Per Call</div>
+                    </div>
+                    <div class="bg-white/10 backdrop-blur rounded-xl p-4">
+                        <div class="text-3xl font-bold">78%</div>
+                        <div class="text-blue-200 text-sm">Choose First Responder</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Core Problem Analysis -->
+    <section class="py-16 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold text-gray-900 mb-8 text-center">
+                <i class="fas fa-exclamation-triangle text-red-500 mr-3"></i>Core Problem Analysis
+            </h2>
+            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="card-hover bg-red-50 border border-red-100 rounded-xl p-6 transition-all">
+                    <div class="w-12 h-12 bg-red-500 text-white rounded-lg flex items-center justify-center mb-4">
+                        <i class="fas fa-phone-slash text-xl"></i>
+                    </div>
+                    <h3 class="font-bold text-gray-900 mb-2">Missed Calls = Lost Revenue</h3>
+                    <p class="text-gray-600 text-sm mb-3">Service businesses miss 20-40% of inbound calls. Each missed call represents $500-$5,000 in lost revenue.</p>
+                    <div class="bg-red-100 rounded-lg p-3">
+                        <div class="text-2xl font-bold text-red-600">$37,000</div>
+                        <div class="text-xs text-red-500">Avg annual loss per business</div>
+                    </div>
+                </div>
+                <div class="card-hover bg-orange-50 border border-orange-100 rounded-xl p-6 transition-all">
+                    <div class="w-12 h-12 bg-orange-500 text-white rounded-lg flex items-center justify-center mb-4">
+                        <i class="fas fa-moon text-xl"></i>
+                    </div>
+                    <h3 class="font-bold text-gray-900 mb-2">After-Hours Demand</h3>
+                    <p class="text-gray-600 text-sm mb-3">35% of service calls occur outside business hours. Emergencies don't wait for 9-5.</p>
+                    <div class="bg-orange-100 rounded-lg p-3">
+                        <div class="text-2xl font-bold text-orange-600">35%</div>
+                        <div class="text-xs text-orange-500">Calls after business hours</div>
+                    </div>
+                </div>
+                <div class="card-hover bg-yellow-50 border border-yellow-100 rounded-xl p-6 transition-all">
+                    <div class="w-12 h-12 bg-yellow-500 text-white rounded-lg flex items-center justify-center mb-4">
+                        <i class="fas fa-clock text-xl"></i>
+                    </div>
+                    <h3 class="font-bold text-gray-900 mb-2">Slow Response Times</h3>
+                    <p class="text-gray-600 text-sm mb-3">Average callback time is 47 hours. 78% of customers hire the first business to respond.</p>
+                    <div class="bg-yellow-100 rounded-lg p-3">
+                        <div class="text-2xl font-bold text-yellow-600">47 hrs</div>
+                        <div class="text-xs text-yellow-500">Avg callback time</div>
+                    </div>
+                </div>
+                <div class="card-hover bg-purple-50 border border-purple-100 rounded-xl p-6 transition-all">
+                    <div class="w-12 h-12 bg-purple-500 text-white rounded-lg flex items-center justify-center mb-4">
+                        <i class="fas fa-users text-xl"></i>
+                    </div>
+                    <h3 class="font-bold text-gray-900 mb-2">Staffing & Call Center Costs</h3>
+                    <p class="text-gray-600 text-sm mb-3">Hiring a receptionist costs $35K-$50K/year. Answering services charge $1-$2 per call.</p>
+                    <div class="bg-purple-100 rounded-lg p-3">
+                        <div class="text-2xl font-bold text-purple-600">$42K</div>
+                        <div class="text-xs text-purple-500">Avg receptionist salary</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- TAM/SAM/SOM Section -->
+    <section id="market" class="py-16 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold text-gray-900 mb-2 text-center">
+                <i class="fas fa-chart-pie text-blue-500 mr-3"></i>Market Sizing: TAM / SAM / SOM
+            </h2>
+            <p class="text-gray-500 text-center mb-12">Total Addressable Market Analysis for Missed-Call Recovery Software</p>
+
+            <div class="grid lg:grid-cols-2 gap-8">
+                <div class="bg-white rounded-2xl shadow-lg p-8">
+                    <div class="chart-container">
+                        <canvas id="tamChart"></canvas>
+                    </div>
+                </div>
+                <div class="space-y-6">
+                    <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl p-6">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <div class="text-blue-100 text-sm font-medium">TAM - Total Addressable Market</div>
+                                <div class="text-3xl font-bold">$4.2 Billion</div>
+                            </div>
+                            <div class="text-5xl opacity-20"><i class="fas fa-globe"></i></div>
+                        </div>
+                        <p class="text-blue-100 text-sm mt-3">All US service businesses with phone-based lead generation (6.2M businesses x $680 avg annual spend)</p>
+                    </div>
+                    <div class="bg-gradient-to-r from-indigo-500 to-indigo-600 text-white rounded-xl p-6">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <div class="text-indigo-100 text-sm font-medium">SAM - Serviceable Addressable Market</div>
+                                <div class="text-3xl font-bold">$890 Million</div>
+                            </div>
+                            <div class="text-5xl opacity-20"><i class="fas fa-bullseye"></i></div>
+                        </div>
+                        <p class="text-indigo-100 text-sm mt-3">SMBs in target verticals (Home Services, Medical, Legal) with 10+ missed calls/month (1.3M businesses)</p>
+                    </div>
+                    <div class="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl p-6">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <div class="text-purple-100 text-sm font-medium">SOM - Serviceable Obtainable Market (Year 3)</div>
+                                <div class="text-3xl font-bold">$18 Million</div>
+                            </div>
+                            <div class="text-5xl opacity-20"><i class="fas fa-rocket"></i></div>
+                        </div>
+                        <p class="text-purple-100 text-sm mt-3">2% market penetration target: 4,500 customers at $333/mo ARPU</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Market Growth -->
+            <div class="mt-12 bg-white rounded-2xl shadow-lg p-8">
+                <h3 class="text-xl font-bold text-gray-900 mb-6">Market Growth Projections</h3>
+                <div class="chart-container" style="height: 250px;">
+                    <canvas id="growthChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ICP Section -->
+    <section id="icp" class="py-16 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold text-gray-900 mb-2 text-center">
+                <i class="fas fa-user-check text-green-500 mr-3"></i>Ideal Customer Profiles
+            </h2>
+            <p class="text-gray-500 text-center mb-12">Primary verticals with highest revenue sensitivity to missed calls</p>
+
+            <div class="grid md:grid-cols-3 gap-8">
+                <!-- Home Services -->
+                <div class="card-hover bg-white border-2 border-gray-100 rounded-2xl overflow-hidden transition-all">
+                    <div class="bg-gradient-to-r from-orange-500 to-red-500 text-white p-6">
+                        <div class="flex items-center gap-4">
+                            <div class="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-wrench text-2xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-bold">Home Services</h3>
+                                <p class="text-orange-100">HVAC, Plumbing, Roofing, Electrical</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="bg-gray-50 rounded-lg p-3 text-center">
+                                <div class="text-2xl font-bold text-gray-900">1-15</div>
+                                <div class="text-xs text-gray-500">Employees</div>
+                            </div>
+                            <div class="bg-gray-50 rounded-lg p-3 text-center">
+                                <div class="text-2xl font-bold text-gray-900">50-200</div>
+                                <div class="text-xs text-gray-500">Calls/Month</div>
+                            </div>
+                            <div class="bg-gray-50 rounded-lg p-3 text-center">
+                                <div class="text-2xl font-bold text-gray-900">$500-2K</div>
+                                <div class="text-xs text-gray-500">Avg Job Value</div>
+                            </div>
+                            <div class="bg-gray-50 rounded-lg p-3 text-center">
+                                <div class="text-2xl font-bold text-gray-900">$1-5M</div>
+                                <div class="text-xs text-gray-500">Annual Revenue</div>
+                            </div>
+                        </div>
+                        <div class="border-t pt-4">
+                            <h4 class="font-semibold text-gray-900 mb-2">Key Pain Points</h4>
+                            <ul class="text-sm text-gray-600 space-y-1">
+                                <li><i class="fas fa-check text-green-500 mr-2"></i>Techs in field can't answer calls</li>
+                                <li><i class="fas fa-check text-green-500 mr-2"></i>Emergency calls after hours</li>
+                                <li><i class="fas fa-check text-green-500 mr-2"></i>High competition, first responder wins</li>
+                            </ul>
+                        </div>
+                        <div class="bg-orange-50 rounded-lg p-3">
+                            <div class="text-sm font-medium text-orange-800">Revenue at Risk</div>
+                            <div class="text-xl font-bold text-orange-600">$45,000/year</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Medical -->
+                <div class="card-hover bg-white border-2 border-gray-100 rounded-2xl overflow-hidden transition-all">
+                    <div class="bg-gradient-to-r from-blue-500 to-cyan-500 text-white p-6">
+                        <div class="flex items-center gap-4">
+                            <div class="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-tooth text-2xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-bold">Medical & Dental</h3>
+                                <p class="text-blue-100">Dentists, Med Spas, Clinics</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="bg-gray-50 rounded-lg p-3 text-center">
+                                <div class="text-2xl font-bold text-gray-900">2-25</div>
+                                <div class="text-xs text-gray-500">Employees</div>
+                            </div>
+                            <div class="bg-gray-50 rounded-lg p-3 text-center">
+                                <div class="text-2xl font-bold text-gray-900">100-400</div>
+                                <div class="text-xs text-gray-500">Calls/Month</div>
+                            </div>
+                            <div class="bg-gray-50 rounded-lg p-3 text-center">
+                                <div class="text-2xl font-bold text-gray-900">$300-5K</div>
+                                <div class="text-xs text-gray-500">Avg Procedure Value</div>
+                            </div>
+                            <div class="bg-gray-50 rounded-lg p-3 text-center">
+                                <div class="text-2xl font-bold text-gray-900">$500K-3M</div>
+                                <div class="text-xs text-gray-500">Annual Revenue</div>
+                            </div>
+                        </div>
+                        <div class="border-t pt-4">
+                            <h4 class="font-semibold text-gray-900 mb-2">Key Pain Points</h4>
+                            <ul class="text-sm text-gray-600 space-y-1">
+                                <li><i class="fas fa-check text-green-500 mr-2"></i>Front desk overwhelmed</li>
+                                <li><i class="fas fa-check text-green-500 mr-2"></i>No-shows hurt revenue</li>
+                                <li><i class="fas fa-check text-green-500 mr-2"></i>New patient acquisition critical</li>
+                            </ul>
+                        </div>
+                        <div class="bg-blue-50 rounded-lg p-3">
+                            <div class="text-sm font-medium text-blue-800">Revenue at Risk</div>
+                            <div class="text-xl font-bold text-blue-600">$62,000/year</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Legal -->
+                <div class="card-hover bg-white border-2 border-gray-100 rounded-2xl overflow-hidden transition-all">
+                    <div class="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-6">
+                        <div class="flex items-center gap-4">
+                            <div class="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-gavel text-2xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-bold">Legal Services</h3>
+                                <p class="text-purple-100">Personal Injury, Immigration, Family</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="bg-gray-50 rounded-lg p-3 text-center">
+                                <div class="text-2xl font-bold text-gray-900">1-20</div>
+                                <div class="text-xs text-gray-500">Employees</div>
+                            </div>
+                            <div class="bg-gray-50 rounded-lg p-3 text-center">
+                                <div class="text-2xl font-bold text-gray-900">30-150</div>
+                                <div class="text-xs text-gray-500">Calls/Month</div>
+                            </div>
+                            <div class="bg-gray-50 rounded-lg p-3 text-center">
+                                <div class="text-2xl font-bold text-gray-900">$3K-50K</div>
+                                <div class="text-xs text-gray-500">Avg Case Value</div>
+                            </div>
+                            <div class="bg-gray-50 rounded-lg p-3 text-center">
+                                <div class="text-2xl font-bold text-gray-900">$500K-5M</div>
+                                <div class="text-xs text-gray-500">Annual Revenue</div>
+                            </div>
+                        </div>
+                        <div class="border-t pt-4">
+                            <h4 class="font-semibold text-gray-900 mb-2">Key Pain Points</h4>
+                            <ul class="text-sm text-gray-600 space-y-1">
+                                <li><i class="fas fa-check text-green-500 mr-2"></i>High cost per lead ($200-500)</li>
+                                <li><i class="fas fa-check text-green-500 mr-2"></i>Time-sensitive cases</li>
+                                <li><i class="fas fa-check text-green-500 mr-2"></i>Attorneys in court/depositions</li>
+                            </ul>
+                        </div>
+                        <div class="bg-purple-50 rounded-lg p-3">
+                            <div class="text-sm font-medium text-purple-800">Revenue at Risk</div>
+                            <div class="text-xl font-bold text-purple-600">$125,000/year</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Buyer Personas -->
+            <h3 class="text-2xl font-bold text-gray-900 mt-16 mb-8 text-center">
+                <i class="fas fa-users text-indigo-500 mr-3"></i>Buyer Personas
+            </h3>
+            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="bg-white border border-gray-200 rounded-xl p-6 card-hover transition-all">
+                    <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-user-tie text-2xl text-blue-600"></i>
+                    </div>
+                    <h4 class="font-bold text-gray-900 text-center mb-2">Business Owner</h4>
+                    <p class="text-gray-500 text-sm text-center mb-4">"I'm losing money but don't have time to fix it"</p>
+                    <div class="space-y-2 text-sm">
+                        <div class="bg-red-50 text-red-700 rounded p-2"><i class="fas fa-fire mr-2"></i>Sees revenue walking out door</div>
+                        <div class="bg-blue-50 text-blue-700 rounded p-2"><i class="fas fa-bolt mr-2"></i>Wants quick ROI proof</div>
+                        <div class="bg-green-50 text-green-700 rounded p-2"><i class="fas fa-check mr-2"></i>Decision maker</div>
+                    </div>
+                    <div class="mt-4 pt-4 border-t">
+                        <div class="text-xs text-gray-500 mb-1">Buying Trigger</div>
+                        <div class="text-sm font-medium text-gray-900">Lost a big job to competitor who answered first</div>
+                    </div>
+                </div>
+
+                <div class="bg-white border border-gray-200 rounded-xl p-6 card-hover transition-all">
+                    <div class="w-16 h-16 bg-pink-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-headset text-2xl text-pink-600"></i>
+                    </div>
+                    <h4 class="font-bold text-gray-900 text-center mb-2">Office Manager</h4>
+                    <p class="text-gray-500 text-sm text-center mb-4">"I can't keep up with the phone anymore"</p>
+                    <div class="space-y-2 text-sm">
+                        <div class="bg-red-50 text-red-700 rounded p-2"><i class="fas fa-fire mr-2"></i>Overwhelmed, stressed</div>
+                        <div class="bg-blue-50 text-blue-700 rounded p-2"><i class="fas fa-bolt mr-2"></i>Needs easy-to-use tools</div>
+                        <div class="bg-green-50 text-green-700 rounded p-2"><i class="fas fa-check mr-2"></i>Influences decision</div>
+                    </div>
+                    <div class="mt-4 pt-4 border-t">
+                        <div class="text-xs text-gray-500 mb-1">Buying Trigger</div>
+                        <div class="text-sm font-medium text-gray-900">Boss complained about missed calls</div>
+                    </div>
+                </div>
+
+                <div class="bg-white border border-gray-200 rounded-xl p-6 card-hover transition-all">
+                    <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-cogs text-2xl text-green-600"></i>
+                    </div>
+                    <h4 class="font-bold text-gray-900 text-center mb-2">Operations Manager</h4>
+                    <p class="text-gray-500 text-sm text-center mb-4">"We need systems that scale"</p>
+                    <div class="space-y-2 text-sm">
+                        <div class="bg-red-50 text-red-700 rounded p-2"><i class="fas fa-fire mr-2"></i>Processes breaking down</div>
+                        <div class="bg-blue-50 text-blue-700 rounded p-2"><i class="fas fa-bolt mr-2"></i>Wants integrations</div>
+                        <div class="bg-green-50 text-green-700 rounded p-2"><i class="fas fa-check mr-2"></i>Technical evaluator</div>
+                    </div>
+                    <div class="mt-4 pt-4 border-t">
+                        <div class="text-xs text-gray-500 mb-1">Buying Trigger</div>
+                        <div class="text-sm font-medium text-gray-900">Audit revealed 30% calls missed</div>
+                    </div>
+                </div>
+
+                <div class="bg-white border border-gray-200 rounded-xl p-6 card-hover transition-all">
+                    <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-bullhorn text-2xl text-purple-600"></i>
+                    </div>
+                    <h4 class="font-bold text-gray-900 text-center mb-2">Marketing Manager</h4>
+                    <p class="text-gray-500 text-sm text-center mb-4">"My leads are being wasted"</p>
+                    <div class="space-y-2 text-sm">
+                        <div class="bg-red-50 text-red-700 rounded p-2"><i class="fas fa-fire mr-2"></i>Paying for dead leads</div>
+                        <div class="bg-blue-50 text-blue-700 rounded p-2"><i class="fas fa-bolt mr-2"></i>Needs attribution data</div>
+                        <div class="bg-green-50 text-green-700 rounded p-2"><i class="fas fa-check mr-2"></i>Budget holder for tools</div>
+                    </div>
+                    <div class="mt-4 pt-4 border-t">
+                        <div class="text-xs text-gray-500 mb-1">Buying Trigger</div>
+                        <div class="text-sm font-medium text-gray-900">PPC cost per lead doubled</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Competitive Landscape -->
+    <section id="competitive" class="py-16 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold text-gray-900 mb-2 text-center">
+                <i class="fas fa-chess text-indigo-500 mr-3"></i>Competitive Landscape
+            </h2>
+            <p class="text-gray-500 text-center mb-12">Feature comparison matrix across 12 competitors</p>
+
+            <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-4 text-left text-sm font-bold text-gray-900">Competitor</th>
+                                <th class="px-4 py-4 text-center text-sm font-bold text-gray-900">Missed Call<br>Recovery</th>
+                                <th class="px-4 py-4 text-center text-sm font-bold text-gray-900">SMS<br>Automation</th>
+                                <th class="px-4 py-4 text-center text-sm font-bold text-gray-900">AI<br>Answering</th>
+                                <th class="px-4 py-4 text-center text-sm font-bold text-gray-900">Appointment<br>Booking</th>
+                                <th class="px-4 py-4 text-center text-sm font-bold text-gray-900">Pricing<br>Accessibility</th>
+                                <th class="px-4 py-4 text-center text-sm font-bold text-gray-900">Starting<br>Price</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            <tr class="bg-blue-50 border-l-4 border-blue-500">
+                                <td class="px-6 py-4 font-bold text-blue-700"><i class="fas fa-star mr-2"></i>Lead Catcher</td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-yellow-500 text-xl"><i class="fas fa-clock"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-yellow-500 text-xl"><i class="fas fa-clock"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center font-bold text-blue-700">$299/mo</td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 font-medium text-gray-900">CallRail</td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-red-400 text-xl"><i class="fas fa-times-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-red-400 text-xl"><i class="fas fa-times-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center text-gray-600">$45/mo</td>
+                            </tr>
+                            <tr class="bg-gray-50">
+                                <td class="px-6 py-4 font-medium text-gray-900">Podium</td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-red-400 text-xl"><i class="fas fa-times-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center text-gray-600">$399/mo</td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 font-medium text-gray-900">Birdeye</td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-yellow-500 text-xl"><i class="fas fa-clock"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-red-400 text-xl"><i class="fas fa-times-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center text-gray-600">$299/mo</td>
+                            </tr>
+                            <tr class="bg-gray-50">
+                                <td class="px-6 py-4 font-medium text-gray-900">GoHighLevel</td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center text-gray-600">$97/mo</td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 font-medium text-gray-900">Ruby</td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-red-400 text-xl"><i class="fas fa-times-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-red-400 text-xl"><i class="fas fa-times-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-red-400 text-xl"><i class="fas fa-times-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center text-gray-600">$235/mo</td>
+                            </tr>
+                            <tr class="bg-gray-50">
+                                <td class="px-6 py-4 font-medium text-gray-900">Smith.ai</td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-red-400 text-xl"><i class="fas fa-times-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center text-gray-600">$285/mo</td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 font-medium text-gray-900">ServiceTitan</td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-red-400 text-xl"><i class="fas fa-times-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-red-400 text-xl"><i class="fas fa-times-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center text-gray-600">$398/mo</td>
+                            </tr>
+                            <tr class="bg-gray-50">
+                                <td class="px-6 py-4 font-medium text-gray-900">Zendesk</td>
+                                <td class="px-4 py-4 text-center"><span class="text-red-400 text-xl"><i class="fas fa-times-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-red-400 text-xl"><i class="fas fa-times-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center text-gray-600">$55/mo</td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 font-medium text-gray-900">Intercom</td>
+                                <td class="px-4 py-4 text-center"><span class="text-red-400 text-xl"><i class="fas fa-times-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-red-400 text-xl"><i class="fas fa-times-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center text-gray-600">$74/mo</td>
+                            </tr>
+                            <tr class="bg-gray-50">
+                                <td class="px-6 py-4 font-medium text-gray-900">Housecall Pro</td>
+                                <td class="px-4 py-4 text-center"><span class="text-yellow-500 text-xl"><i class="fas fa-clock"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-red-400 text-xl"><i class="fas fa-times-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center text-gray-600">$65/mo</td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 font-medium text-gray-900">Jobber</td>
+                                <td class="px-4 py-4 text-center"><span class="text-yellow-500 text-xl"><i class="fas fa-clock"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-red-400 text-xl"><i class="fas fa-times-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center"><span class="text-green-500 text-xl"><i class="fas fa-check-circle"></i></span></td>
+                                <td class="px-4 py-4 text-center text-gray-600">$49/mo</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="px-6 py-4 bg-gray-50 border-t">
+                    <div class="flex items-center gap-6 text-sm">
+                        <span class="flex items-center gap-2"><span class="text-green-500"><i class="fas fa-check-circle"></i></span> Full Feature</span>
+                        <span class="flex items-center gap-2"><span class="text-yellow-500"><i class="fas fa-clock"></i></span> Partial/Coming Soon</span>
+                        <span class="flex items-center gap-2"><span class="text-red-400"><i class="fas fa-times-circle"></i></span> Not Available</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Differentiation -->
+            <div class="mt-12 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-8 text-white">
+                <h3 class="text-2xl font-bold mb-6 text-center">Lead Catcher Differentiation</h3>
+                <div class="grid md:grid-cols-4 gap-6">
+                    <div class="text-center">
+                        <div class="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-phone-volume text-3xl"></i>
+                        </div>
+                        <h4 class="font-bold mb-2">"Never Lose a Lead"</h4>
+                        <p class="text-blue-100 text-sm">Every missed call gets instant engagement</p>
+                    </div>
+                    <div class="text-center">
+                        <div class="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-bolt text-3xl"></i>
+                        </div>
+                        <h4 class="font-bold mb-2">Faster Than Humans</h4>
+                        <p class="text-blue-100 text-sm">Sub-second response vs 47-hour average</p>
+                    </div>
+                    <div class="text-center">
+                        <div class="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-piggy-bank text-3xl"></i>
+                        </div>
+                        <h4 class="font-bold mb-2">Lower Cost</h4>
+                        <p class="text-blue-100 text-sm">10x cheaper than call centers, 15x vs receptionist</p>
+                    </div>
+                    <div class="text-center">
+                        <div class="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-chart-line text-3xl"></i>
+                        </div>
+                        <h4 class="font-bold mb-2">Clear ROI</h4>
+                        <p class="text-blue-100 text-sm">Revenue tied to booked jobs/cases</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Funnel Economics -->
+    <section id="funnel" class="py-16 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold text-gray-900 mb-2 text-center">
+                <i class="fas fa-funnel-dollar text-green-500 mr-3"></i>Funnel Economics
+            </h2>
+            <p class="text-gray-500 text-center mb-12">Revenue impact model for missed-call recovery</p>
+
+            <!-- Funnel Visualization -->
+            <div class="bg-gray-50 rounded-2xl p-8 mb-12">
+                <div class="max-w-4xl mx-auto">
+                    <div class="relative">
+                        <!-- Stage 1 -->
+                        <div class="flex items-center mb-4">
+                            <div class="w-full bg-red-500 text-white p-4 rounded-lg" style="clip-path: polygon(0 0, 100% 0, 95% 100%, 5% 100%);">
+                                <div class="flex justify-between items-center px-4">
+                                    <span class="font-bold">Missed Calls</span>
+                                    <span class="text-2xl font-bold">100</span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Stage 2 -->
+                        <div class="flex items-center mb-4 px-8">
+                            <div class="w-full bg-orange-500 text-white p-4 rounded-lg" style="clip-path: polygon(0 0, 100% 0, 94% 100%, 6% 100%);">
+                                <div class="flex justify-between items-center px-4">
+                                    <span class="font-bold">Auto-Texted</span>
+                                    <span class="text-2xl font-bold">100</span>
+                                    <span class="text-orange-200 text-sm">100% Reached</span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Stage 3 -->
+                        <div class="flex items-center mb-4 px-16">
+                            <div class="w-full bg-yellow-500 text-white p-4 rounded-lg" style="clip-path: polygon(0 0, 100% 0, 92% 100%, 8% 100%);">
+                                <div class="flex justify-between items-center px-4">
+                                    <span class="font-bold">Replied / Contacted</span>
+                                    <span class="text-2xl font-bold">35</span>
+                                    <span class="text-yellow-200 text-sm">35% Reply Rate</span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Stage 4 -->
+                        <div class="flex items-center mb-4 px-24">
+                            <div class="w-full bg-green-500 text-white p-4 rounded-lg" style="clip-path: polygon(0 0, 100% 0, 90% 100%, 10% 100%);">
+                                <div class="flex justify-between items-center px-4">
+                                    <span class="font-bold">Booked</span>
+                                    <span class="text-2xl font-bold">18</span>
+                                    <span class="text-green-200 text-sm">50% Book Rate</span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Stage 5 -->
+                        <div class="flex items-center mb-4 px-32">
+                            <div class="w-full bg-blue-500 text-white p-4 rounded-lg" style="clip-path: polygon(0 0, 100% 0, 88% 100%, 12% 100%);">
+                                <div class="flex justify-between items-center px-4">
+                                    <span class="font-bold">Showed Up</span>
+                                    <span class="text-2xl font-bold">15</span>
+                                    <span class="text-blue-200 text-sm">85% Show Rate</span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Stage 6 -->
+                        <div class="flex items-center px-40">
+                            <div class="w-full bg-purple-600 text-white p-4 rounded-lg">
+                                <div class="flex justify-between items-center px-4">
+                                    <span class="font-bold">Paid / Closed</span>
+                                    <span class="text-2xl font-bold">12</span>
+                                    <span class="text-purple-200 text-sm">80% Close Rate</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Revenue Impact Calculator -->
+            <div class="grid lg:grid-cols-2 gap-8">
+                <div class="bg-white border-2 border-gray-100 rounded-2xl p-8">
+                    <h3 class="text-xl font-bold text-gray-900 mb-6"><i class="fas fa-calculator text-blue-500 mr-2"></i>Recovery Benchmarks</h3>
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
+                            <span class="text-gray-600">Baseline (No Tool)</span>
+                            <div class="text-right">
+                                <div class="font-bold text-gray-900">5-10%</div>
+                                <div class="text-xs text-gray-500">of missed calls recovered</div>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
+                            <span class="text-blue-700 font-medium">With Lead Catcher</span>
+                            <div class="text-right">
+                                <div class="font-bold text-blue-700">35-45%</div>
+                                <div class="text-xs text-blue-500">of missed calls recovered</div>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center p-4 bg-green-50 rounded-lg border-2 border-green-200">
+                            <span class="text-green-700 font-medium">Improvement</span>
+                            <div class="text-right">
+                                <div class="font-bold text-green-700">4-5x</div>
+                                <div class="text-xs text-green-500">increase in recovery rate</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl p-8 text-white">
+                    <h3 class="text-xl font-bold mb-6"><i class="fas fa-dollar-sign mr-2"></i>Revenue Impact Model</h3>
+                    <div class="space-y-4">
+                        <div class="bg-white/10 backdrop-blur rounded-lg p-4">
+                            <div class="text-green-100 text-sm">Monthly Missed Calls</div>
+                            <div class="text-3xl font-bold">50</div>
+                        </div>
+                        <div class="bg-white/10 backdrop-blur rounded-lg p-4">
+                            <div class="text-green-100 text-sm">Avg Job Value</div>
+                            <div class="text-3xl font-bold">$800</div>
+                        </div>
+                        <div class="bg-white/10 backdrop-blur rounded-lg p-4">
+                            <div class="text-green-100 text-sm">Recovered Jobs (12%)</div>
+                            <div class="text-3xl font-bold">6 jobs/mo</div>
+                        </div>
+                        <div class="bg-white/20 backdrop-blur rounded-lg p-4 border-2 border-white/30">
+                            <div class="text-green-100 text-sm">Monthly Revenue Recovered</div>
+                            <div class="text-4xl font-bold">$4,800</div>
+                            <div class="text-sm mt-2 text-green-200">16x ROI on $299/mo subscription</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KPIs -->
+            <div class="mt-12">
+                <h3 class="text-xl font-bold text-gray-900 mb-6 text-center">Key Performance Indicators</h3>
+                <div class="grid md:grid-cols-3 lg:grid-cols-6 gap-4">
+                    <div class="bg-white border border-gray-200 rounded-xl p-4 text-center card-hover transition-all">
+                        <div class="text-3xl mb-2"><i class="fas fa-phone-missed text-red-500"></i></div>
+                        <div class="text-2xl font-bold text-gray-900">42</div>
+                        <div class="text-xs text-gray-500">Missed Calls Recovered</div>
+                    </div>
+                    <div class="bg-white border border-gray-200 rounded-xl p-4 text-center card-hover transition-all">
+                        <div class="text-3xl mb-2"><i class="fas fa-stopwatch text-blue-500"></i></div>
+                        <div class="text-2xl font-bold text-gray-900">&lt;3s</div>
+                        <div class="text-xs text-gray-500">Speed to First Response</div>
+                    </div>
+                    <div class="bg-white border border-gray-200 rounded-xl p-4 text-center card-hover transition-all">
+                        <div class="text-3xl mb-2"><i class="fas fa-comments text-green-500"></i></div>
+                        <div class="text-2xl font-bold text-gray-900">35%</div>
+                        <div class="text-xs text-gray-500">Contact Rate</div>
+                    </div>
+                    <div class="bg-white border border-gray-200 rounded-xl p-4 text-center card-hover transition-all">
+                        <div class="text-3xl mb-2"><i class="fas fa-calendar-check text-purple-500"></i></div>
+                        <div class="text-2xl font-bold text-gray-900">18%</div>
+                        <div class="text-xs text-gray-500">Booked Rate</div>
+                    </div>
+                    <div class="bg-white border border-gray-200 rounded-xl p-4 text-center card-hover transition-all">
+                        <div class="text-3xl mb-2"><i class="fas fa-dollar-sign text-yellow-500"></i></div>
+                        <div class="text-2xl font-bold text-gray-900">$267</div>
+                        <div class="text-xs text-gray-500">Revenue Per Recovered Call</div>
+                    </div>
+                    <div class="bg-white border border-gray-200 rounded-xl p-4 text-center card-hover transition-all">
+                        <div class="text-3xl mb-2"><i class="fas fa-undo text-indigo-500"></i></div>
+                        <div class="text-2xl font-bold text-gray-900">45 days</div>
+                        <div class="text-xs text-gray-500">CAC Payback</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing Strategy -->
+    <section id="pricing" class="py-16 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold text-gray-900 mb-2 text-center">
+                <i class="fas fa-tags text-purple-500 mr-3"></i>Pricing & Packaging Strategy
+            </h2>
+            <p class="text-gray-500 text-center mb-12">Recommended tier structure with upgrade triggers</p>
+
+            <div class="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+                <!-- Starter -->
+                <div class="bg-white rounded-2xl shadow-lg overflow-hidden border-2 border-gray-100 card-hover transition-all">
+                    <div class="p-6 bg-gray-50">
+                        <h3 class="text-xl font-bold text-gray-900">Starter</h3>
+                        <p class="text-gray-500 text-sm mt-1">Missed-Call Text Back</p>
+                        <div class="mt-4">
+                            <span class="text-4xl font-bold text-gray-900">$199</span>
+                            <span class="text-gray-500">/mo</span>
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <ul class="space-y-3">
+                            <li class="flex items-start gap-3"><i class="fas fa-check text-green-500 mt-1"></i><span class="text-gray-600">Automatic SMS on missed calls</span></li>
+                            <li class="flex items-start gap-3"><i class="fas fa-check text-green-500 mt-1"></i><span class="text-gray-600">Custom message template</span></li>
+                            <li class="flex items-start gap-3"><i class="fas fa-check text-green-500 mt-1"></i><span class="text-gray-600">Business hours logic</span></li>
+                            <li class="flex items-start gap-3"><i class="fas fa-check text-green-500 mt-1"></i><span class="text-gray-600">Up to 100 texts/month</span></li>
+                            <li class="flex items-start gap-3"><i class="fas fa-check text-green-500 mt-1"></i><span class="text-gray-600">Basic lead inbox</span></li>
+                            <li class="flex items-start gap-3"><i class="fas fa-check text-green-500 mt-1"></i><span class="text-gray-600">Email support</span></li>
+                        </ul>
+                        <div class="mt-6 p-3 bg-gray-50 rounded-lg">
+                            <div class="text-xs text-gray-500 mb-1">Upgrade Trigger</div>
+                            <div class="text-sm font-medium text-gray-700">Hitting message limits or needing 2-way SMS</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pro -->
+                <div class="bg-white rounded-2xl shadow-xl overflow-hidden border-2 border-blue-500 card-hover transition-all transform scale-105 relative">
+                    <div class="absolute top-0 right-0 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">RECOMMENDED</div>
+                    <div class="p-6 bg-blue-50">
+                        <h3 class="text-xl font-bold text-gray-900">Pro</h3>
+                        <p class="text-gray-500 text-sm mt-1">Advanced Routing + Inbox</p>
+                        <div class="mt-4">
+                            <span class="text-4xl font-bold text-gray-900">$349</span>
+                            <span class="text-gray-500">/mo</span>
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <ul class="space-y-3">
+                            <li class="flex items-start gap-3"><i class="fas fa-check text-blue-500 mt-1"></i><span class="text-gray-700 font-medium">Everything in Starter, plus:</span></li>
+                            <li class="flex items-start gap-3"><i class="fas fa-check text-blue-500 mt-1"></i><span class="text-gray-600">Unlimited SMS</span></li>
+                            <li class="flex items-start gap-3"><i class="fas fa-check text-blue-500 mt-1"></i><span class="text-gray-600">2-way conversation relay</span></li>
+                            <li class="flex items-start gap-3"><i class="fas fa-check text-blue-500 mt-1"></i><span class="text-gray-600">Smart lead routing</span></li>
+                            <li class="flex items-start gap-3"><i class="fas fa-check text-blue-500 mt-1"></i><span class="text-gray-600">Conversion tracking</span></li>
+                            <li class="flex items-start gap-3"><i class="fas fa-check text-blue-500 mt-1"></i><span class="text-gray-600">Analytics dashboard</span></li>
+                            <li class="flex items-start gap-3"><i class="fas fa-check text-blue-500 mt-1"></i><span class="text-gray-600">Priority support</span></li>
+                        </ul>
+                        <div class="mt-6 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                            <div class="text-xs text-blue-600 mb-1">Upgrade Trigger</div>
+                            <div class="text-sm font-medium text-blue-800">Wanting AI answering or CRM integration</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Elite -->
+                <div class="bg-white rounded-2xl shadow-lg overflow-hidden border-2 border-gray-100 card-hover transition-all">
+                    <div class="p-6 bg-gradient-to-r from-purple-50 to-pink-50">
+                        <h3 class="text-xl font-bold text-gray-900">Elite</h3>
+                        <p class="text-gray-500 text-sm mt-1">AI Answering + Full Suite</p>
+                        <div class="mt-4">
+                            <span class="text-4xl font-bold text-gray-900">$599</span>
+                            <span class="text-gray-500">/mo</span>
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <ul class="space-y-3">
+                            <li class="flex items-start gap-3"><i class="fas fa-check text-purple-500 mt-1"></i><span class="text-gray-700 font-medium">Everything in Pro, plus:</span></li>
+                            <li class="flex items-start gap-3"><i class="fas fa-check text-purple-500 mt-1"></i><span class="text-gray-600">AI voice answering</span></li>
+                            <li class="flex items-start gap-3"><i class="fas fa-check text-purple-500 mt-1"></i><span class="text-gray-600">Intent & urgency detection</span></li>
+                            <li class="flex items-start gap-3"><i class="fas fa-check text-purple-500 mt-1"></i><span class="text-gray-600">Appointment booking</span></li>
+                            <li class="flex items-start gap-3"><i class="fas fa-check text-purple-500 mt-1"></i><span class="text-gray-600">CRM integrations</span></li>
+                            <li class="flex items-start gap-3"><i class="fas fa-check text-purple-500 mt-1"></i><span class="text-gray-600">Human escalation</span></li>
+                            <li class="flex items-start gap-3"><i class="fas fa-check text-purple-500 mt-1"></i><span class="text-gray-600">Dedicated success manager</span></li>
+                        </ul>
+                        <div class="mt-6 p-3 bg-purple-50 rounded-lg">
+                            <div class="text-xs text-purple-600 mb-1">Best For</div>
+                            <div class="text-sm font-medium text-purple-800">High-volume, multi-location businesses</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SWOT Analysis -->
+            <div class="mt-16">
+                <h3 class="text-2xl font-bold text-gray-900 mb-8 text-center"><i class="fas fa-th-large text-indigo-500 mr-3"></i>SWOT Analysis</h3>
+                <div class="grid md:grid-cols-2 gap-6 max-w-5xl mx-auto">
+                    <div class="bg-green-50 border border-green-200 rounded-xl p-6">
+                        <h4 class="font-bold text-green-800 mb-4 flex items-center gap-2"><i class="fas fa-plus-circle"></i> Strengths</h4>
+                        <ul class="space-y-2 text-green-700 text-sm">
+                            <li><i class="fas fa-check mr-2"></i>Focused solution for specific pain point</li>
+                            <li><i class="fas fa-check mr-2"></i>Clear, immediate ROI demonstration</li>
+                            <li><i class="fas fa-check mr-2"></i>Low barrier to entry (call forwarding)</li>
+                            <li><i class="fas fa-check mr-2"></i>Modern tech stack, scalable architecture</li>
+                            <li><i class="fas fa-check mr-2"></i>Real-time functionality already working</li>
+                        </ul>
+                    </div>
+                    <div class="bg-red-50 border border-red-200 rounded-xl p-6">
+                        <h4 class="font-bold text-red-800 mb-4 flex items-center gap-2"><i class="fas fa-minus-circle"></i> Weaknesses</h4>
+                        <ul class="space-y-2 text-red-700 text-sm">
+                            <li><i class="fas fa-times mr-2"></i>No test coverage (zero unit/E2E tests)</li>
+                            <li><i class="fas fa-times mr-2"></i>Missing Phase 1 features (business hours)</li>
+                            <li><i class="fas fa-times mr-2"></i>No error monitoring/tracking</li>
+                            <li><i class="fas fa-times mr-2"></i>Limited analytics/reporting</li>
+                            <li><i class="fas fa-times mr-2"></i>No mobile app</li>
+                        </ul>
+                    </div>
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-6">
+                        <h4 class="font-bold text-blue-800 mb-4 flex items-center gap-2"><i class="fas fa-lightbulb"></i> Opportunities</h4>
+                        <ul class="space-y-2 text-blue-700 text-sm">
+                            <li><i class="fas fa-arrow-up mr-2"></i>AI voice answering is emerging market</li>
+                            <li><i class="fas fa-arrow-up mr-2"></i>Agency/reseller channel partnerships</li>
+                            <li><i class="fas fa-arrow-up mr-2"></i>Vertical-specific features (legal intake, HVAC dispatch)</li>
+                            <li><i class="fas fa-arrow-up mr-2"></i>Integration marketplace (CRMs, FSM tools)</li>
+                            <li><i class="fas fa-arrow-up mr-2"></i>White-label opportunities</li>
+                        </ul>
+                    </div>
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
+                        <h4 class="font-bold text-yellow-800 mb-4 flex items-center gap-2"><i class="fas fa-exclamation-triangle"></i> Threats</h4>
+                        <ul class="space-y-2 text-yellow-700 text-sm">
+                            <li><i class="fas fa-warning mr-2"></i>GoHighLevel's aggressive pricing</li>
+                            <li><i class="fas fa-warning mr-2"></i>Podium/Birdeye adding AI features</li>
+                            <li><i class="fas fa-warning mr-2"></i>ServiceTitan vertical lock-in</li>
+                            <li><i class="fas fa-warning mr-2"></i>Twilio pricing increases</li>
+                            <li><i class="fas fa-warning mr-2"></i>10DLC carrier restrictions</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Product Roadmap -->
+    <section id="roadmap" class="py-16 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold text-gray-900 mb-2 text-center">
+                <i class="fas fa-road text-blue-500 mr-3"></i>Product Roadmap
+            </h2>
+            <p class="text-gray-500 text-center mb-12">Phase-based strategy from MVP to AI-powered platform</p>
+
+            <div class="relative">
+                <!-- Timeline line -->
+                <div class="absolute left-1/2 transform -translate-x-1/2 h-full w-1 bg-gradient-to-b from-blue-500 via-purple-500 to-pink-500 hidden lg:block"></div>
+
+                <!-- Phase 1 -->
+                <div class="relative mb-12">
+                    <div class="lg:flex items-center">
+                        <div class="lg:w-1/2 lg:pr-12 lg:text-right mb-6 lg:mb-0">
+                            <div class="bg-blue-50 border-2 border-blue-200 rounded-2xl p-6 inline-block lg:ml-auto">
+                                <div class="flex items-center gap-3 mb-4 lg:justify-end">
+                                    <span class="bg-blue-600 text-white px-3 py-1 rounded-full text-sm font-bold">Phase 1</span>
+                                    <span class="text-blue-600 font-medium">Current</span>
+                                </div>
+                                <h3 class="text-xl font-bold text-gray-900 mb-2">Missed-Call Text Back</h3>
+                                <ul class="text-gray-600 text-sm space-y-2">
+                                    <li><i class="fas fa-check text-green-500 mr-2"></i>Automatic SMS on missed calls</li>
+                                    <li><i class="fas fa-check text-green-500 mr-2"></i>Custom message templates</li>
+                                    <li><i class="fas fa-check text-green-500 mr-2"></i>Business hours logic</li>
+                                    <li><i class="fas fa-check text-green-500 mr-2"></i>Lead capture & reply handling</li>
+                                    <li><i class="fas fa-check text-green-500 mr-2"></i>Simple inbox + conversation view</li>
+                                    <li><i class="fas fa-check text-green-500 mr-2"></i>Basic conversion tracking</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="hidden lg:flex w-8 h-8 bg-blue-600 rounded-full absolute left-1/2 transform -translate-x-1/2 items-center justify-center text-white font-bold z-10">1</div>
+                        <div class="lg:w-1/2 lg:pl-12"></div>
+                    </div>
+                </div>
+
+                <!-- Phase 2 -->
+                <div class="relative mb-12">
+                    <div class="lg:flex items-center">
+                        <div class="lg:w-1/2 lg:pr-12"></div>
+                        <div class="hidden lg:flex w-8 h-8 bg-purple-600 rounded-full absolute left-1/2 transform -translate-x-1/2 items-center justify-center text-white font-bold z-10">2</div>
+                        <div class="lg:w-1/2 lg:pl-12 mb-6 lg:mb-0">
+                            <div class="bg-purple-50 border-2 border-purple-200 rounded-2xl p-6">
+                                <div class="flex items-center gap-3 mb-4">
+                                    <span class="bg-purple-600 text-white px-3 py-1 rounded-full text-sm font-bold">Phase 2</span>
+                                    <span class="text-purple-600 font-medium">Q2 2025</span>
+                                </div>
+                                <h3 class="text-xl font-bold text-gray-900 mb-2">AI Call Answering</h3>
+                                <ul class="text-gray-600 text-sm space-y-2">
+                                    <li><i class="fas fa-robot text-purple-500 mr-2"></i>AI answers missed calls</li>
+                                    <li><i class="fas fa-user text-purple-500 mr-2"></i>Collects name, intent, urgency</li>
+                                    <li><i class="fas fa-calendar text-purple-500 mr-2"></i>Books appointments directly</li>
+                                    <li><i class="fas fa-route text-purple-500 mr-2"></i>Smart lead routing</li>
+                                    <li><i class="fas fa-user-check text-purple-500 mr-2"></i>Escalation to human when needed</li>
+                                    <li><i class="fas fa-moon text-purple-500 mr-2"></i>After-hours & overflow handling</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Phase 3 -->
+                <div class="relative">
+                    <div class="lg:flex items-center">
+                        <div class="lg:w-1/2 lg:pr-12 lg:text-right mb-6 lg:mb-0">
+                            <div class="bg-pink-50 border-2 border-pink-200 rounded-2xl p-6 inline-block lg:ml-auto">
+                                <div class="flex items-center gap-3 mb-4 lg:justify-end">
+                                    <span class="bg-pink-600 text-white px-3 py-1 rounded-full text-sm font-bold">Phase 3</span>
+                                    <span class="text-pink-600 font-medium">Q4 2025</span>
+                                </div>
+                                <h3 class="text-xl font-bold text-gray-900 mb-2">Full Revenue Platform</h3>
+                                <ul class="text-gray-600 text-sm space-y-2">
+                                    <li><i class="fas fa-plug text-pink-500 mr-2"></i>CRM integrations (Salesforce, HubSpot)</li>
+                                    <li><i class="fas fa-tools text-pink-500 mr-2"></i>FSM integrations (ServiceTitan, Jobber)</li>
+                                    <li><i class="fas fa-chart-bar text-pink-500 mr-2"></i>Advanced analytics & reporting</li>
+                                    <li><i class="fas fa-users text-pink-500 mr-2"></i>Multi-location support</li>
+                                    <li><i class="fas fa-building text-pink-500 mr-2"></i>Agency/white-label program</li>
+                                    <li><i class="fas fa-mobile-alt text-pink-500 mr-2"></i>Mobile app</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="hidden lg:flex w-8 h-8 bg-pink-600 rounded-full absolute left-1/2 transform -translate-x-1/2 items-center justify-center text-white font-bold z-10">3</div>
+                        <div class="lg:w-1/2 lg:pl-12"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GTM Strategy -->
+            <div class="mt-16 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-8 text-white">
+                <h3 class="text-2xl font-bold mb-6 text-center">Go-To-Market Strategy</h3>
+                <div class="grid md:grid-cols-4 gap-6">
+                    <div class="bg-white/10 backdrop-blur rounded-xl p-5">
+                        <div class="text-3xl mb-3"><i class="fas fa-bullseye"></i></div>
+                        <h4 class="font-bold mb-2">Agency Channel</h4>
+                        <p class="text-indigo-100 text-sm">Partner with PPC, SEO, and local marketing agencies who manage client lead gen.</p>
+                    </div>
+                    <div class="bg-white/10 backdrop-blur rounded-xl p-5">
+                        <div class="text-3xl mb-3"><i class="fas fa-industry"></i></div>
+                        <h4 class="font-bold mb-2">Vertical Partnerships</h4>
+                        <p class="text-indigo-100 text-sm">Integrate with ServiceTitan, Housecall Pro, Jobber for instant distribution.</p>
+                    </div>
+                    <div class="bg-white/10 backdrop-blur rounded-xl p-5">
+                        <div class="text-3xl mb-3"><i class="fas fa-phone-volume"></i></div>
+                        <h4 class="font-bold mb-2">Outbound Targeting</h4>
+                        <p class="text-indigo-100 text-sm">Target businesses with high call volume via LinkedIn, cold email, and phone.</p>
+                    </div>
+                    <div class="bg-white/10 backdrop-blur rounded-xl p-5">
+                        <div class="text-3xl mb-3"><i class="fas fa-dollar-sign"></i></div>
+                        <h4 class="font-bold mb-2">Revenue Positioning</h4>
+                        <p class="text-indigo-100 text-sm">Position against "missed revenue" not "software" - ROI-first messaging.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Code Audit Section -->
+    <section id="audit" class="py-16 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold text-gray-900 mb-2 text-center">
+                <i class="fas fa-code text-red-500 mr-3"></i>Technical Audit Results
+            </h2>
+            <p class="text-gray-500 text-center mb-12">Security, UX, and code quality assessment</p>
+
+            <!-- Overall Score -->
+            <div class="bg-white rounded-2xl shadow-lg p-8 mb-8">
+                <div class="grid md:grid-cols-4 gap-6">
+                    <div class="text-center">
+                        <div class="relative inline-block">
+                            <svg class="w-32 h-32">
+                                <circle cx="64" cy="64" r="56" stroke="#e5e7eb" stroke-width="12" fill="none"/>
+                                <circle cx="64" cy="64" r="56" stroke="#22c55e" stroke-width="12" fill="none"
+                                    stroke-dasharray="351.86" stroke-dashoffset="105" transform="rotate(-90 64 64)"/>
+                            </svg>
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <span class="text-3xl font-bold text-gray-900">70%</span>
+                            </div>
+                        </div>
+                        <div class="mt-2 font-medium text-gray-900">Overall Score</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="relative inline-block">
+                            <svg class="w-32 h-32">
+                                <circle cx="64" cy="64" r="56" stroke="#e5e7eb" stroke-width="12" fill="none"/>
+                                <circle cx="64" cy="64" r="56" stroke="#eab308" stroke-width="12" fill="none"
+                                    stroke-dasharray="351.86" stroke-dashoffset="140" transform="rotate(-90 64 64)"/>
+                            </svg>
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <span class="text-3xl font-bold text-gray-900">60%</span>
+                            </div>
+                        </div>
+                        <div class="mt-2 font-medium text-gray-900">Security</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="relative inline-block">
+                            <svg class="w-32 h-32">
+                                <circle cx="64" cy="64" r="56" stroke="#e5e7eb" stroke-width="12" fill="none"/>
+                                <circle cx="64" cy="64" r="56" stroke="#22c55e" stroke-width="12" fill="none"
+                                    stroke-dasharray="351.86" stroke-dashoffset="70" transform="rotate(-90 64 64)"/>
+                            </svg>
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <span class="text-3xl font-bold text-gray-900">80%</span>
+                            </div>
+                        </div>
+                        <div class="mt-2 font-medium text-gray-900">UI/UX</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="relative inline-block">
+                            <svg class="w-32 h-32">
+                                <circle cx="64" cy="64" r="56" stroke="#e5e7eb" stroke-width="12" fill="none"/>
+                                <circle cx="64" cy="64" r="56" stroke="#22c55e" stroke-width="12" fill="none"
+                                    stroke-dasharray="351.86" stroke-dashoffset="88" transform="rotate(-90 64 64)"/>
+                            </svg>
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <span class="text-3xl font-bold text-gray-900">75%</span>
+                            </div>
+                        </div>
+                        <div class="mt-2 font-medium text-gray-900">Code Quality</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Security Issues -->
+            <div class="bg-white rounded-2xl shadow-lg p-8 mb-8">
+                <h3 class="text-xl font-bold text-gray-900 mb-6"><i class="fas fa-shield-alt text-red-500 mr-2"></i>Security Assessment</h3>
+                <div class="space-y-4">
+                    <div class="severity-critical rounded-lg p-4">
+                        <div class="flex items-start gap-3">
+                            <span class="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">CRITICAL</span>
+                            <div>
+                                <h4 class="font-bold text-gray-900">No Rate Limiting on APIs</h4>
+                                <p class="text-gray-600 text-sm mt-1">All API endpoints vulnerable to abuse. No protection against brute force or DDoS.</p>
+                                <div class="mt-2 text-sm"><span class="font-medium">File:</span> <code class="bg-gray-100 px-2 py-1 rounded">src/app/api/*</code></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="severity-high rounded-lg p-4">
+                        <div class="flex items-start gap-3">
+                            <span class="bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded">HIGH</span>
+                            <div>
+                                <h4 class="font-bold text-gray-900">Phone Normalization Not Used in Webhooks</h4>
+                                <p class="text-gray-600 text-sm mt-1">Phone utility exists but webhooks accept raw numbers, risking duplicates and injection.</p>
+                                <div class="mt-2 text-sm"><span class="font-medium">File:</span> <code class="bg-gray-100 px-2 py-1 rounded">src/app/api/webhooks/twilio/voice/route.ts</code></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="severity-medium rounded-lg p-4">
+                        <div class="flex items-start gap-3">
+                            <span class="bg-yellow-500 text-white text-xs font-bold px-2 py-1 rounded">MEDIUM</span>
+                            <div>
+                                <h4 class="font-bold text-gray-900">No Error Monitoring</h4>
+                                <p class="text-gray-600 text-sm mt-1">No Sentry, LogRocket, or similar. Production errors will go unnoticed.</p>
+                                <div class="mt-2 text-sm"><span class="font-medium">Recommendation:</span> Add Sentry SDK</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="severity-low rounded-lg p-4">
+                        <div class="flex items-start gap-3">
+                            <span class="bg-green-500 text-white text-xs font-bold px-2 py-1 rounded">GOOD</span>
+                            <div>
+                                <h4 class="font-bold text-gray-900">Twilio Webhook Validation</h4>
+                                <p class="text-gray-600 text-sm mt-1">Properly validates X-Twilio-Signature on all webhooks. Prevents request spoofing.</p>
+                                <div class="mt-2 text-sm"><span class="font-medium">File:</span> <code class="bg-gray-100 px-2 py-1 rounded">src/lib/twilio-validator.ts</code></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="severity-low rounded-lg p-4">
+                        <div class="flex items-start gap-3">
+                            <span class="bg-green-500 text-white text-xs font-bold px-2 py-1 rounded">GOOD</span>
+                            <div>
+                                <h4 class="font-bold text-gray-900">Row Level Security (RLS)</h4>
+                                <p class="text-gray-600 text-sm mt-1">Comprehensive RLS policies on all tables. User data properly isolated.</p>
+                                <div class="mt-2 text-sm"><span class="font-medium">File:</span> <code class="bg-gray-100 px-2 py-1 rounded">supabase/schema-enhanced.sql</code></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- UX Issues -->
+            <div class="bg-white rounded-2xl shadow-lg p-8 mb-8">
+                <h3 class="text-xl font-bold text-gray-900 mb-6"><i class="fas fa-user-experience text-blue-500 mr-2"></i>UX Assessment</h3>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div>
+                        <h4 class="font-bold text-green-700 mb-3"><i class="fas fa-check-circle mr-2"></i>Strengths</h4>
+                        <ul class="space-y-2 text-sm text-gray-600">
+                            <li class="flex items-start gap-2"><i class="fas fa-check text-green-500 mt-1"></i>Clean, modern UI with shadcn/ui</li>
+                            <li class="flex items-start gap-2"><i class="fas fa-check text-green-500 mt-1"></i>Real-time dashboard updates</li>
+                            <li class="flex items-start gap-2"><i class="fas fa-check text-green-500 mt-1"></i>Intuitive conversation view</li>
+                            <li class="flex items-start gap-2"><i class="fas fa-check text-green-500 mt-1"></i>4-step onboarding wizard</li>
+                            <li class="flex items-start gap-2"><i class="fas fa-check text-green-500 mt-1"></i>Toast notifications for feedback</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-red-700 mb-3"><i class="fas fa-times-circle mr-2"></i>Issues</h4>
+                        <ul class="space-y-2 text-sm text-gray-600">
+                            <li class="flex items-start gap-2"><i class="fas fa-times text-red-500 mt-1"></i>No pagination (loads all leads)</li>
+                            <li class="flex items-start gap-2"><i class="fas fa-times text-red-500 mt-1"></i>No message template editing UI</li>
+                            <li class="flex items-start gap-2"><i class="fas fa-times text-red-500 mt-1"></i>No business hours settings UI</li>
+                            <li class="flex items-start gap-2"><i class="fas fa-times text-red-500 mt-1"></i>No mobile responsiveness testing</li>
+                            <li class="flex items-start gap-2"><i class="fas fa-times text-red-500 mt-1"></i>No accessibility audit (a11y)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Code Quality -->
+            <div class="bg-white rounded-2xl shadow-lg p-8">
+                <h3 class="text-xl font-bold text-gray-900 mb-6"><i class="fas fa-code text-purple-500 mr-2"></i>Code Quality Assessment</h3>
+                <div class="grid md:grid-cols-3 gap-6">
+                    <div class="bg-red-50 border border-red-200 rounded-xl p-5">
+                        <h4 class="font-bold text-red-800 mb-3">Critical Gaps</h4>
+                        <ul class="space-y-2 text-sm text-red-700">
+                            <li><i class="fas fa-times mr-2"></i>Zero test coverage</li>
+                            <li><i class="fas fa-times mr-2"></i>No CI/CD pipeline</li>
+                            <li><i class="fas fa-times mr-2"></i>No API documentation</li>
+                            <li><i class="fas fa-times mr-2"></i>Type assertions (as any)</li>
+                        </ul>
+                    </div>
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-5">
+                        <h4 class="font-bold text-yellow-800 mb-3">Moderate Issues</h4>
+                        <ul class="space-y-2 text-sm text-yellow-700">
+                            <li><i class="fas fa-exclamation mr-2"></i>console.log instead of logger</li>
+                            <li><i class="fas fa-exclamation mr-2"></i>Duplicate phone utility files</li>
+                            <li><i class="fas fa-exclamation mr-2"></i>No environment validation</li>
+                            <li><i class="fas fa-exclamation mr-2"></i>Business logic not integrated</li>
+                        </ul>
+                    </div>
+                    <div class="bg-green-50 border border-green-200 rounded-xl p-5">
+                        <h4 class="font-bold text-green-800 mb-3">Good Practices</h4>
+                        <ul class="space-y-2 text-sm text-green-700">
+                            <li><i class="fas fa-check mr-2"></i>TypeScript strict mode</li>
+                            <li><i class="fas fa-check mr-2"></i>Clean component structure</li>
+                            <li><i class="fas fa-check mr-2"></i>Server/client separation</li>
+                            <li><i class="fas fa-check mr-2"></i>Proper async/await patterns</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Recommended Features -->
+    <section id="features" class="py-16 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold text-gray-900 mb-2 text-center">
+                <i class="fas fa-list-check text-green-500 mr-3"></i>Recommended Features to Add
+            </h2>
+            <p class="text-gray-500 text-center mb-12">Prioritized by impact and effort</p>
+
+            <!-- Priority Matrix -->
+            <div class="grid lg:grid-cols-2 gap-8 mb-12">
+                <!-- High Priority -->
+                <div class="bg-red-50 border-2 border-red-200 rounded-2xl overflow-hidden">
+                    <div class="bg-red-500 text-white p-4">
+                        <h3 class="text-xl font-bold"><i class="fas fa-fire mr-2"></i>High Priority (Do Now)</h3>
+                        <p class="text-red-100 text-sm">Critical for production readiness</p>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <div class="bg-white rounded-xl p-4 shadow-sm">
+                            <div class="flex items-center gap-3 mb-2">
+                                <span class="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded">SECURITY</span>
+                                <h4 class="font-bold text-gray-900">Rate Limiting</h4>
+                            </div>
+                            <p class="text-gray-600 text-sm">Add rate limiting middleware to all API routes. Use upstash/ratelimit or similar.</p>
+                        </div>
+                        <div class="bg-white rounded-xl p-4 shadow-sm">
+                            <div class="flex items-center gap-3 mb-2">
+                                <span class="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded">TESTING</span>
+                                <h4 class="font-bold text-gray-900">Test Infrastructure</h4>
+                            </div>
+                            <p class="text-gray-600 text-sm">Add Jest + React Testing Library. Start with critical paths: webhooks, auth, message sending.</p>
+                        </div>
+                        <div class="bg-white rounded-xl p-4 shadow-sm">
+                            <div class="flex items-center gap-3 mb-2">
+                                <span class="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded">MONITORING</span>
+                                <h4 class="font-bold text-gray-900">Error Tracking</h4>
+                            </div>
+                            <p class="text-gray-600 text-sm">Add Sentry for error tracking. Critical for catching production issues.</p>
+                        </div>
+                        <div class="bg-white rounded-xl p-4 shadow-sm">
+                            <div class="flex items-center gap-3 mb-2">
+                                <span class="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded">FEATURE</span>
+                                <h4 class="font-bold text-gray-900">Business Hours Integration</h4>
+                            </div>
+                            <p class="text-gray-600 text-sm">Wire up existing business-logic.ts to webhooks. Logic exists but isn't used.</p>
+                        </div>
+                        <div class="bg-white rounded-xl p-4 shadow-sm">
+                            <div class="flex items-center gap-3 mb-2">
+                                <span class="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded">UX</span>
+                                <h4 class="font-bold text-gray-900">Settings Page</h4>
+                            </div>
+                            <p class="text-gray-600 text-sm">Add UI for editing SMS templates, business hours, and notification preferences.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Medium Priority -->
+                <div class="bg-yellow-50 border-2 border-yellow-200 rounded-2xl overflow-hidden">
+                    <div class="bg-yellow-500 text-white p-4">
+                        <h3 class="text-xl font-bold"><i class="fas fa-clock mr-2"></i>Medium Priority (Next Sprint)</h3>
+                        <p class="text-yellow-100 text-sm">Important for growth</p>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <div class="bg-white rounded-xl p-4 shadow-sm">
+                            <div class="flex items-center gap-3 mb-2">
+                                <span class="bg-yellow-100 text-yellow-700 text-xs font-bold px-2 py-1 rounded">UX</span>
+                                <h4 class="font-bold text-gray-900">Pagination & Virtual Scrolling</h4>
+                            </div>
+                            <p class="text-gray-600 text-sm">Dashboard currently loads all leads. Add pagination or virtual scrolling for scale.</p>
+                        </div>
+                        <div class="bg-white rounded-xl p-4 shadow-sm">
+                            <div class="flex items-center gap-3 mb-2">
+                                <span class="bg-yellow-100 text-yellow-700 text-xs font-bold px-2 py-1 rounded">ANALYTICS</span>
+                                <h4 class="font-bold text-gray-900">Analytics Dashboard</h4>
+                            </div>
+                            <p class="text-gray-600 text-sm">Add charts for missed calls recovered, response times, conversion rates.</p>
+                        </div>
+                        <div class="bg-white rounded-xl p-4 shadow-sm">
+                            <div class="flex items-center gap-3 mb-2">
+                                <span class="bg-yellow-100 text-yellow-700 text-xs font-bold px-2 py-1 rounded">FEATURE</span>
+                                <h4 class="font-bold text-gray-900">Lead Notes & Tags</h4>
+                            </div>
+                            <p class="text-gray-600 text-sm">Allow users to add notes to leads and tag them for organization.</p>
+                        </div>
+                        <div class="bg-white rounded-xl p-4 shadow-sm">
+                            <div class="flex items-center gap-3 mb-2">
+                                <span class="bg-yellow-100 text-yellow-700 text-xs font-bold px-2 py-1 rounded">INFRA</span>
+                                <h4 class="font-bold text-gray-900">CI/CD Pipeline</h4>
+                            </div>
+                            <p class="text-gray-600 text-sm">Add GitHub Actions for linting, testing, and deployment automation.</p>
+                        </div>
+                        <div class="bg-white rounded-xl p-4 shadow-sm">
+                            <div class="flex items-center gap-3 mb-2">
+                                <span class="bg-yellow-100 text-yellow-700 text-xs font-bold px-2 py-1 rounded">MOBILE</span>
+                                <h4 class="font-bold text-gray-900">Mobile Responsiveness</h4>
+                            </div>
+                            <p class="text-gray-600 text-sm">Test and fix mobile layout. Dashboard especially needs attention.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lower Priority -->
+            <div class="grid lg:grid-cols-3 gap-6">
+                <div class="bg-blue-50 border border-blue-200 rounded-xl p-6">
+                    <h3 class="font-bold text-blue-800 mb-4"><i class="fas fa-plug mr-2"></i>Integrations</h3>
+                    <ul class="space-y-2 text-sm text-blue-700">
+                        <li><i class="fas fa-check mr-2"></i>Google Calendar sync</li>
+                        <li><i class="fas fa-check mr-2"></i>Zapier/Make webhooks</li>
+                        <li><i class="fas fa-check mr-2"></i>HubSpot CRM</li>
+                        <li><i class="fas fa-check mr-2"></i>Salesforce</li>
+                        <li><i class="fas fa-check mr-2"></i>ServiceTitan</li>
+                    </ul>
+                </div>
+                <div class="bg-purple-50 border border-purple-200 rounded-xl p-6">
+                    <h3 class="font-bold text-purple-800 mb-4"><i class="fas fa-robot mr-2"></i>AI Features (Phase 2)</h3>
+                    <ul class="space-y-2 text-sm text-purple-700">
+                        <li><i class="fas fa-check mr-2"></i>AI voice answering</li>
+                        <li><i class="fas fa-check mr-2"></i>Intent classification</li>
+                        <li><i class="fas fa-check mr-2"></i>Urgency detection</li>
+                        <li><i class="fas fa-check mr-2"></i>Appointment booking</li>
+                        <li><i class="fas fa-check mr-2"></i>Smart routing</li>
+                    </ul>
+                </div>
+                <div class="bg-green-50 border border-green-200 rounded-xl p-6">
+                    <h3 class="font-bold text-green-800 mb-4"><i class="fas fa-chart-line mr-2"></i>Advanced Analytics</h3>
+                    <ul class="space-y-2 text-sm text-green-700">
+                        <li><i class="fas fa-check mr-2"></i>Revenue attribution</li>
+                        <li><i class="fas fa-check mr-2"></i>Source tracking (PPC, organic)</li>
+                        <li><i class="fas fa-check mr-2"></i>Team performance</li>
+                        <li><i class="fas fa-check mr-2"></i>Custom reports</li>
+                        <li><i class="fas fa-check mr-2"></i>Export to CSV/PDF</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Implementation Checklist -->
+            <div class="mt-12 bg-gray-900 rounded-2xl p-8 text-white">
+                <h3 class="text-2xl font-bold mb-6 text-center">Production Readiness Checklist</h3>
+                <div class="grid md:grid-cols-4 gap-6">
+                    <div>
+                        <h4 class="font-bold text-gray-300 mb-3">Security</h4>
+                        <ul class="space-y-2 text-sm">
+                            <li class="flex items-center gap-2"><input type="checkbox" class="rounded"> Rate limiting</li>
+                            <li class="flex items-center gap-2"><input type="checkbox" checked class="rounded"> RLS policies</li>
+                            <li class="flex items-center gap-2"><input type="checkbox" checked class="rounded"> Twilio validation</li>
+                            <li class="flex items-center gap-2"><input type="checkbox"> Input sanitization</li>
+                            <li class="flex items-center gap-2"><input type="checkbox"> CORS config</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-gray-300 mb-3">Testing</h4>
+                        <ul class="space-y-2 text-sm">
+                            <li class="flex items-center gap-2"><input type="checkbox" class="rounded"> Unit tests</li>
+                            <li class="flex items-center gap-2"><input type="checkbox" class="rounded"> Integration tests</li>
+                            <li class="flex items-center gap-2"><input type="checkbox" class="rounded"> E2E tests</li>
+                            <li class="flex items-center gap-2"><input type="checkbox" class="rounded"> Load testing</li>
+                            <li class="flex items-center gap-2"><input type="checkbox" class="rounded"> Security audit</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-gray-300 mb-3">Monitoring</h4>
+                        <ul class="space-y-2 text-sm">
+                            <li class="flex items-center gap-2"><input type="checkbox" class="rounded"> Error tracking</li>
+                            <li class="flex items-center gap-2"><input type="checkbox" class="rounded"> Performance monitoring</li>
+                            <li class="flex items-center gap-2"><input type="checkbox" class="rounded"> Uptime monitoring</li>
+                            <li class="flex items-center gap-2"><input type="checkbox" class="rounded"> Log aggregation</li>
+                            <li class="flex items-center gap-2"><input type="checkbox" class="rounded"> Alerting</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-gray-300 mb-3">DevOps</h4>
+                        <ul class="space-y-2 text-sm">
+                            <li class="flex items-center gap-2"><input type="checkbox" class="rounded"> CI/CD pipeline</li>
+                            <li class="flex items-center gap-2"><input type="checkbox" class="rounded"> Staging environment</li>
+                            <li class="flex items-center gap-2"><input type="checkbox" class="rounded"> Database backups</li>
+                            <li class="flex items-center gap-2"><input type="checkbox" class="rounded"> Rollback plan</li>
+                            <li class="flex items-center gap-2"><input type="checkbox" class="rounded"> Documentation</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <div class="flex items-center justify-center gap-2 mb-4">
+                <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-2 rounded-lg">
+                    <i class="fas fa-phone-volume"></i>
+                </div>
+                <span class="font-bold text-xl">Lead Catcher</span>
+            </div>
+            <p class="text-gray-400 mb-4">Market Analysis & Product Audit Report</p>
+            <p class="text-gray-500 text-sm">Generated: January 2026</p>
+        </div>
+    </footer>
+
+    <!-- Charts Script -->
+    <script>
+        // TAM Chart
+        const tamCtx = document.getElementById('tamChart').getContext('2d');
+        new Chart(tamCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['TAM ($4.2B)', 'SAM ($890M)', 'SOM ($18M)'],
+                datasets: [{
+                    data: [4200, 890, 18],
+                    backgroundColor: ['#3b82f6', '#6366f1', '#8b5cf6'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+
+        // Growth Chart
+        const growthCtx = document.getElementById('growthChart').getContext('2d');
+        new Chart(growthCtx, {
+            type: 'line',
+            data: {
+                labels: ['2024', '2025', '2026', '2027', '2028'],
+                datasets: [{
+                    label: 'Market Size ($M)',
+                    data: [890, 1100, 1350, 1650, 2000],
+                    borderColor: '#6366f1',
+                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        min: 500
+                    }
+                }
+            }
+        });
+
+        // Navigation active state
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', function() {
+                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+
+        // Smooth scroll
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+    </script>
+</body>
+</html>

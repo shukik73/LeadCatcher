@@ -1,0 +1,216 @@
+/**
+ * SECURE VERSION - Voice Webhook Route
+ * 
+ * This is an example of the secure implementation.
+ * Replace the existing route.ts with this code after testing.
+ * 
+ * Key improvements:
+ * - Twilio signature validation
+ * - Proper error handling
+ * - Phone number normalization
+ * - Business lookup by Twilio number
+ * - Comprehensive logging
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { validateTwilioRequestWithSDK } from '@/lib/twilio-validator';
+import { supabaseAdmin } from '@/lib/supabase-server';
+import { normalizePhoneNumber } from '@/lib/phone-utils';
+import { logger } from '@/lib/logger';
+import twilio from 'twilio';
+
+export async function POST(request: NextRequest) {
+  try {
+    // 1. Validate request signature (CRITICAL SECURITY CHECK)
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    if (!authToken) {
+      logger.error('TWILIO_AUTH_TOKEN not configured');
+      return NextResponse.json(
+        { error: 'Server configuration error' },
+        { status: 500 }
+      );
+    }
+
+    const isValid = await validateTwilioRequestWithSDK(request, authToken);
+    if (!isValid) {
+      logger.warn('Invalid Twilio webhook signature', {
+        url: request.url,
+        headers: Object.fromEntries(request.headers.entries()),
+      });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    }
+
+    // 2. Parse and validate form data
+    const formData = await request.formData();
+    const callerRaw = formData.get('Caller') as string;
+    const callSid = formData.get('CallSid') as string;
+    const calledNumber = formData.get('Called') as string; // The Twilio number that received the call
+
+    if (!callerRaw || !callSid || !calledNumber) {
+      logger.warn('Missing required fields in webhook', {
+        caller: callerRaw,
+        callSid,
+        calledNumber,
+      });
+      return NextResponse.json(
+        { error: 'Missing required fields' },
+        { status: 400 }
+      );
+    }
+
+    // 3. Normalize phone numbers
+    let caller: string;
+    let twilioNumber: string;
+    try {
+      caller = normalizePhoneNumber(callerRaw);
+      twilioNumber = normalizePhoneNumber(calledNumber);
+    } catch (error) {
+      logger.error('Invalid phone number format', error);
+      // Still return valid TwiML to hang up gracefully
+      const response = new twilio.twiml.VoiceResponse();
+      response.hangup();
+      return new NextResponse(response.toString(), {
+        headers: { 'Content-Type': 'text/xml' },
+      });
+    }
+
+    logger.info('Missed call received', {
+      caller,
+      twilioNumber,
+      callSid,
+    });
+
+    // 4. Find business by Twilio number
+    // For MVP: Look up by forwarding_number in businesses table
+    // For future: Use twilio_numbers table
+    const { data: business, error: businessError } = await supabaseAdmin
+      .from('businesses')
+      .select('id, name, owner_phone')
+      .eq('forwarding_number', twilioNumber)
+      .eq('verified', true) // Only verified businesses
+      .maybeSingle();
+
+    if (businessError) {
+      logger.error('Database error finding business', businessError);
+      // Return TwiML to hang up gracefully
+      const response = new twilio.twiml.VoiceResponse();
+      response.hangup();
+      return new NextResponse(response.toString(), {
+        headers: { 'Content-Type': 'text/xml' },
+      });
+    }
+
+    if (!business) {
+      logger.warn('Business not found for Twilio number', { twilioNumber });
+      // Return TwiML to hang up gracefully
+      const response = new twilio.twiml.VoiceResponse();
+      response.hangup();
+      return new NextResponse(response.toString(), {
+        headers: { 'Content-Type': 'text/xml' },
+      });
+    }
+
+    // 5. Initialize Twilio client
+    const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
+    if (!twilioAccountSid || !authToken) {
+      logger.error('Twilio credentials not configured');
+      const response = new twilio.twiml.VoiceResponse();
+      response.hangup();
+      return new NextResponse(response.toString(), {
+        headers: { 'Content-Type': 'text/xml' },
+      });
+    }
+
+    const client = twilio(twilioAccountSid, authToken);
+
+    // 6. Send auto-reply SMS to caller
+    try {
+      await client.messages.create({
+        to: caller,
+        from: twilioNumber,
+        body: `Sorry we missed your call at ${business.name}! How can we help you today? Reply here.`,
+      });
+      logger.info('Auto-reply SMS sent', { caller, businessId: business.id });
+    } catch (smsError) {
+      logger.error('Failed to send auto-reply SMS', smsError);
+      // Continue execution - don't fail the webhook
+    }
+
+    // 7. Notify business owner
+    if (business.owner_phone) {
+      try {
+        await client.messages.create({
+          to: business.owner_phone,
+          from: twilioNumber,
+          body: `🔥 Missed call from ${caller}. Auto-reply sent.`,
+        });
+        logger.info('Owner notification sent', {
+          ownerPhone: business.owner_phone,
+          caller,
+        });
+      } catch (notifyError) {
+        logger.error('Failed to notify owner', notifyError);
+        // Non-critical, continue
+      }
+    }
+
+    // 8. Create or update lead
+    // Check if lead already exists for this caller and business
+    const { data: existingLead, error: leadCheckError } = await supabaseAdmin
+      .from('leads')
+      .select('id')
+      .eq('caller_phone', caller)
+      .eq('business_id', business.id)
+      .maybeSingle();
+
+    if (leadCheckError) {
+      logger.error('Error checking for existing lead', leadCheckError);
+    }
+
+    if (!existingLead) {
+      // Create new lead
+      const { error: leadInsertError } = await supabaseAdmin
+        .from('leads')
+        .insert({
+          caller_phone: caller,
+          business_id: business.id,
+          status: 'New',
+        });
+
+      if (leadInsertError) {
+        logger.error('Failed to create lead', leadInsertError);
+        // Non-critical, continue
+      } else {
+        logger.info('New lead created', { caller, businessId: business.id });
+      }
+    } else {
+      logger.debug('Lead already exists', {
+        leadId: existingLead.id,
+        caller,
+      });
+    }
+
+    // 9. Return TwiML response
+    const response = new twilio.twiml.VoiceResponse();
+    response.say(
+      'Sorry we missed you. We have sent you a text message.',
+      { voice: 'alice' }
+    );
+    response.hangup();
+
+    return new NextResponse(response.toString(), {
+      headers: { 'Content-Type': 'text/xml' },
+    });
+  } catch (error) {
+    logger.error('Unexpected error in voice webhook', error);
+
+    // Always return valid TwiML to avoid Twilio retries
+    const response = new twilio.twiml.VoiceResponse();
+    response.hangup();
+
+    return new NextResponse(response.toString(), {
+      headers: { 'Content-Type': 'text/xml' },
+      status: 200, // Return 200 even on error to prevent retries
+    });
+  }
+}
