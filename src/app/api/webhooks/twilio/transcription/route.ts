@@ -7,9 +7,12 @@ import twilio from 'twilio';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
-    // 1. Validate (Optional but recommended for callbacks)
-    // Twilio callbacks for transcription might need different validation context
-    // For MVP, we'll verify it loosely or trust the signature if possible.
+    // 1. SECURITY: Validate Twilio signature - STRICT validation required
+    const isValid = await validateTwilioRequest(request);
+    if (!isValid) {
+        logger.warn('[Transcription Webhook] Invalid Twilio signature - rejecting request');
+        return new Response('Unauthorized', { status: 403 });
+    }
 
     const formData = await request.formData();
     const transcriptionText = formData.get('TranscriptionText') as string;
@@ -64,9 +67,16 @@ export async function POST(request: Request) {
         });
     }
 
-    // 4. Send Smart SMS Reply
-    // We send the reply suggested by the AI
-    if (analysis.suggestedReply) {
+    // 4. TCPA COMPLIANCE: Check if user is opted out before sending any SMS
+    const { data: optOut } = await supabaseAdmin
+        .from('opt_outs')
+        .select('id')
+        .eq('business_id', businessId)
+        .eq('phone_number', caller)
+        .maybeSingle();
+
+    // 5. Send Smart SMS Reply (only if not opted out)
+    if (analysis.suggestedReply && !optOut) {
         const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
         try {
             await client.messages.create({
@@ -89,10 +99,11 @@ export async function POST(request: Request) {
         } catch (error) {
             logger.error('Failed to send smart reply', error);
         }
+    } else if (optOut) {
+        logger.info('[Transcription Webhook] Skipping auto-reply - user opted out', { caller, businessId });
     }
 
-    // 5. Notify Owner with Summary
-    // We could send the summary to the owner
+    // 6. Notify Owner with Summary
     const { data: business } = await supabaseAdmin.from('businesses').select('owner_phone').eq('id', businessId).single();
     if (business?.owner_phone) {
         const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
