@@ -35,35 +35,39 @@ export default function SettingsPage() {
     const supabase = createSupabaseBrowserClient();
 
     useEffect(() => {
+        const fetchSettings = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                setLoading(false);
+                return;
+            }
+
+            const { data: business } = await supabase
+                .from('businesses')
+                .select('id, sms_template, timezone, business_hours')
+                .eq('user_id', user.id)
+                .single();
+
+            if (business) {
+                setBusinessId(business.id);
+                setSmsTemplate(business.sms_template || "Sorry we missed you. We'll get back to you shortly.");
+                setTimezone(business.timezone || 'America/New_York');
+
+                // Initialize hours if empty
+                const initialHours = (business.business_hours as BusinessHours) || {};
+                DAYS.forEach(day => {
+                    if (!initialHours[day]) {
+                        initialHours[day] = { open: '09:00', close: '17:00', isOpen: true };
+                    }
+                });
+                setHours(initialHours);
+            }
+            setLoading(false);
+        };
+
         fetchSettings();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-
-    const fetchSettings = async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        const { data: business } = await supabase
-            .from('businesses')
-            .select('id, sms_template, timezone, business_hours')
-            .eq('user_id', user.id)
-            .single();
-
-        if (business) {
-            setBusinessId(business.id);
-            setSmsTemplate(business.sms_template || "Sorry we missed you. We'll get back to you shortly.");
-            setTimezone(business.timezone || 'America/New_York');
-
-            // Initialize hours if empty
-            const initialHours = (business.business_hours as BusinessHours) || {};
-            DAYS.forEach(day => {
-                if (!initialHours[day]) {
-                    initialHours[day] = { open: '09:00', close: '17:00', isOpen: true };
-                }
-            });
-            setHours(initialHours);
-        }
-        setLoading(false);
-    };
 
     const handleHourChange = (day: string, field: 'open' | 'close', value: string) => {
         setHours(prev => ({
