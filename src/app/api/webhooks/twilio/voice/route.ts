@@ -1,7 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { validateTwilioRequest } from '@/lib/twilio-validator';
 import { normalizePhoneNumber } from '@/lib/phone-utils';
-import { isBusinessHours, formatTemplate } from '@/lib/business-logic';
+import { isBusinessHours } from '@/lib/business-logic';
 import { logger } from '@/lib/logger';
 import twilio from 'twilio';
 
@@ -53,22 +53,33 @@ export async function POST(request: Request) {
     // In the future, we might want to vary the message based on 'isOpen'.
     logger.info(`[Voice Webhook] Processing missed call. Business Open: ${isOpen}`);
 
+    // 4. TCPA COMPLIANCE: Check if user is opted out before sending any SMS
+    const { data: optOut } = await supabaseAdmin
+        .from('opt_outs')
+        .select('id')
+        .eq('business_id', business.id)
+        .eq('phone_number', caller)
+        .maybeSingle();
+
     const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
-    // 4. PREPARE MESSAGE
-    // Immediate Ack
-    try {
-        const message = `Hi! I'm the AI assistant for ${business.name}. I'm recording your voicemail now and will have someone get back to you shortly.`;
-        await client.messages.create({
-            to: caller,
-            from: called,
-            body: message,
-        });
-    } catch (error) {
-        logger.error('Error sending immediate ack:', error);
+    // 5. PREPARE MESSAGE (only if not opted out)
+    if (!optOut) {
+        try {
+            const message = `Hi! I'm the AI assistant for ${business.name}. I'm recording your voicemail now and will have someone get back to you shortly.`;
+            await client.messages.create({
+                to: caller,
+                from: called,
+                body: message,
+            });
+        } catch (error) {
+            logger.error('Error sending immediate ack:', error);
+        }
+    } else {
+        logger.info('[Voice Webhook] Skipping immediate ack - user opted out', { caller, businessId: business.id });
     }
 
-    // 5. Log Lead (Scoped to Business)
+    // 6. Log Lead (Scoped to Business)
     const { data: existingLead } = await supabaseAdmin
         .from('leads')
         .select('id')
@@ -85,7 +96,7 @@ export async function POST(request: Request) {
         if (error) logger.error('Error creating lead:', error);
     }
 
-    // 6. TwiML: Greeting + Record
+    // 7. TwiML: Greeting + Record
     const response = new twilio.twiml.VoiceResponse();
     // Sanitize business name for TwiML (prevent injection)
     const safeName = (business.name || 'our business').replace(/[<>&"']/g, '');
