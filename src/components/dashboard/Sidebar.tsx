@@ -2,8 +2,11 @@
 
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Search, MessageSquare } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Search, MessageSquare, Settings, LogOut } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { useRouter } from 'next/navigation';
+import { createSupabaseBrowserClient } from '@/lib/supabase-client';
 
 interface Lead {
     id: string;
@@ -38,6 +41,14 @@ export function Sidebar({
     onSearchChange,
     onSelectLead,
 }: SidebarProps) {
+    const router = useRouter();
+    const supabase = createSupabaseBrowserClient();
+
+    const handleSignOut = async () => {
+        await supabase.auth.signOut();
+        router.push('/login');
+    };
+
     const filteredLeads = leads.filter(lead =>
         (lead.caller_name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
         lead.caller_phone.includes(searchQuery) ||
@@ -98,6 +109,25 @@ export function Sidebar({
                         </div>
                     ))
                 )}
+            </div>
+            {/* Footer with Settings and Sign Out */}
+            <div className="p-4 border-t border-slate-100 space-y-2">
+                <Button
+                    variant="ghost"
+                    className="w-full justify-start text-slate-600 hover:text-slate-900"
+                    onClick={() => router.push('/dashboard/settings')}
+                >
+                    <Settings className="h-4 w-4 mr-2" />
+                    Settings
+                </Button>
+                <Button
+                    variant="ghost"
+                    className="w-full justify-start text-slate-600 hover:text-red-600"
+                    onClick={handleSignOut}
+                >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Sign Out
+                </Button>
             </div>
         </div>
     );

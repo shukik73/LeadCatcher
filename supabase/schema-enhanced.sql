@@ -7,11 +7,12 @@ create extension if not exists "uuid-ossp";
 -- Businesses Table
 create table businesses (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users not null,
+  user_id uuid references auth.users not null unique, -- Unique constraint for upsert
   name text not null,
   business_phone text not null,
   owner_phone text not null,
   forwarding_number text, -- The Twilio number (for MVP)
+  twilio_sid text, -- Twilio phone number SID for API operations
   carrier text,
   verified boolean default false,
   created_at timestamptz default now()
