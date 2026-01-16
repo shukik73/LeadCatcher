@@ -3,6 +3,14 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { Input } from '@/components/ui/input';
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { MessageSquare, Phone, Send, User, Loader2, Menu, AlertCircle, RefreshCw } from 'lucide-react';
+import { createSupabaseBrowserClient } from '@/lib/supabase-client';
+import { logger } from '@/lib/logger';
+import { Sidebar } from '@/components/dashboard/Sidebar';
+import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeleton';
 
 // Types (should ideally be generated from Supabase)
 interface Lead {
@@ -22,16 +30,6 @@ interface Message {
     created_at: string;
     lead_id: string;
 }
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, MessageSquare, Phone, Send, User, Loader2, Menu } from 'lucide-react';
-import { createSupabaseBrowserClient } from '@/lib/supabase-client';
-import { formatDistanceToNow } from 'date-fns';
-import { logger } from '@/lib/logger';
-import { AlertCircle, RefreshCw } from 'lucide-react';
-// ... other imports
 
 export default function Dashboard() {
     const [searchQuery, setSearchQuery] = useState('');
@@ -43,14 +41,6 @@ export default function Dashboard() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const supabase = createSupabaseBrowserClient();
-
-    // ... (keep useEffects and helper functions same) ...
-
-    const filteredLeads = leads.filter(lead =>
-        (lead.caller_name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-        lead.caller_phone.includes(searchQuery) ||
-        lead.messages.some(m => m.body.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
 
     const updateStatus = async (status: string) => {
         if (!selectedLead) return;
@@ -160,69 +150,12 @@ export default function Dashboard() {
         setSending(false);
     };
 
-    const SidebarContent = () => (
-        <div className="flex flex-col h-full">
-            <div className="p-4 border-b border-slate-100">
-                <h1 className="font-bold text-xl text-slate-800 flex items-center gap-2">
-                    <div className="bg-blue-600 text-white p-1 rounded">
-                        <MessageSquare size={14} fill="currentColor" />
-                    </div>
-                    LeadCatcher
-                </h1>
-            </div>
-            <div className="p-4">
-                <div className="relative">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-                    <Input
-                        placeholder="Search leads..."
-                        className="pl-9 bg-slate-50"
-                        value={searchQuery}
-                        aria-label="Search leads by name, phone, or message content"
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                </div>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-                {filteredLeads.length === 0 ? (
-                    <div className="p-8 text-center text-slate-400 text-sm">No leads match your search.</div>
-                ) : (
-                    filteredLeads.map(lead => (
-                        <div
-                            key={lead.id}
-                            onClick={() => {
-                                setSelectedLead(lead);
-                                setIsMobileMenuOpen(false);
-                            }}
-                            role="option"
-                            aria-selected={selectedLead?.id === lead.id}
-                            tabIndex={0}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault();
-                                    setSelectedLead(lead);
-                                    setIsMobileMenuOpen(false);
-                                }
-                            }}
-                            className={`p-4 border-b border-slate-50 cursor-pointer hover:bg-slate-50 transition-colors ${selectedLead?.id === lead.id ? 'bg-blue-50/50 border-l-4 border-l-blue-600' : 'border-l-4 border-l-transparent'}`}
-                        >
-                            <div className="flex justify-between mb-1">
-                                <span className="font-semibold text-slate-900">{lead.caller_name || lead.caller_phone}</span>
-                                <span className="text-xs text-slate-400">{formatDistanceToNow(new Date(lead.created_at))}</span>
-                            </div>
-                            <p className="text-sm text-slate-500 truncate">
-                                {lead.messages.length > 0 ? lead.messages[lead.messages.length - 1].body : 'Missed Call'}
-                            </p>
-                            <div className="mt-2 flex gap-2">
-                                <Badge variant="secondary" className="text-xs">{lead.status}</Badge>
-                            </div>
-                        </div>
-                    ))
-                )}
-            </div>
-        </div>
-    );
+    const handleSelectLead = (lead: Lead) => {
+        setSelectedLead(lead);
+        setIsMobileMenuOpen(false);
+    };
 
-    if (loading) return <div className="h-screen flex items-center justify-center text-slate-400">Loading leads...</div>;
+    if (loading) return <DashboardSkeleton />;
 
     if (error && leads.length === 0) {
         return (
@@ -267,14 +200,26 @@ export default function Dashboard() {
                         <div className="sr-only">
                             <SheetTitle>Navigation Menu</SheetTitle>
                         </div>
-                        <SidebarContent />
+                        <Sidebar
+                            leads={leads}
+                            selectedLead={selectedLead}
+                            searchQuery={searchQuery}
+                            onSearchChange={setSearchQuery}
+                            onSelectLead={handleSelectLead}
+                        />
                     </SheetContent>
                 </Sheet>
             </div>
 
             {/* Desktop Sidebar */}
             <div className="hidden md:flex w-80 bg-white border-r border-slate-200 flex-col">
-                <SidebarContent />
+                <Sidebar
+                    leads={leads}
+                    selectedLead={selectedLead}
+                    searchQuery={searchQuery}
+                    onSearchChange={setSearchQuery}
+                    onSelectLead={handleSelectLead}
+                />
             </div>
 
             {/* Main Chat Area */}

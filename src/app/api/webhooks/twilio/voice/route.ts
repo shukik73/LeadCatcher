@@ -102,7 +102,14 @@ export async function POST(request: Request) {
     const safeName = (business.name || 'our business').replace(/[<>&"']/g, '');
     response.say({ voice: 'alice' }, `Hello! You've reached ${safeName}. We are currently assisting other clients. Please leave your name and how we can help, and I will have a team member text you back immediately.`);
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://demo-leadcatcher.com';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+    if (!baseUrl) {
+        logger.error('[Voice Webhook] NEXT_PUBLIC_APP_URL missing; cannot build transcription callback URL');
+        const errorResponse = new twilio.twiml.VoiceResponse();
+        errorResponse.say({ voice: 'alice' }, 'We apologize, but we are experiencing technical difficulties. Please try again later.');
+        errorResponse.hangup();
+        return new Response(errorResponse.toString(), { headers: { 'Content-Type': 'text/xml' } });
+    }
     const callbackUrl = `${baseUrl}/api/webhooks/twilio/transcription?businessId=${business.id}&caller=${encodeURIComponent(caller)}&called=${encodeURIComponent(called)}`;
 
     response.record({
