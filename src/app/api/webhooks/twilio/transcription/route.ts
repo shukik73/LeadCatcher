@@ -113,7 +113,7 @@ export async function POST(request: Request) {
                 from: called,
                 body: `🎙️ New Voicemail from ${caller}.\nSummary: ${analysis.summary}\nIntent: ${analysis.intent}`,
             });
-        } catch (e) { /* ignore */ }
+        } catch { /* ignore notification failure */ }
     }
 
     return new Response('OK');

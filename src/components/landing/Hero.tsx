@@ -42,7 +42,7 @@ export default function Hero() {
                     transition={{ duration: 0.5, delay: 0.2 }}
                     className="text-xl md:text-2xl text-slate-500 mb-10 max-w-2xl mx-auto leading-relaxed"
                 >
-                    Instantly text back every caller you miss. Keep the lead warm and secure the job while you're busy on-site.
+                    Instantly text back every caller you miss. Keep the lead warm and secure the job while you&apos;re busy on-site.
                 </motion.p>
 
                 <motion.div
@@ -93,7 +93,7 @@ export default function Hero() {
                             <div className="flex-1 space-y-6 w-full">
                                 <div className="bg-blue-600 p-5 rounded-2xl rounded-tr-sm shadow-lg text-left text-white relative">
                                     <p className="text-sm font-medium leading-relaxed">
-                                        "Hey! Sorry I missed your call at Techy Miramar. How can we help you today?"
+                                        &ldquo;Hey! Sorry I missed your call at Techy Miramar. How can we help you today?&rdquo;
                                     </p>
                                     <div className="mt-2 flex items-center gap-2 text-blue-200 text-xs">
                                         <CheckCircle2 size={12} /> Sent automatically
