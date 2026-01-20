@@ -29,6 +29,19 @@ export async function middleware(request: NextRequest) {
     });
 
     // -------------------------------------------------------------------------
+    // 0. HANDLE AUTH CODE AT ROOT (Password Reset, Email Verification)
+    // -------------------------------------------------------------------------
+    // Supabase sends auth codes to the Site URL root. Redirect to auth callback.
+    const code = request.nextUrl.searchParams.get('code');
+    if (code && request.nextUrl.pathname === '/') {
+        const callbackUrl = new URL('/auth/callback', request.url);
+        callbackUrl.searchParams.set('code', code);
+        // Check if this might be a password reset (add marker for callback)
+        callbackUrl.searchParams.set('next', '/auth/reset-password');
+        return NextResponse.redirect(callbackUrl);
+    }
+
+    // -------------------------------------------------------------------------
     // 1. RATE LIMITING (API Routes Only)
     // -------------------------------------------------------------------------
     if (request.nextUrl.pathname.startsWith('/api')) {
