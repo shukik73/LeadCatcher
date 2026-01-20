@@ -1,4 +1,4 @@
-interface BusinessHours {
+export interface BusinessHours {
     [key: string]: {
         open: string;  // "09:00"
         close: string; // "17:00"

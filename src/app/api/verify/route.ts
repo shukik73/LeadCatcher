@@ -24,7 +24,7 @@ import twilio from 'twilio';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST(request: Request) {
+export async function POST(_request: Request) {
     const cookieStore = await cookies();
 
     const supabase = createServerClient(

@@ -1,7 +1,7 @@
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Phone, MessageSquare } from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
 
 export default function Header() {
     return (
@@ -24,7 +24,7 @@ export default function Header() {
                 <div className="flex items-center gap-4">
                     <Link href="/login" className="md:hidden text-sm font-medium text-slate-600">Login</Link>
                     <Button asChild className="rounded-full px-6 bg-slate-900 hover:bg-slate-800 text-white shadow-lg shadow-slate-200">
-                        <Link href="#trial">Start Free Trial</Link>
+                        <Link href="/onboarding">Start Free Trial</Link>
                     </Button>
                 </div>
             </div>

@@ -1,7 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { validateTwilioRequest } from '@/lib/twilio-validator';
 import { normalizePhoneNumber } from '@/lib/phone-utils';
-import { isBusinessHours } from '@/lib/business-logic';
+import { isBusinessHours, type BusinessHours } from '@/lib/business-logic';
 import { logger } from '@/lib/logger';
 import twilio from 'twilio';
 
@@ -44,8 +44,7 @@ export async function POST(request: Request) {
     logger.info(`[Voice Webhook] Missed call for business`, { business: business.name });
 
     // 3. CHECK BUSINESS HOURS
-    // Cast jsonb to the interface (quick cast)
-    const hours = business.business_hours as any;
+    const hours = business.business_hours as BusinessHours | null;
     const timezone = business.timezone || 'America/New_York';
     const isOpen = isBusinessHours(hours, timezone);
 
