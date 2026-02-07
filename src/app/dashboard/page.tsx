@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
@@ -40,7 +40,7 @@ export default function Dashboard() {
     const [sending, setSending] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const supabase = createSupabaseBrowserClient();
+    const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
     const updateStatus = async (status: string) => {
         if (!selectedLead) return;
@@ -85,7 +85,7 @@ export default function Dashboard() {
             setLoading(false);
         }
         fetchLeads();
-    }, []);
+    }, [supabase]);
 
     // ... (Realtime effect same) ...
     // Real-time Subscription
@@ -128,7 +128,7 @@ export default function Dashboard() {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [selectedLead]);
+    }, [selectedLead, supabase]);
 
     const handleSendReply = async () => {
         if (!replyText || !selectedLead) return;
@@ -238,7 +238,11 @@ export default function Dashboard() {
                                 </div>
                             </div>
                             <div className="flex gap-2">
-                                <Button variant="outline" size="sm">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => window.open(`tel:${selectedLead.caller_phone}`, '_self')}
+                                >
                                     <Phone className="h-4 w-4 mr-2" /> Call
                                 </Button>
                                 <Select value={selectedLead.status} onValueChange={updateStatus}>

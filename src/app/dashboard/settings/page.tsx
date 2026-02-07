@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,7 +32,7 @@ export default function SettingsPage() {
     const [timezone, setTimezone] = useState('America/New_York');
     const [hours, setHours] = useState<BusinessHours>({});
 
-    const supabase = createSupabaseBrowserClient();
+    const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
     useEffect(() => {
         const fetchSettings = async () => {
@@ -53,12 +53,11 @@ export default function SettingsPage() {
                 setSmsTemplate(business.sms_template || "Sorry we missed you. We'll get back to you shortly.");
                 setTimezone(business.timezone || 'America/New_York');
 
-                // Initialize hours if empty
-                const initialHours = (business.business_hours as BusinessHours) || {};
+                // Initialize hours if empty - create new object to avoid mutating Supabase data
+                const existingHours = (business.business_hours as BusinessHours) || {};
+                const initialHours: BusinessHours = {};
                 DAYS.forEach(day => {
-                    if (!initialHours[day]) {
-                        initialHours[day] = { open: '09:00', close: '17:00', isOpen: true };
-                    }
+                    initialHours[day] = existingHours[day] || { open: '09:00', close: '17:00', isOpen: true };
                 });
                 setHours(initialHours);
             }
@@ -66,8 +65,7 @@ export default function SettingsPage() {
         };
 
         fetchSettings();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [supabase]);
 
     const handleHourChange = (day: string, field: 'open' | 'close', value: string) => {
         setHours(prev => ({

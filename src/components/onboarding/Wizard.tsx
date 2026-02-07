@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { createSupabaseBrowserClient } from '@/lib/supabase-client';
@@ -64,7 +64,7 @@ export default function Wizard() {
     });
 
     // Derived state
-    const carrier = carrierForm.watch('carrier');
+    const carrier = useWatch({ control: carrierForm.control, name: 'carrier' });
 
     // Handlers
     const onBusinessSubmit = async (data: BusinessFormData) => {
