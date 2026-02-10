@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     const transcriptionText = formData.get('TranscriptionText') as string;
     const transcriptionStatus = formData.get('TranscriptionStatus') as string;
 
-    // URL Params passed in callback URL
+    // URL Params passed in callback URL — validate format after presence check
     const url = new URL(request.url);
     const businessId = url.searchParams.get('businessId');
     const caller = url.searchParams.get('caller'); // E.164
@@ -27,6 +27,15 @@ export async function POST(request: Request) {
     if (!businessId || !caller || !called) {
         logger.error('Missing params in transcription callback', null, { url: request.url });
         return new Response('Missing params', { status: 400 });
+    }
+
+    // Validate param formats to prevent injection via crafted callback URLs
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const e164Regex = /^\+[1-9]\d{1,14}$/;
+
+    if (!uuidRegex.test(businessId) || !e164Regex.test(caller) || !e164Regex.test(called)) {
+        logger.warn('[Transcription Webhook] Invalid param format', { businessId, caller, called });
+        return new Response('Invalid params', { status: 400 });
     }
 
     if (transcriptionStatus !== 'completed') {
