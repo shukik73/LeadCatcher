@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,38 +34,44 @@ export default function SettingsPage() {
 
     const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
-    useEffect(() => {
-        const fetchSettings = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) {
-                setLoading(false);
-                return;
-            }
-
-            const { data: business } = await supabase
-                .from('businesses')
-                .select('id, sms_template, timezone, business_hours')
-                .eq('user_id', user.id)
-                .single();
-
-            if (business) {
-                setBusinessId(business.id);
-                setSmsTemplate(business.sms_template || "Sorry we missed you. We'll get back to you shortly.");
-                setTimezone(business.timezone || 'America/New_York');
-
-                // Initialize hours if empty - create new object to avoid mutating Supabase data
-                const existingHours = (business.business_hours as BusinessHours) || {};
-                const initialHours: BusinessHours = {};
-                DAYS.forEach(day => {
-                    initialHours[day] = existingHours[day] || { open: '09:00', close: '17:00', isOpen: true };
-                });
-                setHours(initialHours);
-            }
+    const fetchSettings = useCallback(async (signal?: { cancelled: boolean }) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (signal?.cancelled) return;
+        if (!user) {
             setLoading(false);
-        };
+            return;
+        }
 
-        fetchSettings();
+        const { data: business } = await supabase
+            .from('businesses')
+            .select('id, sms_template, timezone, business_hours')
+            .eq('user_id', user.id)
+            .single();
+
+        if (signal?.cancelled) return;
+        if (business) {
+            setBusinessId(business.id);
+            setSmsTemplate(business.sms_template || "Sorry we missed you. We'll get back to you shortly.");
+            setTimezone(business.timezone || 'America/New_York');
+
+            // Initialize hours if empty - create new object to avoid mutating Supabase data
+            const existingHours = (business.business_hours as BusinessHours) || {};
+            const initialHours: BusinessHours = {};
+            DAYS.forEach(day => {
+                initialHours[day] = existingHours[day] || { open: '09:00', close: '17:00', isOpen: true };
+            });
+            setHours(initialHours);
+        }
+        setLoading(false);
     }, [supabase]);
+
+    useEffect(() => {
+        const signal = { cancelled: false };
+        // Data fetching with setState is the standard React effect pattern
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        fetchSettings(signal);
+        return () => { signal.cancelled = true; };
+    }, [fetchSettings]);
 
     const handleHourChange = (day: string, field: 'open' | 'close', value: string) => {
         setHours(prev => ({
