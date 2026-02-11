@@ -20,3 +20,16 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_leads_external_source
 
 -- Index for filtering by source
 CREATE INDEX IF NOT EXISTS idx_leads_source ON leads(source);
+
+-- Grace period: holds SMS sending until this timestamp passes.
+-- When a missed call is detected, sms_hold_until is set to NOW() + interval.
+-- The poll job checks: if sms_hold_until < NOW() and no callback detected → send SMS.
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS sms_hold_until timestamptz;
+
+-- Track when we last polled RepairDesk for each business (avoids re-fetching old data)
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS repairdesk_last_poll_at timestamptz;
+
+-- Index for the poll job: find leads waiting for SMS delivery
+CREATE INDEX IF NOT EXISTS idx_leads_sms_hold
+  ON leads(sms_hold_until)
+  WHERE sms_hold_until IS NOT NULL;

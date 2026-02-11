@@ -50,6 +50,19 @@ export interface RepairDeskListResponse<T> {
     };
 }
 
+export interface RepairDeskCallLog {
+    id: number;
+    customer_id: number;
+    customer_name: string;
+    phone: string;
+    direction: 'inbound' | 'outbound';
+    status: 'missed' | 'answered' | 'voicemail';
+    duration: number;
+    notes: string;
+    created_at: string;
+    updated_at: string;
+}
+
 export interface RepairDeskError {
     message: string;
     status: number;
@@ -136,6 +149,42 @@ export class RepairDeskClient {
      */
     async getTicket(ticketId: number): Promise<RepairDeskTicket> {
         return this.request<RepairDeskTicket>(`/tickets/${ticketId}`);
+    }
+
+    /**
+     * Get call logs, optionally filtered by page and date range.
+     * Endpoint may vary — verify against your RepairDesk dashboard.
+     */
+    async getCallLogs(page = 1, since?: string): Promise<RepairDeskListResponse<RepairDeskCallLog>> {
+        let endpoint = `/call-logs?page=${page}`;
+        if (since) {
+            endpoint += `&since=${encodeURIComponent(since)}`;
+        }
+        return this.request<RepairDeskListResponse<RepairDeskCallLog>>(endpoint);
+    }
+
+    /**
+     * Get missed calls since a given timestamp.
+     * Filters call logs for inbound calls with status 'missed'.
+     */
+    async getMissedCalls(page = 1, since?: string): Promise<RepairDeskListResponse<RepairDeskCallLog>> {
+        let endpoint = `/call-logs?page=${page}&status=missed&direction=inbound`;
+        if (since) {
+            endpoint += `&since=${encodeURIComponent(since)}`;
+        }
+        return this.request<RepairDeskListResponse<RepairDeskCallLog>>(endpoint);
+    }
+
+    /**
+     * Check if there was an outbound call to a specific phone number since a given time.
+     * Used to detect if the user returned a missed call.
+     */
+    async getOutboundCallsTo(phone: string, since?: string): Promise<RepairDeskListResponse<RepairDeskCallLog>> {
+        let endpoint = `/call-logs?direction=outbound&phone=${encodeURIComponent(phone)}`;
+        if (since) {
+            endpoint += `&since=${encodeURIComponent(since)}`;
+        }
+        return this.request<RepairDeskListResponse<RepairDeskCallLog>>(endpoint);
     }
 
     /**

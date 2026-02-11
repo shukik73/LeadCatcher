@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/repairdesk/poll",
+      "schedule": "*/3 * * * *"
+    }
+  ]
+}
