@@ -18,6 +18,7 @@ interface Lead {
     caller_phone: string;
     caller_name: string | null;
     status: string;
+    source?: string;
     created_at: string;
     business_id: string;
     messages: Message[];

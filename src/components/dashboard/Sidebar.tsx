@@ -3,7 +3,7 @@
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Search, MessageSquare, Settings, LogOut } from 'lucide-react';
+import { Search, MessageSquare, Settings, LogOut, Phone, Wrench } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-client';
@@ -13,6 +13,7 @@ interface Lead {
     caller_phone: string;
     caller_name: string | null;
     status: string;
+    source?: string;
     created_at: string;
     business_id: string;
     messages: Message[];
@@ -105,6 +106,18 @@ export function Sidebar({
                             </p>
                             <div className="mt-2 flex gap-2">
                                 <Badge variant="secondary" className="text-xs">{lead.status}</Badge>
+                                {lead.source === 'repairdesk' && (
+                                    <Badge variant="outline" className="text-xs gap-1">
+                                        <Wrench className="h-3 w-3" />
+                                        RepairDesk
+                                    </Badge>
+                                )}
+                                {(!lead.source || lead.source === 'phone') && (
+                                    <Badge variant="outline" className="text-xs gap-1">
+                                        <Phone className="h-3 w-3" />
+                                        Call
+                                    </Badge>
+                                )}
                             </div>
                         </div>
                     ))
