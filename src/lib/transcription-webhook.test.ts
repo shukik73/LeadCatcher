@@ -63,6 +63,9 @@ function mockSupabaseChain(returnValue: { data: unknown; error: unknown }) {
     };
 }
 
+// Valid UUID for tests (our webhook now validates UUID format)
+const VALID_BIZ_ID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+
 describe('Transcription Webhook Route', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -75,7 +78,7 @@ describe('Transcription Webhook Route', () => {
         vi.mocked(validateTwilioRequest).mockResolvedValue(false);
         const req = createFormDataRequest(
             { TranscriptionText: 'Hello', TranscriptionStatus: 'completed' },
-            { businessId: 'biz-1', caller: '+15551234567', called: '+15559876543' }
+            { businessId: VALID_BIZ_ID, caller: '+15551234567', called: '+15559876543' }
         );
         const res = await POST(req);
         expect(res.status).toBe(403);
@@ -95,7 +98,7 @@ describe('Transcription Webhook Route', () => {
         vi.mocked(validateTwilioRequest).mockResolvedValue(true);
         const req = createFormDataRequest(
             { TranscriptionText: '', TranscriptionStatus: 'failed' },
-            { businessId: 'biz-1', caller: '+15551234567', called: '+15559876543' }
+            { businessId: VALID_BIZ_ID, caller: '+15551234567', called: '+15559876543' }
         );
         const res = await POST(req);
         expect(res.status).toBe(200);
@@ -123,7 +126,7 @@ describe('Transcription Webhook Route', () => {
 
         const req = createFormDataRequest(
             { TranscriptionText: 'I want to book an appointment', TranscriptionStatus: 'completed' },
-            { businessId: 'biz-1', caller: '+15551234567', called: '+15559876543' }
+            { businessId: VALID_BIZ_ID, caller: '+15551234567', called: '+15559876543' }
         );
         const res = await POST(req);
         expect(res.status).toBe(200);
@@ -151,7 +154,7 @@ describe('Transcription Webhook Route', () => {
 
         const req = createFormDataRequest(
             { TranscriptionText: 'Book me in', TranscriptionStatus: 'completed' },
-            { businessId: 'biz-1', caller: '+15551234567', called: '+15559876543' }
+            { businessId: VALID_BIZ_ID, caller: '+15551234567', called: '+15559876543' }
         );
         await POST(req);
 
@@ -182,7 +185,7 @@ describe('Transcription Webhook Route', () => {
 
         const req = createFormDataRequest(
             { TranscriptionText: 'Book me in', TranscriptionStatus: 'completed' },
-            { businessId: 'biz-1', caller: '+15551234567', called: '+15559876543' }
+            { businessId: VALID_BIZ_ID, caller: '+15551234567', called: '+15559876543' }
         );
         await POST(req);
 
@@ -211,7 +214,7 @@ describe('Transcription Webhook Route', () => {
 
         const req = createFormDataRequest(
             { TranscriptionText: 'I want to book', TranscriptionStatus: 'completed' },
-            { businessId: 'biz-1', caller: '+15551234567', called: '+15559876543' }
+            { businessId: VALID_BIZ_ID, caller: '+15551234567', called: '+15559876543' }
         );
         await POST(req);
 
@@ -221,5 +224,69 @@ describe('Transcription Webhook Route', () => {
                 body: expect.stringContaining('Voicemail'),
             })
         );
+    });
+
+    describe('param format validation', () => {
+        beforeEach(() => {
+            vi.mocked(validateTwilioRequest).mockResolvedValue(true);
+        });
+
+        it('returns 400 for non-UUID businessId', async () => {
+            const req = createFormDataRequest(
+                { TranscriptionText: 'Hello', TranscriptionStatus: 'completed' },
+                { businessId: 'not-a-uuid', caller: '+15551234567', called: '+15559876543' }
+            );
+            const res = await POST(req);
+            expect(res.status).toBe(400);
+        });
+
+        it('returns 400 for SQL injection in businessId', async () => {
+            const req = createFormDataRequest(
+                { TranscriptionText: 'Hello', TranscriptionStatus: 'completed' },
+                { businessId: "'; DROP TABLE leads;--", caller: '+15551234567', called: '+15559876543' }
+            );
+            const res = await POST(req);
+            expect(res.status).toBe(400);
+        });
+
+        it('returns 400 for invalid caller phone format', async () => {
+            const req = createFormDataRequest(
+                { TranscriptionText: 'Hello', TranscriptionStatus: 'completed' },
+                { businessId: VALID_BIZ_ID, caller: '5551234567', called: '+15559876543' }
+            );
+            const res = await POST(req);
+            expect(res.status).toBe(400);
+        });
+
+        it('returns 400 for invalid called phone format', async () => {
+            const req = createFormDataRequest(
+                { TranscriptionText: 'Hello', TranscriptionStatus: 'completed' },
+                { businessId: VALID_BIZ_ID, caller: '+15551234567', called: 'not-a-phone' }
+            );
+            const res = await POST(req);
+            expect(res.status).toBe(400);
+        });
+
+        it('accepts valid UUID and E.164 params', async () => {
+            mockSupabaseFrom.mockImplementation((table: string) => {
+                if (table === 'leads') {
+                    const chain = mockSupabaseChain({ data: { id: 'lead-1' }, error: null });
+                    chain.update = vi.fn().mockReturnValue({
+                        eq: vi.fn().mockResolvedValue({ error: null }),
+                    });
+                    return chain;
+                }
+                if (table === 'opt_outs') return mockSupabaseChain({ data: null, error: null });
+                if (table === 'businesses') return mockSupabaseChain({ data: { owner_phone: '+15550001111' }, error: null });
+                return mockSupabaseChain({ data: null, error: null });
+            });
+
+            const req = createFormDataRequest(
+                { TranscriptionText: 'Hello', TranscriptionStatus: 'completed' },
+                { businessId: VALID_BIZ_ID, caller: '+15551234567', called: '+15559876543' }
+            );
+            const res = await POST(req);
+            expect(res.status).toBe(200);
+        });
     });
 });
