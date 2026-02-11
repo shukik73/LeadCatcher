@@ -11,6 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TIMEZONES } from '@/lib/timezones';
 import { toast } from 'sonner';
+import { Loader2, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
 
 interface BusinessHours {
     [key: string]: {
@@ -32,6 +33,12 @@ export default function SettingsPage() {
     const [timezone, setTimezone] = useState('America/New_York');
     const [hours, setHours] = useState<BusinessHours>({});
 
+    // RepairDesk State
+    const [repairDeskApiKey, setRepairDeskApiKey] = useState('');
+    const [repairDeskStoreUrl, setRepairDeskStoreUrl] = useState('');
+    const [rdTestStatus, setRdTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+    const [syncing, setSyncing] = useState(false);
+
     const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
     const fetchSettings = useCallback(async (signal?: { cancelled: boolean }) => {
@@ -44,7 +51,7 @@ export default function SettingsPage() {
 
         const { data: business } = await supabase
             .from('businesses')
-            .select('id, sms_template, timezone, business_hours')
+            .select('id, sms_template, timezone, business_hours, repairdesk_api_key, repairdesk_store_url')
             .eq('user_id', user.id)
             .single();
 
@@ -53,6 +60,8 @@ export default function SettingsPage() {
             setBusinessId(business.id);
             setSmsTemplate(business.sms_template || "Sorry we missed you. We'll get back to you shortly.");
             setTimezone(business.timezone || 'America/New_York');
+                setRepairDeskApiKey(business.repairdesk_api_key || '');
+                setRepairDeskStoreUrl(business.repairdesk_store_url || '');
 
             // Initialize hours if empty - create new object to avoid mutating Supabase data
             const existingHours = (business.business_hours as BusinessHours) || {};
@@ -96,7 +105,9 @@ export default function SettingsPage() {
             .update({
                 sms_template: smsTemplate,
                 timezone,
-                business_hours: hours
+                business_hours: hours,
+                repairdesk_api_key: repairDeskApiKey || null,
+                repairdesk_store_url: repairDeskStoreUrl || null,
             })
             .eq('id', businessId);
 
@@ -106,6 +117,48 @@ export default function SettingsPage() {
             toast.success('Settings saved successfully');
         }
         setSaving(false);
+    };
+
+    const handleTestRepairDesk = async () => {
+        if (!repairDeskApiKey) {
+            toast.error('Enter your RepairDesk API key first');
+            return;
+        }
+        setRdTestStatus('testing');
+        try {
+            const res = await fetch('/api/repairdesk/test-connection', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ apiKey: repairDeskApiKey, storeUrl: repairDeskStoreUrl || undefined }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                setRdTestStatus('success');
+                toast.success('Connected to RepairDesk!');
+            } else {
+                setRdTestStatus('error');
+                toast.error(data.message || 'Connection failed');
+            }
+        } catch {
+            setRdTestStatus('error');
+            toast.error('Connection test failed');
+        }
+    };
+
+    const handleSyncRepairDesk = async () => {
+        setSyncing(true);
+        try {
+            const res = await fetch('/api/repairdesk/sync', { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                toast.success(`Synced ${data.synced} customers from RepairDesk`);
+            } else {
+                toast.error(data.error || 'Sync failed');
+            }
+        } catch {
+            toast.error('Sync failed');
+        }
+        setSyncing(false);
     };
 
     if (loading) return <div className="p-8">Loading settings...</div>;
@@ -190,6 +243,63 @@ export default function SettingsPage() {
                                 )}
                             </div>
                         ))}
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* RepairDesk Integration */}
+            <Card>
+                <CardHeader>
+                    <CardTitle>RepairDesk Integration</CardTitle>
+                    <CardDescription>Connect your RepairDesk account to sync customers as leads.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="rd-store-url">Store URL (optional)</Label>
+                        <Input
+                            id="rd-store-url"
+                            type="url"
+                            value={repairDeskStoreUrl}
+                            onChange={(e) => setRepairDeskStoreUrl(e.target.value)}
+                            placeholder="https://yourstore.repairdesk.co"
+                        />
+                        <p className="text-sm text-gray-500">Your RepairDesk store URL. Leave blank to use the default API.</p>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="rd-api-key">API Key</Label>
+                        <Input
+                            id="rd-api-key"
+                            type="password"
+                            value={repairDeskApiKey}
+                            onChange={(e) => setRepairDeskApiKey(e.target.value)}
+                            placeholder="Enter your RepairDesk API key"
+                        />
+                        <p className="text-sm text-gray-500">
+                            Find this in RepairDesk: Store Settings &rarr; Other Information &rarr; API Key.
+                        </p>
+                    </div>
+                    <div className="flex gap-3 items-center">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleTestRepairDesk}
+                            disabled={rdTestStatus === 'testing' || !repairDeskApiKey}
+                        >
+                            {rdTestStatus === 'testing' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                            {rdTestStatus === 'success' && <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" />}
+                            {rdTestStatus === 'error' && <XCircle className="h-4 w-4 mr-2 text-red-600" />}
+                            {rdTestStatus === 'idle' && null}
+                            Test Connection
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleSyncRepairDesk}
+                            disabled={syncing || !repairDeskApiKey}
+                        >
+                            {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                            Sync Customers
+                        </Button>
                     </div>
                 </CardContent>
             </Card>
