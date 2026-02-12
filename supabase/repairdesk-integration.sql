@@ -33,3 +33,6 @@ ALTER TABLE businesses ADD COLUMN IF NOT EXISTS repairdesk_last_poll_at timestam
 CREATE INDEX IF NOT EXISTS idx_leads_sms_hold
   ON leads(sms_hold_until)
   WHERE sms_hold_until IS NOT NULL;
+
+-- After-hours SMS template (sent when the business is closed)
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS sms_template_closed text;

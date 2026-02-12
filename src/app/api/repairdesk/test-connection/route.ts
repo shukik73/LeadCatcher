@@ -23,15 +23,23 @@ export async function POST(request: Request) {
         }
 
         const client = new RepairDeskClient(apiKey, storeUrl);
-        const isConnected = await client.testConnection();
+        const result = await client.testConnection();
 
-        if (isConnected) {
+        if (result.success) {
             logger.info('[RepairDesk] Connection test successful', { userId: user.id });
             return Response.json({ success: true, message: 'Connected to RepairDesk' });
         } else {
-            logger.warn('[RepairDesk] Connection test failed', { userId: user.id });
+            logger.warn('[RepairDesk] Connection test failed', {
+                userId: user.id,
+                error: result.error,
+                baseUrl: result.baseUrl,
+            });
             return Response.json(
-                { success: false, message: 'Failed to connect. Check your API key and store URL.' },
+                {
+                    success: false,
+                    message: `Connection failed: ${result.error}`,
+                    baseUrl: result.baseUrl,
+                },
                 { status: 400 }
             );
         }

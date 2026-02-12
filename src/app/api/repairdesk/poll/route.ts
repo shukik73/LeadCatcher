@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { RepairDeskClient } from '@/lib/repairdesk';
 import { normalizePhoneNumber } from '@/lib/phone-utils';
+import { isBusinessHours, type BusinessHours } from '@/lib/business-logic';
 import { logger } from '@/lib/logger';
 import twilio from 'twilio';
 
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
         // Get all businesses with RepairDesk configured
         const { data: businesses, error: bizError } = await supabaseAdmin
             .from('businesses')
-            .select('id, repairdesk_api_key, repairdesk_store_url, repairdesk_last_poll_at, forwarding_number, name, sms_template')
+            .select('id, repairdesk_api_key, repairdesk_store_url, repairdesk_last_poll_at, forwarding_number, name, sms_template, sms_template_closed, business_hours, timezone')
             .not('repairdesk_api_key', 'is', null);
 
         if (bizError) {
@@ -78,6 +79,9 @@ interface BusinessRow {
     forwarding_number: string;
     name: string;
     sms_template: string | null;
+    sms_template_closed: string | null;
+    business_hours: BusinessHours | null;
+    timezone: string | null;
 }
 
 async function pollBusiness(business: BusinessRow) {
@@ -261,9 +265,16 @@ async function sendMissedCallSms(
         return false;
     }
 
-    // Build message from template or default
-    const template = business.sms_template
-        || "Hi! Sorry we missed your call. How can we help you today?";
+    // Pick template based on business hours
+    const timezone = business.timezone || 'America/New_York';
+    const isOpen = isBusinessHours(business.business_hours, timezone);
+
+    const defaultOpen = "Hi! We missed your call — we were helping another customer. How can we help you? Would you like us to give you a call back in a few?";
+    const defaultClosed = "Hi! Our store is currently closed. How can we help you? Would you like us to schedule an appointment for when we open?";
+
+    const template = isOpen
+        ? (business.sms_template || defaultOpen)
+        : (business.sms_template_closed || defaultClosed);
     const body = template.replace(/\{\{business_name\}\}/g, business.name || 'our business');
 
     try {

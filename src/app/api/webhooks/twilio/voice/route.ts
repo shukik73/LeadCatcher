@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     // 2. ISOLATION: Look up business
     const { data: business, error: bizError } = await supabaseAdmin
         .from('businesses')
-        .select('id, owner_phone, name, business_hours, timezone, sms_template')
+        .select('id, owner_phone, name, business_hours, timezone, sms_template, sms_template_closed')
         .eq('forwarding_number', called)
         .single();
 
@@ -62,10 +62,17 @@ export async function POST(request: Request) {
 
     const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
-    // 5. PREPARE MESSAGE (only if not opted out)
+    // 5. PREPARE MESSAGE (only if not opted out) — use time-aware template
     if (!optOut) {
         try {
-            const message = `Hi! I'm the AI assistant for ${business.name}. I'm recording your voicemail now and will have someone get back to you shortly.`;
+            const defaultOpen = "Hi! We missed your call — we were helping another customer. How can we help you? Would you like us to give you a call back in a few?";
+            const defaultClosed = "Hi! Our store is currently closed. How can we help you? Would you like us to schedule an appointment for when we open?";
+
+            const template = isOpen
+                ? (business.sms_template || defaultOpen)
+                : (business.sms_template_closed || defaultClosed);
+            const message = template.replace(/\{\{business_name\}\}/g, business.name || 'our business');
+
             await client.messages.create({
                 to: caller,
                 from: called,

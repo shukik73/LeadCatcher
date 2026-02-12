@@ -188,14 +188,16 @@ export class RepairDeskClient {
     }
 
     /**
-     * Test connection by fetching the first page of customers
+     * Test connection by fetching the first page of customers.
+     * Returns detailed error info on failure for debugging.
      */
-    async testConnection(): Promise<boolean> {
+    async testConnection(): Promise<{ success: boolean; error?: string; baseUrl?: string }> {
         try {
             await this.getCustomers(1);
-            return true;
-        } catch {
-            return false;
+            return { success: true };
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            return { success: false, error: message, baseUrl: this.baseUrl };
         }
     }
 }
