@@ -152,12 +152,16 @@ export async function middleware(request: NextRequest) {
 export const config = {
     matcher: [
         /*
-         * Match all request paths except for the ones starting with:
-         * - _next/static (static files)
-         * - _next/image (image optimization files)
-         * - favicon.ico (favicon file)
-         * - api/webhooks (public webhooks - optional exclude from auth but keep for rate limit)
+         * Match only routes that need auth or rate limiting:
+         * - /api/* routes (rate limiting + webhook auth)
+         * - /dashboard/* (auth required)
+         * - /onboarding/* (auth required)
+         * - /login (redirect if authenticated)
+         * - / (auth code redirect)
+         *
+         * Excludes static assets, images, fonts, and file extensions
+         * to avoid unnecessary middleware overhead.
          */
-        '/((?!_next/static|_next/image|favicon.ico).*)',
+        '/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff|woff2|ttf|eot)$).*)',
     ],
 };

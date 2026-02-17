@@ -80,6 +80,8 @@ describe('Middleware', () => {
         mockLimit.mockResolvedValue({ success: true, limit: 10, reset: Date.now(), remaining: 9 });
     });
 
+    // Minimal mock that satisfies middleware's NextRequest usage.
+    // Cast via `unknown` to avoid tsc errors with the incomplete mock.
     function createMockRequest(pathname: string, options: {
         searchParams?: Record<string, string>;
         headers?: Record<string, string>;
@@ -101,7 +103,7 @@ describe('Middleware', () => {
                 get: vi.fn(),
                 set: vi.fn(),
             },
-        };
+        } as unknown as Parameters<typeof import('@/middleware').middleware>[0];
     }
 
     it('redirects root with auth code to /auth/callback', async () => {
@@ -110,7 +112,7 @@ describe('Middleware', () => {
         const { middleware } = await import('@/middleware');
 
         const req = createMockRequest('/', { searchParams: { code: 'abc123' } });
-        const res = await middleware(req as never);
+        const res = await middleware(req);
 
         expect((res as Record<string, unknown>)._redirectUrl).toContain('/auth/callback');
         expect((res as Record<string, unknown>)._redirectUrl).toContain('code=abc123');
@@ -122,7 +124,7 @@ describe('Middleware', () => {
 
         const { middleware } = await import('@/middleware');
         const req = createMockRequest('/dashboard');
-        const res = await middleware(req as never);
+        const res = await middleware(req);
 
         expect((res as Record<string, unknown>)._redirectUrl).toContain('/login');
     });
@@ -133,7 +135,7 @@ describe('Middleware', () => {
 
         const { middleware } = await import('@/middleware');
         const req = createMockRequest('/onboarding');
-        const res = await middleware(req as never);
+        const res = await middleware(req);
 
         expect((res as Record<string, unknown>)._redirectUrl).toContain('/login');
     });
@@ -144,7 +146,7 @@ describe('Middleware', () => {
 
         const { middleware } = await import('@/middleware');
         const req = createMockRequest('/dashboard');
-        const res = await middleware(req as never);
+        const res = await middleware(req);
 
         // Should be a "next" response, not a redirect
         expect((res as Record<string, unknown>)._isNext).toBe(true);
@@ -156,7 +158,7 @@ describe('Middleware', () => {
 
         const { middleware } = await import('@/middleware');
         const req = createMockRequest('/login');
-        const res = await middleware(req as never);
+        const res = await middleware(req);
 
         expect((res as Record<string, unknown>)._redirectUrl).toContain('/dashboard');
     });
@@ -167,7 +169,7 @@ describe('Middleware', () => {
 
         const { middleware } = await import('@/middleware');
         const req = createMockRequest('/login');
-        const res = await middleware(req as never);
+        const res = await middleware(req);
 
         expect((res as Record<string, unknown>)._isNext).toBe(true);
     });
@@ -180,7 +182,7 @@ describe('Middleware', () => {
         const req = createMockRequest('/api/some-endpoint', {
             headers: { 'x-forwarded-for': '1.2.3.4' },
         });
-        const res = await middleware(req as never);
+        const res = await middleware(req);
 
         expect(res.status).toBe(429);
     });
@@ -194,7 +196,7 @@ describe('Middleware', () => {
         const req = createMockRequest('/api/some-endpoint', {
             headers: { 'x-forwarded-for': '1.2.3.4' },
         });
-        const res = await middleware(req as never);
+        const res = await middleware(req);
 
         // Should not be 429
         expect(res.status).not.toBe(429);
@@ -209,7 +211,7 @@ describe('Middleware', () => {
         const req = createMockRequest('/api/endpoint', {
             headers: { 'x-forwarded-for': '5.6.7.8, 1.2.3.4' },
         });
-        await middleware(req as never);
+        await middleware(req);
 
         // Rate limit should use first IP from x-forwarded-for
         expect(mockLimit).toHaveBeenCalledWith('5.6.7.8');

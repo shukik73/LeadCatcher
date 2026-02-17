@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase-server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import twilio from 'twilio';
+import { logger } from '@/lib/logger';
 
 // This route triggers a real call to the user's business phone to verify forwarding.
 // 1. Authenticate User
@@ -79,7 +80,7 @@ export async function POST() {
         });
 
     } catch (error) {
-        console.error('Verification Call Failed:', error);
+        logger.error('Verification Call Failed', error);
         return new Response(JSON.stringify({ success: false, error: 'Failed to place call' }), { status: 500 });
     }
 }

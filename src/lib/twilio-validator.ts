@@ -14,7 +14,18 @@ export async function validateTwilioRequest(request: Request): Promise<boolean> 
   }
 
   const authToken = process.env.TWILIO_AUTH_TOKEN!;
-  const url = process.env.TWILIO_WEBHOOK_URL || request.url; // In prod use env var to handle load balancers/ngrok
+
+  // Build validation URL: use APP_BASE_URL + request pathname for correct
+  // signature matching. Twilio signs against the exact URL it posted to.
+  // Using request.url directly can fail behind proxies/load balancers.
+  let url: string;
+  const baseUrl = process.env.APP_BASE_URL || process.env.TWILIO_WEBHOOK_URL;
+  if (baseUrl) {
+    const requestUrl = new URL(request.url);
+    url = `${baseUrl.replace(/\/$/, '')}${requestUrl.pathname}${requestUrl.search}`;
+  } else {
+    url = request.url;
+  }
 
   // Parse form data
   const formData = await request.clone().formData();

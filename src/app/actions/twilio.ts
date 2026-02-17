@@ -3,6 +3,7 @@
 import twilio from 'twilio';
 import { z } from 'zod';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { logger } from '@/lib/logger';
 
 // Validation schema for phone number (E.164 format)
 const phoneNumberSchema = z.string()
@@ -51,7 +52,7 @@ export async function verifyTwilioPhoneNumber(phoneNumber: string): Promise<Veri
     const authToken = process.env.TWILIO_AUTH_TOKEN;
 
     if (!accountSid || !authToken) {
-        console.error('[verifyTwilioPhoneNumber] Missing Twilio credentials');
+        logger.error('[verifyTwilioPhoneNumber] Missing Twilio credentials');
         return {
             success: false,
             error: 'Server configuration error. Please contact support.'
@@ -59,7 +60,7 @@ export async function verifyTwilioPhoneNumber(phoneNumber: string): Promise<Veri
     }
 
     if (!accountSid.startsWith('AC')) {
-        console.error('[verifyTwilioPhoneNumber] Invalid Twilio Account SID format');
+        logger.error('[verifyTwilioPhoneNumber] Invalid Twilio Account SID format');
         return {
             success: false,
             error: 'Invalid Twilio configuration. Account SID must start with AC.'
@@ -93,7 +94,7 @@ export async function verifyTwilioPhoneNumber(phoneNumber: string): Promise<Veri
         };
 
     } catch (error) {
-        console.error('[verifyTwilioPhoneNumber] Twilio API error:', error);
+        logger.error('[verifyTwilioPhoneNumber] Twilio API error', error);
 
         // Handle specific Twilio errors
         if (error instanceof Error) {
@@ -145,14 +146,14 @@ export async function linkTwilioNumberToBusiness(
             .eq('user_id', user.id);
 
         if (updateError) {
-            console.error('[linkTwilioNumberToBusiness] DB error:', updateError);
+            logger.error('[linkTwilioNumberToBusiness] DB error', updateError);
             return { success: false, error: 'Failed to save phone number to your account' };
         }
 
         return { success: true };
 
     } catch (error) {
-        console.error('[linkTwilioNumberToBusiness] Error:', error);
+        logger.error('[linkTwilioNumberToBusiness] Error', error);
         return { success: false, error: 'An unexpected error occurred' };
     }
 }

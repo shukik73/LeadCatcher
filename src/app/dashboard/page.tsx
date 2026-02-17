@@ -145,7 +145,7 @@ export default function Dashboard() {
             setReplyText('');
             toast.success('Message sent!');
         } catch (error) {
-            console.error('Error sending message:', error);
+            logger.error('Error sending message', error);
             toast.error('Failed to send message.');
         }
         setSending(false);
@@ -192,7 +192,7 @@ export default function Dashboard() {
                 </h1>
                 <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                     <SheetTrigger asChild>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" aria-label="Open navigation menu">
                             <Menu className="h-6 w-6" />
                         </Button>
                     </SheetTrigger>

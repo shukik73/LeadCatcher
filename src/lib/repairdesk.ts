@@ -1,4 +1,5 @@
 import { logger } from '@/lib/logger';
+import { validateRepairDeskUrl } from '@/lib/url-validator';
 
 /**
  * RepairDesk API Client
@@ -76,10 +77,17 @@ export class RepairDeskClient {
 
     constructor(apiKey: string, storeUrl?: string) {
         this.apiKey = apiKey;
-        // Default base URL pattern — update if RepairDesk uses a different structure
-        this.baseUrl = storeUrl
-            ? `${storeUrl.replace(/\/$/, '')}/api/v1`
-            : 'https://api.repairdesk.co/api/v1';
+
+        if (storeUrl) {
+            // SSRF protection: validate the URL before using it
+            const validation = validateRepairDeskUrl(storeUrl);
+            if (!validation.valid) {
+                throw new Error(`Invalid RepairDesk URL: ${validation.error}`);
+            }
+            this.baseUrl = `${storeUrl.replace(/\/$/, '')}/api/v1`;
+        } else {
+            this.baseUrl = 'https://api.repairdesk.co/api/v1';
+        }
     }
 
     private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {

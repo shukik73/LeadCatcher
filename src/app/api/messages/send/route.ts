@@ -1,22 +1,30 @@
 import { supabaseAdmin } from '@/lib/supabase-server';
-import { createSupabaseServerClient } from '@/lib/supabase-server'; // Handles auth context
+import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { logger } from '@/lib/logger';
 import twilio from 'twilio';
+import { z } from 'zod';
 
 // Initialize Twilio Client
 const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
+const sendMessageSchema = z.object({
+    leadId: z.string().uuid('Invalid lead ID format'),
+    body: z.string().min(1, 'Message body is required').max(1600, 'Message too long (max 1600 characters)'),
+});
+
 export async function POST(request: Request) {
     try {
-        const { leadId, body } = await request.json();
+        const rawBody = await request.json();
+        const parsed = sendMessageSchema.safeParse(rawBody);
 
-        if (!leadId || !body) {
-            return new Response('Missing leadId or body', { status: 400 });
+        if (!parsed.success) {
+            return new Response(JSON.stringify({
+                success: false,
+                error: parsed.error.issues[0]?.message || 'Invalid request',
+            }), { status: 400, headers: { 'Content-Type': 'application/json' } });
         }
 
-        if (body.length > 1600) {
-            return new Response('Message too long (max 1600 characters)', { status: 400 });
-        }
+        const { leadId, body } = parsed.data;
 
         // 1. Authenticate User
         const supabase = await createSupabaseServerClient();
@@ -64,15 +72,27 @@ export async function POST(request: Request) {
         }
 
         // 3. TCPA COMPLIANCE: Check if user is opted out
+        // FAIL CLOSED: if the opt-out lookup errors, do NOT send SMS
         const businessId = leadWithBusiness.businesses.id;
         const toNumber = leadWithBusiness.caller_phone;
 
-        const { data: optOut } = await supabaseAdmin
+        const { data: optOut, error: optOutError } = await supabaseAdmin
             .from('opt_outs')
             .select('id')
             .eq('business_id', businessId)
             .eq('phone_number', toNumber)
             .maybeSingle();
+
+        if (optOutError) {
+            logger.error('Opt-out check failed, blocking send (fail closed)', optOutError, { leadId, toNumber, userId: user.id });
+            return new Response(JSON.stringify({
+                success: false,
+                error: 'Unable to verify opt-out status. Please try again.'
+            }), {
+                status: 503,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
 
         if (optOut) {
             logger.warn('Attempted to send message to opted-out user', { leadId, toNumber, userId: user.id });

@@ -16,10 +16,27 @@ export async function POST(request: Request) {
     }
 
     const formData = await request.formData();
+    const callSid = formData.get('CallSid') as string;
     const callerRaw = formData.get('Caller') as string;
     const calledRaw = formData.get('Called') as string;
 
     if (!callerRaw) return new Response('No caller found', { status: 400 });
+
+    // Idempotency: skip if we already processed this CallSid
+    if (callSid) {
+        const { data: existing } = await supabaseAdmin
+            .from('webhook_events')
+            .select('id')
+            .eq('event_id', callSid)
+            .maybeSingle();
+
+        if (existing) {
+            logger.info('[Voice Webhook] Duplicate CallSid, skipping', { callSid });
+            const dup = new twilio.twiml.VoiceResponse();
+            dup.hangup();
+            return new Response(dup.toString(), { headers: { 'Content-Type': 'text/xml' } });
+        }
+    }
 
     const caller = normalizePhoneNumber(callerRaw);
     const called = normalizePhoneNumber(calledRaw);
@@ -41,6 +58,15 @@ export async function POST(request: Request) {
         return new Response(response.toString(), { headers: { 'Content-Type': 'text/xml' } });
     }
 
+    // Record this event for idempotency
+    if (callSid) {
+        await supabaseAdmin.from('webhook_events').insert({
+            event_id: callSid,
+            event_type: 'voice',
+            business_id: business.id,
+        }).catch(() => { /* unique constraint = already recorded */ });
+    }
+
     logger.info(`[Voice Webhook] Missed call for business`, { business: business.name });
 
     // 3. CHECK BUSINESS HOURS
@@ -53,7 +79,8 @@ export async function POST(request: Request) {
     logger.info(`[Voice Webhook] Processing missed call. Business Open: ${isOpen}`);
 
     // 4. TCPA COMPLIANCE: Check if user is opted out before sending any SMS
-    const { data: optOut } = await supabaseAdmin
+    // FAIL CLOSED: if the opt-out lookup errors, do NOT send SMS
+    const { data: optOut, error: optOutError } = await supabaseAdmin
         .from('opt_outs')
         .select('id')
         .eq('business_id', business.id)
@@ -62,8 +89,12 @@ export async function POST(request: Request) {
 
     const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
-    // 5. PREPARE MESSAGE (only if not opted out) — use time-aware template
-    if (!optOut) {
+    if (optOutError) {
+        logger.error('[Voice Webhook] Opt-out check failed, suppressing SMS (fail closed)', optOutError, { caller, businessId: business.id });
+    }
+
+    // 5. PREPARE MESSAGE (only if not opted out AND lookup succeeded)
+    if (!optOut && !optOutError) {
         try {
             const defaultOpen = "Hi! We missed your call — we were helping another customer. How can we help you? Would you like us to give you a call back in a few?";
             const defaultClosed = "Hi! Our store is currently closed. How can we help you? Would you like us to schedule an appointment for when we open?";
@@ -82,7 +113,7 @@ export async function POST(request: Request) {
             logger.error('Error sending immediate ack:', error);
         }
     } else {
-        logger.info('[Voice Webhook] Skipping immediate ack - user opted out', { caller, businessId: business.id });
+        logger.info('[Voice Webhook] Skipping immediate ack - user opted out or lookup failed', { caller, businessId: business.id });
     }
 
     // 6. Log Lead (Scoped to Business)

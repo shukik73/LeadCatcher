@@ -245,12 +245,21 @@ async function sendMissedCallSms(
     lead: { id: string; caller_phone: string; caller_name: string | null }
 ): Promise<boolean> {
     // TCPA compliance: check opt-out list
-    const { data: optOut } = await supabaseAdmin
+    // FAIL CLOSED: if the opt-out lookup errors, do NOT send SMS
+    const { data: optOut, error: optOutError } = await supabaseAdmin
         .from('opt_outs')
         .select('id')
         .eq('business_id', business.id)
         .eq('phone_number', lead.caller_phone)
         .maybeSingle();
+
+    if (optOutError) {
+        logger.error('[RepairDesk Poll] Opt-out check failed, suppressing SMS (fail closed)', optOutError, {
+            leadId: lead.id,
+            phone: lead.caller_phone,
+        });
+        return false;
+    }
 
     if (optOut) {
         logger.info('[RepairDesk Poll] Skipping SMS - user opted out', {

@@ -41,7 +41,7 @@ export default function Error({
                         <RefreshCw className="h-4 w-4" />
                         Try again
                     </Button>
-                    <Button onClick={() => window.location.href = '/'} variant="ghost">
+                    <Button onClick={() => window.location.assign('/')} variant="ghost">
                         Go home
                     </Button>
                 </div>
