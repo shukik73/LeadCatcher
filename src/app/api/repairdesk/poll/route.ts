@@ -10,9 +10,9 @@ export const dynamic = 'force-dynamic';
 const GRACE_PERIOD_MINUTES = 3;
 
 /**
- * POST /api/repairdesk/poll
+ * GET /api/repairdesk/poll
  *
- * Cron-triggered endpoint that:
+ * Cron-triggered endpoint (Vercel Cron sends GET) that:
  * 1. Polls RepairDesk for new missed calls
  * 2. Creates leads with a grace period (sms_hold_until)
  * 3. After grace period, checks if user returned the call
@@ -20,7 +20,7 @@ const GRACE_PERIOD_MINUTES = 3;
  *
  * Secured via CRON_SECRET bearer token (Vercel Cron).
  */
-export async function POST(request: Request) {
+export async function GET(request: Request) {
     // Authenticate cron request
     const authHeader = request.headers.get('authorization');
     const cronSecret = process.env.CRON_SECRET;

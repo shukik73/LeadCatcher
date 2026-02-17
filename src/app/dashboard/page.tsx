@@ -94,7 +94,7 @@ export default function Dashboard() {
         const channel = supabase
             .channel('dashboard-realtime')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, (payload) => {
-                console.log('Lead change:', payload);
+                // Realtime lead update received
                 if (payload.eventType === 'INSERT') {
                     const newLead = payload.new as Lead;
                     setLeads(prev => [{ ...newLead, messages: [] }, ...prev]);
