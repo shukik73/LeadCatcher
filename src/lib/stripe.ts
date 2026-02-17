@@ -1,11 +1,31 @@
 import Stripe from 'stripe';
 
-if (!process.env.STRIPE_SECRET_KEY) {
-    throw new Error('Missing STRIPE_SECRET_KEY environment variable');
+// Lazy-initialized Stripe client.
+// Defers creation until first use to avoid build-time failures when
+// env vars aren't available (next build collects route data before runtime).
+let _stripe: Stripe | null = null;
+
+function getStripe(): Stripe {
+    if (_stripe) return _stripe;
+
+    const key = process.env.STRIPE_SECRET_KEY;
+    if (!key) {
+        throw new Error('Missing STRIPE_SECRET_KEY environment variable');
+    }
+
+    _stripe = new Stripe(key, { typescript: true });
+    return _stripe;
 }
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-    typescript: true,
+export const stripe: Stripe = new Proxy({} as Stripe, {
+    get(_target, prop, receiver) {
+        const client = getStripe();
+        const value = Reflect.get(client, prop, receiver);
+        if (typeof value === 'function') {
+            return value.bind(client);
+        }
+        return value;
+    },
 });
 
 /**
