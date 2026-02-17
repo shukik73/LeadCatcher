@@ -36,7 +36,7 @@ export async function POST(request: Request) {
         await supabaseAdmin.from('webhook_events').insert({
             event_id: recordingSid,
             event_type: 'transcription',
-        }).catch(() => { /* unique constraint = already recorded */ });
+        }); // unique constraint silently prevents duplicates
     }
 
     // URL Params passed in callback URL — validate format after presence check

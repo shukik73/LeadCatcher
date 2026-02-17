@@ -61,7 +61,7 @@ export async function POST(request: Request) {
             event_id: messageSid,
             event_type: 'sms',
             business_id: business.id,
-        }).catch(() => { /* unique constraint = already recorded */ });
+        }); // unique constraint silently prevents duplicates
     }
 
     // 2.5. TCPA COMPLIANCE: Handle STOP keywords (STOP, UNSUBSCRIBE, CANCEL, END, QUIT)

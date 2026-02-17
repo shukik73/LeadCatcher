@@ -64,7 +64,7 @@ export async function POST(request: Request) {
             event_id: callSid,
             event_type: 'voice',
             business_id: business.id,
-        }).catch(() => { /* unique constraint = already recorded */ });
+        }); // unique constraint silently prevents duplicates
     }
 
     logger.info(`[Voice Webhook] Missed call for business`, { business: business.name });

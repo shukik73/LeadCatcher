@@ -31,6 +31,7 @@ vi.mock('./logger', () => ({
 // Since middleware uses next/server, we mock the necessary parts
 vi.mock('next/server', () => {
     class MockNextResponse {
+        [key: string]: unknown;
         status: number;
         headers: Map<string, string>;
         body: string | null;
@@ -43,20 +44,17 @@ vi.mock('next/server', () => {
 
         static next(opts?: { request?: { headers?: Headers } }) {
             const res = new MockNextResponse(null, { status: 200 });
-            (res as Record<string, unknown>)._isNext = true;
-            // Add cookies mock
-            (res as Record<string, unknown>).cookies = {
-                set: vi.fn(),
-            };
+            res._isNext = true;
+            res.cookies = { set: vi.fn() };
             if (opts?.request?.headers) {
-                (res as Record<string, unknown>)._requestHeaders = opts.request.headers;
+                res._requestHeaders = opts.request.headers;
             }
             return res;
         }
 
         static redirect(url: URL) {
             const res = new MockNextResponse(null, { status: 307 });
-            (res as Record<string, unknown>)._redirectUrl = url.toString();
+            res._redirectUrl = url.toString();
             return res;
         }
     }
@@ -114,8 +112,8 @@ describe('Middleware', () => {
         const req = createMockRequest('/', { searchParams: { code: 'abc123' } });
         const res = await middleware(req);
 
-        expect((res as Record<string, unknown>)._redirectUrl).toContain('/auth/callback');
-        expect((res as Record<string, unknown>)._redirectUrl).toContain('code=abc123');
+        expect((res as unknown as Record<string, unknown>)._redirectUrl).toContain('/auth/callback');
+        expect((res as unknown as Record<string, unknown>)._redirectUrl).toContain('code=abc123');
     });
 
     it('redirects unauthenticated users from /dashboard to /login', async () => {
@@ -126,7 +124,7 @@ describe('Middleware', () => {
         const req = createMockRequest('/dashboard');
         const res = await middleware(req);
 
-        expect((res as Record<string, unknown>)._redirectUrl).toContain('/login');
+        expect((res as unknown as Record<string, unknown>)._redirectUrl).toContain('/login');
     });
 
     it('redirects unauthenticated users from /onboarding to /login', async () => {
@@ -137,7 +135,7 @@ describe('Middleware', () => {
         const req = createMockRequest('/onboarding');
         const res = await middleware(req);
 
-        expect((res as Record<string, unknown>)._redirectUrl).toContain('/login');
+        expect((res as unknown as Record<string, unknown>)._redirectUrl).toContain('/login');
     });
 
     it('allows authenticated users to access /dashboard', async () => {
@@ -149,7 +147,7 @@ describe('Middleware', () => {
         const res = await middleware(req);
 
         // Should be a "next" response, not a redirect
-        expect((res as Record<string, unknown>)._isNext).toBe(true);
+        expect((res as unknown as Record<string, unknown>)._isNext).toBe(true);
     });
 
     it('redirects authenticated users from /login to /dashboard', async () => {
@@ -160,7 +158,7 @@ describe('Middleware', () => {
         const req = createMockRequest('/login');
         const res = await middleware(req);
 
-        expect((res as Record<string, unknown>)._redirectUrl).toContain('/dashboard');
+        expect((res as unknown as Record<string, unknown>)._redirectUrl).toContain('/dashboard');
     });
 
     it('allows unauthenticated users to access /login', async () => {
@@ -171,7 +169,7 @@ describe('Middleware', () => {
         const req = createMockRequest('/login');
         const res = await middleware(req);
 
-        expect((res as Record<string, unknown>)._isNext).toBe(true);
+        expect((res as unknown as Record<string, unknown>)._isNext).toBe(true);
     });
 
     it('returns 429 when rate limit is exceeded on API routes', async () => {
