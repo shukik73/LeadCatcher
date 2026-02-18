@@ -3,7 +3,7 @@
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Search, MessageSquare, Settings, LogOut, Phone, Wrench } from 'lucide-react';
+import { Search, MessageSquare, Settings, LogOut, Phone, Wrench, CreditCard } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-client';
@@ -132,6 +132,14 @@ export function Sidebar({
                 >
                     <Settings className="h-4 w-4 mr-2" />
                     Settings
+                </Button>
+                <Button
+                    variant="ghost"
+                    className="w-full justify-start text-slate-600 hover:text-slate-900"
+                    onClick={() => router.push('/dashboard/billing')}
+                >
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Billing
                 </Button>
                 <Button
                     variant="ghost"

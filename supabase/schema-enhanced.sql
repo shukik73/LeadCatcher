@@ -1,11 +1,12 @@
 -- Enhanced Schema with Complete RLS Policies
--- This is an improved version of schema.sql with all necessary policies
+-- This is the REFERENCE schema. For safe re-runs, use schema.sql which
+-- has IF NOT EXISTS / DO $$ guards for idempotent execution.
 
 -- Enable UUID extension
 create extension if not exists "uuid-ossp";
 
 -- Businesses Table
-create table businesses (
+create table if not exists businesses (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users not null unique, -- Unique constraint for upsert
   name text not null,
@@ -19,7 +20,7 @@ create table businesses (
 );
 
 -- Leads Table
-create table leads (
+create table if not exists leads (
   id uuid primary key default gen_random_uuid(),
   business_id uuid references businesses(id) on delete cascade not null,
   caller_phone text not null,
@@ -30,7 +31,7 @@ create table leads (
 );
 
 -- Messages Table
-create table messages (
+create table if not exists messages (
   id uuid primary key default gen_random_uuid(),
   lead_id uuid references leads(id) on delete cascade not null,
   direction text not null check (direction in ('inbound', 'outbound')),

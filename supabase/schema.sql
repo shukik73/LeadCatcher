@@ -2,7 +2,7 @@
 create extension if not exists "uuid-ossp";
 
 -- Businesses Table
-create table businesses (
+create table if not exists businesses (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users not null unique, -- Unique constraint for upsert
   name text not null,
@@ -20,7 +20,7 @@ create table businesses (
 );
 
 -- Leads Table
-create table leads (
+create table if not exists leads (
   id uuid primary key default gen_random_uuid(),
   business_id uuid references businesses(id) not null,
   caller_phone text not null,
@@ -33,7 +33,7 @@ create table leads (
 );
 
 -- Messages Table
-create table messages (
+create table if not exists messages (
   id uuid primary key default gen_random_uuid(),
   lead_id uuid references leads(id) not null,
   direction text not null check (direction in ('inbound', 'outbound')),
@@ -49,53 +49,74 @@ alter table businesses enable row level security;
 alter table leads enable row level security;
 alter table messages enable row level security;
 
--- 1. Businesses Policies
-create policy "Users can view own business" on businesses
-  for select using (auth.uid() = user_id);
+-- 1. Businesses Policies (idempotent with DO $$ guards)
+DO $$ BEGIN
+  CREATE POLICY "Users can view own business" ON businesses
+    FOR SELECT USING (auth.uid() = user_id);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
-create policy "Users can update own business" on businesses
-  for update using (auth.uid() = user_id);
+DO $$ BEGIN
+  CREATE POLICY "Users can update own business" ON businesses
+    FOR UPDATE USING (auth.uid() = user_id);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
-create policy "Users can create own business" on businesses
-  for insert with check (auth.uid() = user_id);
+DO $$ BEGIN
+  CREATE POLICY "Users can create own business" ON businesses
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- 2. Leads Policies
--- View: Own leads (linked to own business)
-create policy "Users can view own leads" on leads
-  for select using (
-    business_id in (select id from businesses where user_id = auth.uid())
-  );
+DO $$ BEGIN
+  CREATE POLICY "Users can view own leads" ON leads
+    FOR SELECT USING (
+      business_id IN (SELECT id FROM businesses WHERE user_id = auth.uid())
+    );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
--- Create: Only separate service/admin can create leads technically (via webhook), 
--- but if we allow manual lead creation used this:
-create policy "Users can create leads for own business" on leads
-  for insert with check (
-    business_id in (select id from businesses where user_id = auth.uid())
-  );
+DO $$ BEGIN
+  CREATE POLICY "Users can create leads for own business" ON leads
+    FOR INSERT WITH CHECK (
+      business_id IN (SELECT id FROM businesses WHERE user_id = auth.uid())
+    );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
--- Update: e.g. changing status
-create policy "Users can update own leads" on leads
-  for update using (
-    business_id in (select id from businesses where user_id = auth.uid())
-  );
+DO $$ BEGIN
+  CREATE POLICY "Users can update own leads" ON leads
+    FOR UPDATE USING (
+      business_id IN (SELECT id FROM businesses WHERE user_id = auth.uid())
+    );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
--- Delete: (Optional, maybe soft delete preferable)
-create policy "Users can delete own leads" on leads
-  for delete using (
-    business_id in (select id from businesses where user_id = auth.uid())
-  );
+DO $$ BEGIN
+  CREATE POLICY "Users can delete own leads" ON leads
+    FOR DELETE USING (
+      business_id IN (SELECT id FROM businesses WHERE user_id = auth.uid())
+    );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- 3. Messages Policies
-create policy "Users can view own messages" on messages
-  for select using (
-    lead_id in (select id from leads where business_id in (select id from businesses where user_id = auth.uid()))
-  );
+DO $$ BEGIN
+  CREATE POLICY "Users can view own messages" ON messages
+    FOR SELECT USING (
+      lead_id IN (SELECT id FROM leads WHERE business_id IN (SELECT id FROM businesses WHERE user_id = auth.uid()))
+    );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
--- Allow creating outbound messages
-create policy "Users can create messages for own leads" on messages
-  for insert with check (
-    lead_id in (select id from leads where business_id in (select id from businesses where user_id = auth.uid()))
-  );
+DO $$ BEGIN
+  CREATE POLICY "Users can create messages for own leads" ON messages
+    FOR INSERT WITH CHECK (
+      lead_id IN (SELECT id FROM leads WHERE business_id IN (SELECT id FROM businesses WHERE user_id = auth.uid()))
+    );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Performance Indexes
 CREATE INDEX IF NOT EXISTS idx_businesses_forwarding_number ON businesses(forwarding_number);
@@ -104,4 +125,3 @@ CREATE INDEX IF NOT EXISTS idx_leads_caller_phone ON leads(caller_phone);
 CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
 CREATE INDEX IF NOT EXISTS idx_messages_lead_id ON messages(lead_id);
 CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at DESC);
-

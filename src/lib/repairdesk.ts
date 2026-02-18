@@ -1,4 +1,5 @@
 import { logger } from '@/lib/logger';
+import { validateRepairDeskUrl } from '@/lib/url-validator';
 
 /**
  * RepairDesk API Client
@@ -50,6 +51,19 @@ export interface RepairDeskListResponse<T> {
     };
 }
 
+export interface RepairDeskCallLog {
+    id: number;
+    customer_id: number;
+    customer_name: string;
+    phone: string;
+    direction: 'inbound' | 'outbound';
+    status: 'missed' | 'answered' | 'voicemail';
+    duration: number;
+    notes: string;
+    created_at: string;
+    updated_at: string;
+}
+
 export interface RepairDeskError {
     message: string;
     status: number;
@@ -63,10 +77,17 @@ export class RepairDeskClient {
 
     constructor(apiKey: string, storeUrl?: string) {
         this.apiKey = apiKey;
-        // Default base URL pattern — update if RepairDesk uses a different structure
-        this.baseUrl = storeUrl
-            ? `${storeUrl.replace(/\/$/, '')}/api/v1`
-            : 'https://api.repairdesk.co/api/v1';
+
+        if (storeUrl) {
+            // SSRF protection: validate the URL before using it
+            const validation = validateRepairDeskUrl(storeUrl);
+            if (!validation.valid) {
+                throw new Error(`Invalid RepairDesk URL: ${validation.error}`);
+            }
+            this.baseUrl = `${storeUrl.replace(/\/$/, '')}/api/v1`;
+        } else {
+            this.baseUrl = 'https://api.repairdesk.co/api/v1';
+        }
     }
 
     private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -139,14 +160,52 @@ export class RepairDeskClient {
     }
 
     /**
-     * Test connection by fetching the first page of customers
+     * Get call logs, optionally filtered by page and date range.
+     * Endpoint may vary — verify against your RepairDesk dashboard.
      */
-    async testConnection(): Promise<boolean> {
+    async getCallLogs(page = 1, since?: string): Promise<RepairDeskListResponse<RepairDeskCallLog>> {
+        let endpoint = `/call-logs?page=${page}`;
+        if (since) {
+            endpoint += `&since=${encodeURIComponent(since)}`;
+        }
+        return this.request<RepairDeskListResponse<RepairDeskCallLog>>(endpoint);
+    }
+
+    /**
+     * Get missed calls since a given timestamp.
+     * Filters call logs for inbound calls with status 'missed'.
+     */
+    async getMissedCalls(page = 1, since?: string): Promise<RepairDeskListResponse<RepairDeskCallLog>> {
+        let endpoint = `/call-logs?page=${page}&status=missed&direction=inbound`;
+        if (since) {
+            endpoint += `&since=${encodeURIComponent(since)}`;
+        }
+        return this.request<RepairDeskListResponse<RepairDeskCallLog>>(endpoint);
+    }
+
+    /**
+     * Check if there was an outbound call to a specific phone number since a given time.
+     * Used to detect if the user returned a missed call.
+     */
+    async getOutboundCallsTo(phone: string, since?: string): Promise<RepairDeskListResponse<RepairDeskCallLog>> {
+        let endpoint = `/call-logs?direction=outbound&phone=${encodeURIComponent(phone)}`;
+        if (since) {
+            endpoint += `&since=${encodeURIComponent(since)}`;
+        }
+        return this.request<RepairDeskListResponse<RepairDeskCallLog>>(endpoint);
+    }
+
+    /**
+     * Test connection by fetching the first page of customers.
+     * Returns detailed error info on failure for debugging.
+     */
+    async testConnection(): Promise<{ success: boolean; error?: string; baseUrl?: string }> {
         try {
             await this.getCustomers(1);
-            return true;
-        } catch {
-            return false;
+            return { success: true };
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            return { success: false, error: message, baseUrl: this.baseUrl };
         }
     }
 }

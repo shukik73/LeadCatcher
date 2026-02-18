@@ -1,31 +1,48 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
-// Validate required environment variables
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Lazy-initialized admin client.
+// Avoids build-time failures when env vars aren't set (e.g. `next build`
+// collects route data before runtime environment is available).
+let _supabaseAdmin: SupabaseClient | null = null;
 
-if (!supabaseUrl || !serviceRoleKey) {
-  throw new Error(
-    'Missing Supabase environment variables. Please set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.'
-  );
+function getSupabaseAdmin(): SupabaseClient {
+  if (_supabaseAdmin) return _supabaseAdmin;
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !key) {
+    throw new Error(
+      'Missing Supabase environment variables. Please set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.'
+    );
+  }
+
+  _supabaseAdmin = createClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  return _supabaseAdmin;
 }
 
-// This client should ONLY be used in API routes or Server Components
-// It has ADMIN privileges.
-export const supabaseAdmin = createClient(
-  supabaseUrl,
-  serviceRoleKey,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
+// This client should ONLY be used in API routes or Server Components.
+// It has ADMIN privileges and bypasses RLS.
+// Uses a Proxy so the actual client is only created at first use (request-time),
+// not at module-load time (build-time).
+export const supabaseAdmin: SupabaseClient = new Proxy({} as SupabaseClient, {
+  get(_target, prop, receiver) {
+    const admin = getSupabaseAdmin();
+    const value = Reflect.get(admin, prop, receiver);
+    if (typeof value === 'function') {
+      return value.bind(admin);
     }
-  }
-);
+    return value;
+  },
+});
 
 export async function createSupabaseServerClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!supabaseUrl || !anonKey) {
     throw new Error(

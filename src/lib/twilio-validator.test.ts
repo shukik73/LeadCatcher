@@ -71,15 +71,15 @@ describe('validateTwilioRequest', () => {
         expect(result).toBe(false);
     });
 
-    it('uses TWILIO_WEBHOOK_URL env var when set', async () => {
-        process.env.TWILIO_WEBHOOK_URL = 'https://production.example.com/api/webhooks/twilio/sms';
+    it('uses TWILIO_WEBHOOK_URL as base + request path when set', async () => {
+        process.env.TWILIO_WEBHOOK_URL = 'https://production.example.com';
         mockGet.mockReturnValue('some-signature');
         mockValidateRequest.mockReturnValue(true);
 
         const req = createMockRequest({ Body: 'Hello' }, 'https://localhost:3000/api/webhooks/twilio/sms');
         await validateTwilioRequest(req);
 
-        // Should use env var URL, not the request URL
+        // Should use env var base URL + request path, not the raw request URL
         expect(mockValidateRequest).toHaveBeenCalledWith(
             'test-auth-token',
             'some-signature',

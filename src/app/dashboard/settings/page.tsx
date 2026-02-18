@@ -30,13 +30,19 @@ export default function SettingsPage() {
 
     // Form State
     const [smsTemplate, setSmsTemplate] = useState('');
+    const [smsTemplateClosed, setSmsTemplateClosed] = useState('');
     const [timezone, setTimezone] = useState('America/New_York');
-    const [hours, setHours] = useState<BusinessHours>({});
+    const [hours, setHours] = useState<BusinessHours>(() => {
+        const init: BusinessHours = {};
+        DAYS.forEach(day => { init[day] = { open: '09:00', close: '17:00', isOpen: true }; });
+        return init;
+    });
 
     // RepairDesk State
     const [repairDeskApiKey, setRepairDeskApiKey] = useState('');
     const [repairDeskStoreUrl, setRepairDeskStoreUrl] = useState('');
     const [rdTestStatus, setRdTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+    const [rdTestError, setRdTestError] = useState('');
     const [syncing, setSyncing] = useState(false);
 
     const supabase = useMemo(() => createSupabaseBrowserClient(), []);
@@ -51,14 +57,15 @@ export default function SettingsPage() {
 
         const { data: business } = await supabase
             .from('businesses')
-            .select('id, sms_template, timezone, business_hours, repairdesk_api_key, repairdesk_store_url')
+            .select('id, sms_template, sms_template_closed, timezone, business_hours, repairdesk_api_key, repairdesk_store_url')
             .eq('user_id', user.id)
             .single();
 
         if (signal?.cancelled) return;
         if (business) {
             setBusinessId(business.id);
-            setSmsTemplate(business.sms_template || "Sorry we missed you. We'll get back to you shortly.");
+            setSmsTemplate(business.sms_template || "Hi! We missed your call — we were helping another customer. How can we help you? Would you like us to give you a call back in a few?");
+            setSmsTemplateClosed(business.sms_template_closed || "Hi! Our store is currently closed. How can we help you? Would you like us to schedule an appointment for when we open?");
             setTimezone(business.timezone || 'America/New_York');
                 setRepairDeskApiKey(business.repairdesk_api_key || '');
                 setRepairDeskStoreUrl(business.repairdesk_store_url || '');
@@ -83,17 +90,17 @@ export default function SettingsPage() {
     }, [fetchSettings]);
 
     const handleHourChange = (day: string, field: 'open' | 'close', value: string) => {
-        setHours(prev => ({
-            ...prev,
-            [day]: { ...prev[day], [field]: value }
-        }));
+        setHours(prev => {
+            const current = prev[day] || { open: '09:00', close: '17:00', isOpen: true };
+            return { ...prev, [day]: { ...current, [field]: value } };
+        });
     };
 
     const handleToggleDay = (day: string) => {
-        setHours(prev => ({
-            ...prev,
-            [day]: { ...prev[day], isOpen: !prev[day].isOpen }
-        }));
+        setHours(prev => {
+            const current = prev[day] || { open: '09:00', close: '17:00', isOpen: true };
+            return { ...prev, [day]: { ...current, isOpen: !current.isOpen } };
+        });
     };
 
     const handleSave = async () => {
@@ -104,6 +111,7 @@ export default function SettingsPage() {
             .from('businesses')
             .update({
                 sms_template: smsTemplate,
+                sms_template_closed: smsTemplateClosed || null,
                 timezone,
                 business_hours: hours,
                 repairdesk_api_key: repairDeskApiKey || null,
@@ -125,6 +133,7 @@ export default function SettingsPage() {
             return;
         }
         setRdTestStatus('testing');
+        setRdTestError('');
         try {
             const res = await fetch('/api/repairdesk/test-connection', {
                 method: 'POST',
@@ -134,13 +143,19 @@ export default function SettingsPage() {
             const data = await res.json();
             if (data.success) {
                 setRdTestStatus('success');
+                setRdTestError('');
                 toast.success('Connected to RepairDesk!');
             } else {
                 setRdTestStatus('error');
+                const errorDetail = data.baseUrl
+                    ? `${data.message} (Tried: ${data.baseUrl})`
+                    : data.message || 'Connection failed';
+                setRdTestError(errorDetail);
                 toast.error(data.message || 'Connection failed');
             }
         } catch {
             setRdTestStatus('error');
+            setRdTestError('Network error — could not reach the server');
             toast.error('Connection test failed');
         }
     };
@@ -170,19 +185,29 @@ export default function SettingsPage() {
             {/* SMS Template Section */}
             <Card>
                 <CardHeader>
-                    <CardTitle>Smart Response Template</CardTitle>
-                    <CardDescription>Customize the message sent to missed calls.</CardDescription>
+                    <CardTitle>Smart Response Templates</CardTitle>
+                    <CardDescription>Customize the messages sent to missed calls based on your business hours.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-6">
                     <div className="space-y-2">
-                        <Label>SMS Template</Label>
+                        <Label>During Business Hours</Label>
                         <Textarea
                             value={smsTemplate}
                             onChange={(e) => setSmsTemplate(e.target.value)}
-                            placeholder="Sorry we missed you..."
+                            placeholder="Hi! We missed your call — we were helping another customer..."
                             className="h-24"
                         />
-                        <p className="text-sm text-gray-500">Use {'{{business_name}}'} as a placeholder.</p>
+                        <p className="text-sm text-gray-500">Sent when a call is missed during your open hours. Use {'{{business_name}}'} as a placeholder.</p>
+                    </div>
+                    <div className="space-y-2">
+                        <Label>After Hours / Closed</Label>
+                        <Textarea
+                            value={smsTemplateClosed}
+                            onChange={(e) => setSmsTemplateClosed(e.target.value)}
+                            placeholder="Hi! Our store is currently closed..."
+                            className="h-24"
+                        />
+                        <p className="text-sm text-gray-500">Sent when a call is missed outside your business hours. Use {'{{business_name}}'} as a placeholder.</p>
                     </div>
                 </CardContent>
             </Card>
@@ -215,25 +240,25 @@ export default function SettingsPage() {
                             <div key={day} className="flex items-center justify-between p-2 border rounded-lg">
                                 <div className="flex items-center gap-4 w-32">
                                     <Switch
-                                        checked={hours[day]?.isOpen}
+                                        checked={hours[day]?.isOpen ?? true}
                                         onCheckedChange={() => handleToggleDay(day)}
                                         aria-label={`Toggle ${day} business hours`}
                                     />
                                     <span className="capitalize font-medium">{day}</span>
                                 </div>
 
-                                {hours[day]?.isOpen ? (
+                                {(hours[day]?.isOpen ?? true) ? (
                                     <div className="flex items-center gap-2">
                                         <Input
                                             type="time"
-                                            value={hours[day].open}
+                                            value={hours[day]?.open ?? '09:00'}
                                             onChange={(e) => handleHourChange(day, 'open', e.target.value)}
                                             className="w-32"
                                         />
                                         <span>to</span>
                                         <Input
                                             type="time"
-                                            value={hours[day].close}
+                                            value={hours[day]?.close ?? '17:00'}
                                             onChange={(e) => handleHourChange(day, 'close', e.target.value)}
                                             className="w-32"
                                         />
@@ -301,6 +326,9 @@ export default function SettingsPage() {
                             Sync Customers
                         </Button>
                     </div>
+                    {rdTestError && (
+                        <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{rdTestError}</p>
+                    )}
                 </CardContent>
             </Card>
 

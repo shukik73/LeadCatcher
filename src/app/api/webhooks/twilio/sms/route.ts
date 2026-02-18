@@ -15,11 +15,26 @@ export async function POST(request: Request) {
     }
 
     const formData = await request.formData();
+    const messageSid = formData.get('MessageSid') as string;
     const fromRaw = formData.get('From') as string;
     const toRaw = formData.get('To') as string;
     const body = formData.get('Body') as string;
 
     if (!fromRaw || !body) return new Response('Invalid Request', { status: 400 });
+
+    // Idempotency: skip if we already processed this MessageSid
+    if (messageSid) {
+        const { data: existing } = await supabaseAdmin
+            .from('webhook_events')
+            .select('id')
+            .eq('event_id', messageSid)
+            .maybeSingle();
+
+        if (existing) {
+            logger.info('[SMS Webhook] Duplicate MessageSid, skipping', { messageSid });
+            return new Response('<Response></Response>', { headers: { 'Content-Type': 'text/xml' } });
+        }
+    }
 
     const from = normalizePhoneNumber(fromRaw);
     const to = normalizePhoneNumber(toRaw);
@@ -38,6 +53,15 @@ export async function POST(request: Request) {
     if (!business) {
         logger.error(`[SMS Webhook] No business found for number`, null, { to });
         return new Response('<Response></Response>', { headers: { 'Content-Type': 'text/xml' } });
+    }
+
+    // Record this event for idempotency
+    if (messageSid) {
+        await supabaseAdmin.from('webhook_events').insert({
+            event_id: messageSid,
+            event_type: 'sms',
+            business_id: business.id,
+        }); // unique constraint silently prevents duplicates
     }
 
     // 2.5. TCPA COMPLIANCE: Handle STOP keywords (STOP, UNSUBSCRIBE, CANCEL, END, QUIT)

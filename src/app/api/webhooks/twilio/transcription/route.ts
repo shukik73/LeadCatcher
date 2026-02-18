@@ -15,8 +15,29 @@ export async function POST(request: Request) {
     }
 
     const formData = await request.formData();
+    const recordingSid = formData.get('RecordingSid') as string;
     const transcriptionText = formData.get('TranscriptionText') as string;
     const transcriptionStatus = formData.get('TranscriptionStatus') as string;
+
+    // Idempotency: skip if we already processed this RecordingSid
+    if (recordingSid) {
+        const { data: existing } = await supabaseAdmin
+            .from('webhook_events')
+            .select('id')
+            .eq('event_id', recordingSid)
+            .maybeSingle();
+
+        if (existing) {
+            logger.info('[Transcription Webhook] Duplicate RecordingSid, skipping', { recordingSid });
+            return new Response('OK');
+        }
+
+        // Record this event
+        await supabaseAdmin.from('webhook_events').insert({
+            event_id: recordingSid,
+            event_type: 'transcription',
+        }); // unique constraint silently prevents duplicates
+    }
 
     // URL Params passed in callback URL — validate format after presence check
     const url = new URL(request.url);
@@ -40,6 +61,11 @@ export async function POST(request: Request) {
 
     if (transcriptionStatus !== 'completed') {
         logger.warn('Transcription failed or pending', { status: transcriptionStatus });
+        return new Response('OK');
+    }
+
+    if (!transcriptionText) {
+        logger.warn('[Transcription Webhook] Transcription completed but text is empty', { caller });
         return new Response('OK');
     }
 
@@ -77,15 +103,20 @@ export async function POST(request: Request) {
     }
 
     // 4. TCPA COMPLIANCE: Check if user is opted out before sending any SMS
-    const { data: optOut } = await supabaseAdmin
+    // FAIL CLOSED: if the opt-out lookup errors, do NOT send SMS
+    const { data: optOut, error: optOutError } = await supabaseAdmin
         .from('opt_outs')
         .select('id')
         .eq('business_id', businessId)
         .eq('phone_number', caller)
         .maybeSingle();
 
-    // 5. Send Smart SMS Reply (only if not opted out)
-    if (analysis.suggestedReply && !optOut) {
+    if (optOutError) {
+        logger.error('[Transcription Webhook] Opt-out check failed, suppressing SMS (fail closed)', optOutError, { caller, businessId });
+    }
+
+    // 5. Send Smart SMS Reply (only if not opted out AND lookup succeeded)
+    if (analysis.suggestedReply && !optOut && !optOutError) {
         const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
         try {
             await client.messages.create({
@@ -108,8 +139,8 @@ export async function POST(request: Request) {
         } catch (error) {
             logger.error('Failed to send smart reply', error);
         }
-    } else if (optOut) {
-        logger.info('[Transcription Webhook] Skipping auto-reply - user opted out', { caller, businessId });
+    } else if (optOut || optOutError) {
+        logger.info('[Transcription Webhook] Skipping auto-reply - user opted out or lookup failed', { caller, businessId });
     }
 
     // 6. Notify Owner with Summary

@@ -37,7 +37,7 @@ export function isBusinessHours(hours: BusinessHours | null, timezone: string): 
 
         return currentTime >= todayHours.open && currentTime <= todayHours.close;
     } catch (error) {
-        console.error('Error checking business hours:', error);
+        void error; // Fail open — error already caught
         return true; // Fail open
     }
 }

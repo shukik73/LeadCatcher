@@ -12,6 +12,7 @@ import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { createSupabaseBrowserClient } from '@/lib/supabase-client';
+import { logger } from '@/lib/logger';
 import { toast } from 'sonner';
 import { CheckCircle2, Phone, Loader2, Copy, AlertCircle } from 'lucide-react';
 import { verifyTwilioPhoneNumber, linkTwilioNumberToBusiness } from '@/app/actions/twilio';
@@ -85,7 +86,7 @@ export default function Wizard() {
         }, { onConflict: 'user_id' }).select().single();
 
         if (error) {
-            console.error(error);
+            logger.error('Failed to save business', error);
             toast.error("Failed to save business");
             return;
         }
@@ -139,7 +140,7 @@ export default function Wizard() {
             }, 1500);
 
         } catch (error) {
-            console.error('Verification error:', error);
+            logger.error('Verification error', error);
             setVerificationError('An unexpected error occurred. Please try again.');
             setIsVerifying(false);
         }
@@ -163,7 +164,7 @@ export default function Wizard() {
                 }, 3000);
             }
         } catch (e) {
-            console.error(e);
+            logger.error('Test call failed', e);
             setIsVerifying(false);
         }
     };
