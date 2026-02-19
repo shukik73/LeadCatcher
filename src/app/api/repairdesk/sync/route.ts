@@ -6,7 +6,7 @@ import { normalizePhoneNumber } from '@/lib/phone-utils';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST(_request: Request) {
+export async function POST() {
     try {
         // Auth: verify the user owns this business
         const supabase = await createSupabaseServerClient();

@@ -22,15 +22,20 @@ export async function POST(request: Request) {
 
     if (!callerRaw) return new Response('No caller found', { status: 400 });
 
-    // Idempotency: skip if we already processed this CallSid
+    // Idempotency: atomic claim via INSERT ... ON CONFLICT DO NOTHING.
+    // Only the first request to claim the event_id proceeds; retries get 0 rows.
     if (callSid) {
-        const { data: existing } = await supabaseAdmin
+        const { data: claimed } = await supabaseAdmin
             .from('webhook_events')
+            .insert({
+                event_id: callSid,
+                event_type: 'voice',
+                status: 'processing',
+            })
             .select('id')
-            .eq('event_id', callSid)
             .maybeSingle();
 
-        if (existing) {
+        if (!claimed) {
             logger.info('[Voice Webhook] Duplicate CallSid, skipping', { callSid });
             const dup = new twilio.twiml.VoiceResponse();
             dup.hangup();
@@ -52,19 +57,23 @@ export async function POST(request: Request) {
 
     if (bizError || !business) {
         logger.error(`[Voice Webhook] No business found`, bizError, { called });
+        // Mark as failed so retries can re-attempt
+        if (callSid) {
+            await supabaseAdmin.from('webhook_events')
+                .update({ status: 'failed' })
+                .eq('event_id', callSid);
+        }
         const response = new twilio.twiml.VoiceResponse();
         response.say("We're sorry, this number is not configured correctly. Goodbye.");
         response.hangup();
         return new Response(response.toString(), { headers: { 'Content-Type': 'text/xml' } });
     }
 
-    // Record this event for idempotency
+    // Update the claimed event with the business_id
     if (callSid) {
-        await supabaseAdmin.from('webhook_events').insert({
-            event_id: callSid,
-            event_type: 'voice',
-            business_id: business.id,
-        }); // unique constraint silently prevents duplicates
+        await supabaseAdmin.from('webhook_events')
+            .update({ business_id: business.id })
+            .eq('event_id', callSid);
     }
 
     logger.info(`[Voice Webhook] Missed call for business`, { business: business.name });
@@ -157,6 +166,13 @@ export async function POST(request: Request) {
     });
 
     response.hangup();
+
+    // Mark event as fully processed after all side effects succeeded
+    if (callSid) {
+        await supabaseAdmin.from('webhook_events')
+            .update({ status: 'processed', processed_at: new Date().toISOString() })
+            .eq('event_id', callSid);
+    }
 
     return new Response(response.toString(), {
         headers: { 'Content-Type': 'text/xml' },
