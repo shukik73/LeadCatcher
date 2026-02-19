@@ -120,7 +120,8 @@ export default function SettingsPage() {
             .eq('id', businessId);
 
         if (error) {
-            toast.error('Failed to save settings');
+            console.error('Settings save error:', error);
+            toast.error('Failed to save settings', { description: error.message });
         } else {
             toast.success('Settings saved successfully');
         }
@@ -128,6 +129,10 @@ export default function SettingsPage() {
     };
 
     const handleTestRepairDesk = async () => {
+        if (!repairDeskStoreUrl) {
+            toast.error('Enter your RepairDesk store URL first');
+            return;
+        }
         if (!repairDeskApiKey) {
             toast.error('Enter your RepairDesk API key first');
             return;
@@ -280,15 +285,16 @@ export default function SettingsPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="space-y-2">
-                        <Label htmlFor="rd-store-url">Store URL (optional)</Label>
+                        <Label htmlFor="rd-store-url">Store URL <span className="text-red-500">*</span></Label>
                         <Input
                             id="rd-store-url"
                             type="url"
                             value={repairDeskStoreUrl}
                             onChange={(e) => setRepairDeskStoreUrl(e.target.value)}
                             placeholder="https://yourstore.repairdesk.co"
+                            required
                         />
-                        <p className="text-sm text-gray-500">Your RepairDesk store URL. Leave blank to use the default API.</p>
+                        <p className="text-sm text-gray-500">Your RepairDesk store URL, e.g. <code className="bg-gray-100 px-1 rounded">https://yourstore.repairdesk.co</code>. Find your store subdomain in your browser address bar when logged into RepairDesk.</p>
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="rd-api-key">API Key</Label>
@@ -308,7 +314,7 @@ export default function SettingsPage() {
                             variant="outline"
                             size="sm"
                             onClick={handleTestRepairDesk}
-                            disabled={rdTestStatus === 'testing' || !repairDeskApiKey}
+                            disabled={rdTestStatus === 'testing' || !repairDeskApiKey || !repairDeskStoreUrl}
                         >
                             {rdTestStatus === 'testing' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                             {rdTestStatus === 'success' && <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" />}
@@ -320,7 +326,7 @@ export default function SettingsPage() {
                             variant="outline"
                             size="sm"
                             onClick={handleSyncRepairDesk}
-                            disabled={syncing || !repairDeskApiKey}
+                            disabled={syncing || !repairDeskApiKey || !repairDeskStoreUrl}
                         >
                             {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
                             Sync Customers

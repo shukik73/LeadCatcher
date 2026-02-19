@@ -1,6 +1,7 @@
 import { createSupabaseServerClient, supabaseAdmin } from '@/lib/supabase-server';
 import { redirect } from 'next/navigation';
 import { SubscriptionBanner } from '@/components/dashboard/SubscriptionBanner';
+import { DashboardNav } from '@/components/dashboard/DashboardNav';
 
 export default async function DashboardLayout({
     children,
@@ -35,12 +36,17 @@ export default async function DashboardLayout({
     }
 
     return (
-        <>
-            <SubscriptionBanner
-                status={stripeStatus}
-                trialDaysLeft={trialDaysLeft}
-            />
-            {children}
-        </>
+        <div className="flex flex-col md:flex-row h-screen overflow-hidden">
+            <DashboardNav />
+            <div className="flex-1 flex flex-col overflow-hidden">
+                <SubscriptionBanner
+                    status={stripeStatus}
+                    trialDaysLeft={trialDaysLeft}
+                />
+                <div className="flex-1 overflow-auto">
+                    {children}
+                </div>
+            </div>
+        </div>
     );
 }

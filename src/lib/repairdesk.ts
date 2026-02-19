@@ -78,16 +78,18 @@ export class RepairDeskClient {
     constructor(apiKey: string, storeUrl?: string) {
         this.apiKey = apiKey;
 
-        if (storeUrl) {
-            // SSRF protection: validate the URL before using it
-            const validation = validateRepairDeskUrl(storeUrl);
-            if (!validation.valid) {
-                throw new Error(`Invalid RepairDesk URL: ${validation.error}`);
-            }
-            this.baseUrl = `${storeUrl.replace(/\/$/, '')}/api/v1`;
-        } else {
-            this.baseUrl = 'https://api.repairdesk.co/api/v1';
+        if (!storeUrl) {
+            throw new Error(
+                'Store URL is required. Enter your RepairDesk store URL (e.g. https://yourstore.repairdesk.co)'
+            );
         }
+
+        // SSRF protection: validate the URL before using it
+        const validation = validateRepairDeskUrl(storeUrl);
+        if (!validation.valid) {
+            throw new Error(`Invalid RepairDesk URL: ${validation.error}`);
+        }
+        this.baseUrl = `${storeUrl.replace(/\/$/, '')}/api/web/v1`;
     }
 
     private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {

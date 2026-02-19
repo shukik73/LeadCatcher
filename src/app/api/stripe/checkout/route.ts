@@ -22,8 +22,11 @@ export async function POST(request: Request) {
         const plan = PLANS[planId as PlanId];
 
         if (!plan.priceId) {
-            logger.error('[Stripe] Missing price ID for plan', null, { planId });
-            return Response.json({ error: 'Plan not configured' }, { status: 500 });
+            logger.error('[Stripe] Missing Stripe price ID. Set STRIPE_STARTER_PRICE_ID and STRIPE_PRO_PRICE_ID env vars.', null, { planId });
+            return Response.json(
+                { error: 'Billing is not set up yet. Please configure Stripe price IDs in your environment variables (STRIPE_STARTER_PRICE_ID / STRIPE_PRO_PRICE_ID).' },
+                { status: 500 }
+            );
         }
 
         // 2. Get business

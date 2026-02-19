@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MessageSquare, Phone, Send, User, Loader2, Menu, AlertCircle, RefreshCw } from 'lucide-react';
+import { Phone, Send, User, Loader2, Menu, AlertCircle, RefreshCw } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-client';
 import { logger } from '@/lib/logger';
 import { Sidebar } from '@/components/dashboard/Sidebar';
@@ -181,25 +181,19 @@ export default function Dashboard() {
     }
 
     return (
-        <div className="flex h-screen bg-slate-50 overflow-hidden flex-col md:flex-row">
-            {/* Mobile Header */}
-            <div className="md:hidden bg-white border-b border-slate-200 p-4 flex items-center justify-between">
-                <h1 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                    <div className="bg-blue-600 text-white p-1 rounded">
-                        <MessageSquare size={14} fill="currentColor" />
-                    </div>
-                    LeadCatcher
-                </h1>
+        <div className="flex h-full bg-slate-50 overflow-hidden flex-col md:flex-row">
+            {/* Mobile leads toggle */}
+            <div className="md:hidden bg-white border-b border-slate-200 p-3">
                 <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                     <SheetTrigger asChild>
-                        <Button variant="ghost" size="icon" aria-label="Open navigation menu">
-                            <Menu className="h-6 w-6" />
+                        <Button variant="outline" size="sm" className="w-full gap-2">
+                            <Menu className="h-4 w-4" />
+                            View Leads
                         </Button>
                     </SheetTrigger>
                     <SheetContent side="left" className="p-0 w-80">
-                        {/* Hidden Title for Accessibility */}
                         <div className="sr-only">
-                            <SheetTitle>Navigation Menu</SheetTitle>
+                            <SheetTitle>Leads List</SheetTitle>
                         </div>
                         <Sidebar
                             leads={leads}
@@ -212,7 +206,7 @@ export default function Dashboard() {
                 </Sheet>
             </div>
 
-            {/* Desktop Sidebar */}
+            {/* Desktop Leads Sidebar */}
             <div className="hidden md:flex w-80 bg-white border-r border-slate-200 flex-col">
                 <Sidebar
                     leads={leads}
@@ -224,7 +218,7 @@ export default function Dashboard() {
             </div>
 
             {/* Main Chat Area */}
-            <div className="flex-1 flex flex-col h-[calc(100vh-65px)] md:h-screen">
+            <div className="flex-1 flex flex-col h-full">
                 {selectedLead ? (
                     <>
                         {/* Header */}

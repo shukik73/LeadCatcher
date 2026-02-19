@@ -1,7 +1,6 @@
 "use client";
 
 import { Skeleton } from '@/components/ui/skeleton';
-import { MessageSquare } from 'lucide-react';
 
 function LeadItemSkeleton() {
     return (
@@ -20,12 +19,7 @@ function SidebarSkeleton() {
     return (
         <div className="flex flex-col h-full">
             <div className="p-4 border-b border-slate-100">
-                <h1 className="font-bold text-xl text-slate-800 flex items-center gap-2">
-                    <div className="bg-blue-600 text-white p-1 rounded">
-                        <MessageSquare size={14} fill="currentColor" />
-                    </div>
-                    LeadCatcher
-                </h1>
+                <Skeleton className="h-6 w-32" />
             </div>
             <div className="p-4">
                 <Skeleton className="h-10 w-full" />
@@ -43,8 +37,7 @@ function SidebarSkeleton() {
 
 function ChatAreaSkeleton() {
     return (
-        <div className="flex-1 flex flex-col h-[calc(100vh-65px)] md:h-screen">
-            {/* Header Skeleton */}
+        <div className="flex-1 flex flex-col h-full">
             <header className="bg-white border-b border-slate-200 p-4 flex justify-between items-center">
                 <div className="flex items-center gap-3">
                     <Skeleton className="h-10 w-10 rounded-full" />
@@ -59,7 +52,6 @@ function ChatAreaSkeleton() {
                 </div>
             </header>
 
-            {/* Messages Area Skeleton */}
             <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50/50">
                 <div className="flex justify-start">
                     <Skeleton className="h-16 w-64 rounded-2xl" />
@@ -75,7 +67,6 @@ function ChatAreaSkeleton() {
                 </div>
             </div>
 
-            {/* Input Skeleton */}
             <div className="p-4 bg-white border-t border-slate-200">
                 <div className="flex gap-2">
                     <Skeleton className="h-10 flex-1" />
@@ -88,19 +79,8 @@ function ChatAreaSkeleton() {
 
 export function DashboardSkeleton() {
     return (
-        <div className="flex h-screen bg-slate-50 overflow-hidden flex-col md:flex-row">
-            {/* Mobile Header */}
-            <div className="md:hidden bg-white border-b border-slate-200 p-4 flex items-center justify-between">
-                <h1 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                    <div className="bg-blue-600 text-white p-1 rounded">
-                        <MessageSquare size={14} fill="currentColor" />
-                    </div>
-                    LeadCatcher
-                </h1>
-                <Skeleton className="h-8 w-8" />
-            </div>
-
-            {/* Desktop Sidebar */}
+        <div className="flex h-full bg-slate-50 overflow-hidden flex-col md:flex-row">
+            {/* Desktop Leads Sidebar */}
             <div className="hidden md:flex w-80 bg-white border-r border-slate-200 flex-col">
                 <SidebarSkeleton />
             </div>
