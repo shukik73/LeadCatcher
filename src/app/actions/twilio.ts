@@ -121,6 +121,7 @@ export async function verifyTwilioPhoneNumber(phoneNumber: string): Promise<Veri
 
 /**
  * Links a verified Twilio phone number to the user's business
+ * and automatically configures Twilio webhook URLs to point to this app.
  */
 export async function linkTwilioNumberToBusiness(
     phoneNumber: string,
@@ -148,6 +149,31 @@ export async function linkTwilioNumberToBusiness(
         if (updateError) {
             logger.error('[linkTwilioNumberToBusiness] DB error', updateError);
             return { success: false, error: 'Failed to save phone number to your account' };
+        }
+
+        // Auto-configure Twilio webhook URLs
+        const baseUrl = process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL;
+        if (baseUrl) {
+            try {
+                const accountSid = process.env.TWILIO_ACCOUNT_SID;
+                const authToken = process.env.TWILIO_AUTH_TOKEN;
+                if (accountSid && authToken) {
+                    const client = twilio(accountSid, authToken);
+                    await client.incomingPhoneNumbers(twilioSid).update({
+                        voiceUrl: `${baseUrl}/api/webhooks/twilio/voice`,
+                        voiceMethod: 'POST',
+                        smsUrl: `${baseUrl}/api/webhooks/twilio/sms`,
+                        smsMethod: 'POST',
+                    });
+                    logger.info('[linkTwilioNumberToBusiness] Twilio webhooks configured', {
+                        voiceUrl: `${baseUrl}/api/webhooks/twilio/voice`,
+                        smsUrl: `${baseUrl}/api/webhooks/twilio/sms`,
+                    });
+                }
+            } catch (webhookError) {
+                // Non-fatal: number is linked, webhooks can be configured manually
+                logger.error('[linkTwilioNumberToBusiness] Failed to auto-configure webhooks', webhookError);
+            }
         }
 
         return { success: true };
