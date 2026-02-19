@@ -80,6 +80,18 @@ export async function middleware(request: NextRequest) {
     // 2. AUTHENTICATION (Dashboard & Onboarding)
     // -------------------------------------------------------------------------
 
+    // Only create Supabase client and check auth for routes that need it.
+    // This avoids a ~100-300ms Supabase round-trip on every page load
+    // (e.g. landing page, static pages) that don't need auth at all.
+    const pathname = request.nextUrl.pathname;
+    const needsAuth = pathname.startsWith('/dashboard') ||
+                      pathname.startsWith('/onboarding') ||
+                      pathname === '/login';
+
+    if (!needsAuth) {
+        return response;
+    }
+
     // Create Supabase Client
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -128,19 +140,17 @@ export async function middleware(request: NextRequest) {
     );
 
     // Refresh Session
-    // calling getUser() or getSession() triggers the cookie refresh mechanism in createServerClient
     const { data: { user } } = await supabase.auth.getUser();
-    // const user = { id: 'preview-user' };
 
     // Protect Dashboard & Onboarding
-    if (request.nextUrl.pathname.startsWith('/dashboard') || request.nextUrl.pathname.startsWith('/onboarding')) {
+    if (pathname.startsWith('/dashboard') || pathname.startsWith('/onboarding')) {
         if (!user) {
             return NextResponse.redirect(new URL('/login', request.url));
         }
     }
 
     // Redirect /login if authenticated
-    if (request.nextUrl.pathname === '/login') {
+    if (pathname === '/login') {
         if (user) {
             return NextResponse.redirect(new URL('/dashboard', request.url));
         }
