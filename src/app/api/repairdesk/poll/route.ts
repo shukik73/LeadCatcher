@@ -154,7 +154,7 @@ async function pollBusiness(business: BusinessRow) {
     // --- Phase 2: Process leads whose grace period has expired ---
     const { data: pendingLeads, error: pendingError } = await supabaseAdmin
         .from('leads')
-        .select('id, caller_phone, caller_name, external_id, sms_hold_until')
+        .select('id, caller_phone, caller_name, external_id, sms_hold_until, created_at')
         .eq('business_id', business.id)
         .eq('source', 'repairdesk')
         .eq('status', 'New')
@@ -170,8 +170,10 @@ async function pollBusiness(business: BusinessRow) {
 
         for (const lead of pendingLeads) {
             try {
-                // Check if user returned the call
-                const callbackDetected = await checkForCallback(client, lead.caller_phone, lead.sms_hold_until);
+                // Check if user returned the call since the lead was created
+                // (not since sms_hold_until, which is the future grace period end —
+                // using hold_until would miss callbacks during the grace window)
+                const callbackDetected = await checkForCallback(client, lead.caller_phone, lead.created_at);
 
                 if (callbackDetected) {
                     // User already returned the call — mark as Contacted, clear hold
@@ -216,7 +218,9 @@ async function pollBusiness(business: BusinessRow) {
 
 /**
  * Check if the user returned a call to this phone number.
- * Looks for outbound calls in RepairDesk after the missed call was detected.
+ * Looks for outbound calls in RepairDesk since the lead was created
+ * (i.e. since the missed call was first detected), covering the full
+ * grace window.
  */
 async function checkForCallback(
     client: RepairDeskClient,

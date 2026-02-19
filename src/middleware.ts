@@ -5,8 +5,21 @@ import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 import { logger } from './lib/logger';
 
-// Initialize Redis and Ratelimit
-let ratelimit: Ratelimit | null = null;
+// Paths that receive signed provider webhooks or cron requests.
+// These get a higher rate limit to avoid dropping legitimate traffic.
+const WEBHOOK_PATHS = [
+    '/api/webhooks/twilio/',
+    '/api/stripe/webhook',
+    '/api/repairdesk/poll',
+];
+
+function isWebhookPath(pathname: string): boolean {
+    return WEBHOOK_PATHS.some(prefix => pathname.startsWith(prefix));
+}
+
+// Initialize Redis and Ratelimits (separate buckets per route class)
+let userRatelimit: Ratelimit | null = null;
+let webhookRatelimit: Ratelimit | null = null;
 
 if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
     const redis = new Redis({
@@ -14,10 +27,20 @@ if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) 
         token: process.env.UPSTASH_REDIS_REST_TOKEN,
     });
 
-    ratelimit = new Ratelimit({
+    // Standard user API routes: 10 requests / 10s
+    userRatelimit = new Ratelimit({
         redis: redis,
         limiter: Ratelimit.slidingWindow(10, '10 s'),
         analytics: true,
+        prefix: 'rl:user',
+    });
+
+    // Webhook/cron routes: 60 requests / 10s (providers send bursts)
+    webhookRatelimit = new Ratelimit({
+        redis: redis,
+        limiter: Ratelimit.slidingWindow(60, '10 s'),
+        analytics: true,
+        prefix: 'rl:webhook',
     });
 }
 
@@ -45,17 +68,21 @@ export async function middleware(request: NextRequest) {
     // 1. RATE LIMITING (API Routes Only)
     // -------------------------------------------------------------------------
     if (request.nextUrl.pathname.startsWith('/api')) {
-        // Skip for internal Next.js requests if any leak through
-        if (ratelimit) {
+        // Use the appropriate rate limiter based on route class
+        const limiter = isWebhookPath(request.nextUrl.pathname)
+            ? webhookRatelimit
+            : userRatelimit;
+
+        if (limiter) {
             // Get IP from headers (Vercel/Next.js sets this)
             const forwarded = request.headers.get('x-forwarded-for');
             const realIp = request.headers.get('x-real-ip');
             const ip = forwarded?.split(',')[0] || realIp || request.headers.get('cf-connecting-ip') || '127.0.0.1';
             try {
-                const { success, limit, reset, remaining } = await ratelimit.limit(ip);
+                const { success, limit, reset, remaining } = await limiter.limit(ip);
 
                 if (!success) {
-                    logger.warn(`Rate limit exceeded for IP: ${ip}`);
+                    logger.warn(`Rate limit exceeded for IP: ${ip}`, { path: request.nextUrl.pathname });
                     return new NextResponse('Too Many Requests', {
                         status: 429,
                         headers: {

@@ -41,6 +41,8 @@ export default function SettingsPage() {
     // RepairDesk State
     const [repairDeskApiKey, setRepairDeskApiKey] = useState('');
     const [repairDeskStoreUrl, setRepairDeskStoreUrl] = useState('');
+    const [hasExistingApiKey, setHasExistingApiKey] = useState(false);
+    const [apiKeyModified, setApiKeyModified] = useState(false);
     const [rdTestStatus, setRdTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
     const [rdTestError, setRdTestError] = useState('');
     const [syncing, setSyncing] = useState(false);
@@ -67,7 +69,16 @@ export default function SettingsPage() {
             setSmsTemplate(business.sms_template || "Hi! We missed your call — we were helping another customer. How can we help you? Would you like us to give you a call back in a few?");
             setSmsTemplateClosed(business.sms_template_closed || "Hi! Our store is currently closed. How can we help you? Would you like us to schedule an appointment for when we open?");
             setTimezone(business.timezone || 'America/New_York');
-                setRepairDeskApiKey(business.repairdesk_api_key || '');
+                // Mask API key: show only last 4 chars if present
+                if (business.repairdesk_api_key) {
+                    const key = business.repairdesk_api_key;
+                    setRepairDeskApiKey('••••••••' + key.slice(-4));
+                    setHasExistingApiKey(true);
+                    setApiKeyModified(false);
+                } else {
+                    setRepairDeskApiKey('');
+                    setHasExistingApiKey(false);
+                }
                 setRepairDeskStoreUrl(business.repairdesk_store_url || '');
 
             // Initialize hours if empty - create new object to avoid mutating Supabase data
@@ -107,16 +118,22 @@ export default function SettingsPage() {
         if (!businessId) return;
         setSaving(true);
 
+        const updateData: Record<string, unknown> = {
+            sms_template: smsTemplate,
+            sms_template_closed: smsTemplateClosed || null,
+            timezone,
+            business_hours: hours,
+            repairdesk_store_url: repairDeskStoreUrl || null,
+        };
+
+        // Only send API key if user explicitly changed it (avoid saving masked value)
+        if (apiKeyModified) {
+            updateData.repairdesk_api_key = repairDeskApiKey || null;
+        }
+
         const { error } = await supabase
             .from('businesses')
-            .update({
-                sms_template: smsTemplate,
-                sms_template_closed: smsTemplateClosed || null,
-                timezone,
-                business_hours: hours,
-                repairdesk_api_key: repairDeskApiKey || null,
-                repairdesk_store_url: repairDeskStoreUrl || null,
-            })
+            .update(updateData)
             .eq('id', businessId);
 
         if (error) {
@@ -296,8 +313,18 @@ export default function SettingsPage() {
                             id="rd-api-key"
                             type="password"
                             value={repairDeskApiKey}
-                            onChange={(e) => setRepairDeskApiKey(e.target.value)}
-                            placeholder="Enter your RepairDesk API key"
+                            onChange={(e) => {
+                                setRepairDeskApiKey(e.target.value);
+                                setApiKeyModified(true);
+                            }}
+                            onFocus={() => {
+                                // Clear masked placeholder when user focuses the field
+                                if (hasExistingApiKey && !apiKeyModified) {
+                                    setRepairDeskApiKey('');
+                                    setApiKeyModified(true);
+                                }
+                            }}
+                            placeholder={hasExistingApiKey ? 'Key saved (click to change)' : 'Enter your RepairDesk API key'}
                         />
                         <p className="text-sm text-gray-500">
                             Find this in RepairDesk: Store Settings &rarr; Other Information &rarr; API Key.

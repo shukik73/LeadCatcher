@@ -10,6 +10,10 @@ export const dynamic = 'force-dynamic';
  *
  * Handles Stripe webhook events for subscription lifecycle.
  * Must be configured in Stripe Dashboard → Webhooks.
+ *
+ * Idempotency: Uses atomic INSERT to claim the Stripe event.id.
+ * Ordering: For subscription updates, checks event.created timestamp
+ * to avoid overwriting newer state with older replayed events.
  */
 export async function POST(request: Request) {
     const body = await request.text();
@@ -36,7 +40,24 @@ export async function POST(request: Request) {
         return new Response(`Webhook Error: ${message}`, { status: 400 });
     }
 
-    logger.info('[Stripe Webhook] Event received', { type: event.type });
+    logger.info('[Stripe Webhook] Event received', { type: event.type, eventId: event.id });
+
+    // Idempotency: atomic claim via INSERT ... ON CONFLICT DO NOTHING.
+    // Only the first request to claim the event.id proceeds; replays get 0 rows.
+    const { data: claimed } = await supabaseAdmin
+        .from('webhook_events')
+        .insert({
+            event_id: event.id,
+            event_type: 'stripe',
+            status: 'processing',
+        })
+        .select('id')
+        .maybeSingle();
+
+    if (!claimed) {
+        logger.info('[Stripe Webhook] Duplicate event, skipping', { eventId: event.id });
+        return new Response('OK', { status: 200 });
+    }
 
     try {
         switch (event.type) {
@@ -45,7 +66,7 @@ export async function POST(request: Request) {
                 break;
 
             case 'customer.subscription.updated':
-                await handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
+                await handleSubscriptionUpdated(event.data.object as Stripe.Subscription, event.created, event.id);
                 break;
 
             case 'customer.subscription.deleted':
@@ -59,8 +80,17 @@ export async function POST(request: Request) {
             default:
                 logger.info('[Stripe Webhook] Unhandled event type', { type: event.type });
         }
+
+        // Mark as processed after all side effects succeed
+        await supabaseAdmin.from('webhook_events')
+            .update({ status: 'processed', processed_at: new Date().toISOString() })
+            .eq('event_id', event.id);
     } catch (error) {
         logger.error('[Stripe Webhook] Error handling event', error, { type: event.type });
+        // Mark as failed so we can investigate / allow manual retry
+        await supabaseAdmin.from('webhook_events')
+            .update({ status: 'failed' })
+            .eq('event_id', event.id);
         return new Response('Webhook handler error', { status: 500 });
     }
 
@@ -104,17 +134,48 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     });
 }
 
-async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
+/**
+ * Handle subscription updates with monotonic ordering guard.
+ * Uses the Stripe event.created timestamp to avoid overwriting
+ * newer state with a replayed/out-of-order older event.
+ */
+async function handleSubscriptionUpdated(subscription: Stripe.Subscription, eventCreatedAt: number, eventId: string) {
     const customerId = subscription.customer as string;
 
     const { data: business } = await supabaseAdmin
         .from('businesses')
-        .select('id')
+        .select('id, stripe_status')
         .eq('stripe_customer_id', customerId)
         .single();
 
     if (!business) {
         logger.warn('[Stripe Webhook] No business for customer', { customerId });
+        return;
+    }
+
+    // Store business_id and Stripe event timestamp on the webhook_events row
+    // so we can do ordering checks across events for the same business.
+    const eventTimestamp = new Date(eventCreatedAt * 1000).toISOString();
+    await supabaseAdmin.from('webhook_events')
+        .update({ business_id: business.id, created_at: eventTimestamp })
+        .eq('event_id', eventId);
+
+    // Monotonic ordering guard: check if we already processed a newer event
+    // for this business. If so, skip to avoid overwriting newer state.
+    const { data: newerEvents } = await supabaseAdmin
+        .from('webhook_events')
+        .select('id')
+        .eq('event_type', 'stripe')
+        .eq('status', 'processed')
+        .eq('business_id', business.id)
+        .gt('created_at', eventTimestamp)
+        .limit(1);
+
+    if (newerEvents && newerEvents.length > 0) {
+        logger.info('[Stripe Webhook] Skipping out-of-order subscription update', {
+            businessId: business.id,
+            eventTimestamp,
+        });
         return;
     }
 

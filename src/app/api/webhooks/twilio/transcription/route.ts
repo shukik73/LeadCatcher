@@ -19,24 +19,23 @@ export async function POST(request: Request) {
     const transcriptionText = formData.get('TranscriptionText') as string;
     const transcriptionStatus = formData.get('TranscriptionStatus') as string;
 
-    // Idempotency: skip if we already processed this RecordingSid
+    // Idempotency: atomic claim via INSERT ... ON CONFLICT DO NOTHING.
+    // Only the first request to claim the event_id proceeds; retries get 0 rows.
     if (recordingSid) {
-        const { data: existing } = await supabaseAdmin
+        const { data: claimed } = await supabaseAdmin
             .from('webhook_events')
+            .insert({
+                event_id: recordingSid,
+                event_type: 'transcription',
+                status: 'processing',
+            })
             .select('id')
-            .eq('event_id', recordingSid)
             .maybeSingle();
 
-        if (existing) {
+        if (!claimed) {
             logger.info('[Transcription Webhook] Duplicate RecordingSid, skipping', { recordingSid });
             return new Response('OK');
         }
-
-        // Record this event
-        await supabaseAdmin.from('webhook_events').insert({
-            event_id: recordingSid,
-            event_type: 'transcription',
-        }); // unique constraint silently prevents duplicates
     }
 
     // URL Params passed in callback URL — validate format after presence check
@@ -154,6 +153,13 @@ export async function POST(request: Request) {
                 body: `🎙️ New Voicemail from ${caller}.\nSummary: ${analysis.summary}\nIntent: ${analysis.intent}`,
             });
         } catch { /* ignore notification failure */ }
+    }
+
+    // Mark event as fully processed after all side effects succeeded
+    if (recordingSid) {
+        await supabaseAdmin.from('webhook_events')
+            .update({ status: 'processed', processed_at: new Date().toISOString() })
+            .eq('event_id', recordingSid);
     }
 
     return new Response('OK');
