@@ -40,7 +40,7 @@ export default function SettingsPage() {
 
     // RepairDesk State
     const [repairDeskApiKey, setRepairDeskApiKey] = useState('');
-    const [repairDeskStoreUrl, setRepairDeskStoreUrl] = useState('');
+    const [repairDeskSubdomain, setRepairDeskSubdomain] = useState('');
     const [rdTestStatus, setRdTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
     const [rdTestError, setRdTestError] = useState('');
     const [syncing, setSyncing] = useState(false);
@@ -68,7 +68,7 @@ export default function SettingsPage() {
             setSmsTemplateClosed(business.sms_template_closed || "Hi! Our store is currently closed. How can we help you? Would you like us to schedule an appointment for when we open?");
             setTimezone(business.timezone || 'America/New_York');
                 setRepairDeskApiKey(business.repairdesk_api_key || '');
-                setRepairDeskStoreUrl(business.repairdesk_store_url || '');
+                setRepairDeskSubdomain(business.repairdesk_store_url || '');
 
             // Initialize hours if empty - create new object to avoid mutating Supabase data
             const existingHours = (business.business_hours as BusinessHours) || {};
@@ -115,7 +115,7 @@ export default function SettingsPage() {
                 timezone,
                 business_hours: hours,
                 repairdesk_api_key: repairDeskApiKey || null,
-                repairdesk_store_url: repairDeskStoreUrl || null,
+                repairdesk_store_url: repairDeskSubdomain || null,
             })
             .eq('id', businessId);
 
@@ -129,10 +129,6 @@ export default function SettingsPage() {
     };
 
     const handleTestRepairDesk = async () => {
-        if (!repairDeskStoreUrl) {
-            toast.error('Enter your RepairDesk store URL first');
-            return;
-        }
         if (!repairDeskApiKey) {
             toast.error('Enter your RepairDesk API key first');
             return;
@@ -143,7 +139,7 @@ export default function SettingsPage() {
             const res = await fetch('/api/repairdesk/test-connection', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ apiKey: repairDeskApiKey, storeUrl: repairDeskStoreUrl || undefined }),
+                body: JSON.stringify({ apiKey: repairDeskApiKey, subdomain: repairDeskSubdomain || undefined }),
             });
             const data = await res.json();
             if (data.success) {
@@ -285,18 +281,6 @@ export default function SettingsPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="space-y-2">
-                        <Label htmlFor="rd-store-url">Store URL <span className="text-red-500">*</span></Label>
-                        <Input
-                            id="rd-store-url"
-                            type="url"
-                            value={repairDeskStoreUrl}
-                            onChange={(e) => setRepairDeskStoreUrl(e.target.value)}
-                            placeholder="https://yourstore.repairdesk.co"
-                            required
-                        />
-                        <p className="text-sm text-gray-500">Your RepairDesk store URL, e.g. <code className="bg-gray-100 px-1 rounded">https://yourstore.repairdesk.co</code>. Find your store subdomain in your browser address bar when logged into RepairDesk.</p>
-                    </div>
-                    <div className="space-y-2">
                         <Label htmlFor="rd-api-key">API Key</Label>
                         <Input
                             id="rd-api-key"
@@ -309,12 +293,27 @@ export default function SettingsPage() {
                             Find this in RepairDesk: Store Settings &rarr; Other Information &rarr; API Key.
                         </p>
                     </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="rd-subdomain">Subdomain (optional)</Label>
+                        <div className="flex items-center gap-1">
+                            <Input
+                                id="rd-subdomain"
+                                type="text"
+                                value={repairDeskSubdomain}
+                                onChange={(e) => setRepairDeskSubdomain(e.target.value)}
+                                placeholder="yourshop"
+                                className="max-w-48"
+                            />
+                            <span className="text-sm text-gray-500 whitespace-nowrap">.repairdesk.co</span>
+                        </div>
+                        <p className="text-sm text-gray-500">Your RepairDesk subdomain. Leave blank to use the default.</p>
+                    </div>
                     <div className="flex gap-3 items-center">
                         <Button
                             variant="outline"
                             size="sm"
                             onClick={handleTestRepairDesk}
-                            disabled={rdTestStatus === 'testing' || !repairDeskApiKey || !repairDeskStoreUrl}
+                            disabled={rdTestStatus === 'testing' || !repairDeskApiKey}
                         >
                             {rdTestStatus === 'testing' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                             {rdTestStatus === 'success' && <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" />}
@@ -326,7 +325,7 @@ export default function SettingsPage() {
                             variant="outline"
                             size="sm"
                             onClick={handleSyncRepairDesk}
-                            disabled={syncing || !repairDeskApiKey || !repairDeskStoreUrl}
+                            disabled={syncing || !repairDeskApiKey}
                         >
                             {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
                             Sync Customers

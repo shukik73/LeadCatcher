@@ -1,14 +1,13 @@
 import { logger } from '@/lib/logger';
-import { validateRepairDeskUrl } from '@/lib/url-validator';
 
 /**
  * RepairDesk API Client
  *
  * Docs: https://api-docs.repairdesk.co/
  * Auth: API key passed as query param `api_key`
- * Base URL: https://{store}.repairdesk.co/api/v1
+ * Base URL: https://{subdomain}.repairdesk.co/api/web/v1
  *
- * Update BASE_URL and endpoints once confirmed from your RepairDesk dashboard.
+ * Matches the architecture from ReviewGuard (controllers/repairDeskController.js).
  */
 
 // --- Types ---
@@ -69,27 +68,28 @@ export interface RepairDeskError {
     status: number;
 }
 
+// Validate subdomain: only alphanumeric, hyphens, dots allowed
+const SUBDOMAIN_RE = /^[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]$/;
+
 // --- Client ---
 
 export class RepairDeskClient {
     private apiKey: string;
     private baseUrl: string;
 
-    constructor(apiKey: string, storeUrl?: string) {
+    constructor(apiKey: string, subdomain?: string) {
         this.apiKey = apiKey;
 
-        if (!storeUrl) {
+        // Default to "api" subdomain if none provided (same as ReviewGuard)
+        const cleanSubdomain = (subdomain || 'api').trim();
+
+        if (!SUBDOMAIN_RE.test(cleanSubdomain)) {
             throw new Error(
-                'Store URL is required. Enter your RepairDesk store URL (e.g. https://yourstore.repairdesk.co)'
+                `Invalid RepairDesk subdomain "${cleanSubdomain}". Use only letters, numbers, and hyphens.`
             );
         }
 
-        // SSRF protection: validate the URL before using it
-        const validation = validateRepairDeskUrl(storeUrl);
-        if (!validation.valid) {
-            throw new Error(`Invalid RepairDesk URL: ${validation.error}`);
-        }
-        this.baseUrl = `${storeUrl.replace(/\/$/, '')}/api/web/v1`;
+        this.baseUrl = `https://${cleanSubdomain}.repairdesk.co/api/web/v1`;
     }
 
     private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -163,7 +163,6 @@ export class RepairDeskClient {
 
     /**
      * Get call logs, optionally filtered by page and date range.
-     * Endpoint may vary — verify against your RepairDesk dashboard.
      */
     async getCallLogs(page = 1, since?: string): Promise<RepairDeskListResponse<RepairDeskCallLog>> {
         let endpoint = `/call-logs?page=${page}`;
@@ -198,12 +197,12 @@ export class RepairDeskClient {
     }
 
     /**
-     * Test connection by fetching the first page of customers.
-     * Returns detailed error info on failure for debugging.
+     * Test connection by fetching the first page of customers (limit=1).
+     * Matches ReviewGuard pattern: GET /customers?limit=1
      */
     async testConnection(): Promise<{ success: boolean; error?: string; baseUrl?: string }> {
         try {
-            await this.getCustomers(1);
+            await this.request<unknown>('/customers?limit=1');
             return { success: true };
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Unknown error';
