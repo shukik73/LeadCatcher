@@ -22,15 +22,20 @@ export async function POST(request: Request) {
 
     if (!fromRaw || !body) return new Response('Invalid Request', { status: 400 });
 
-    // Idempotency: skip if we already processed this MessageSid
+    // Idempotency: atomic claim via INSERT ... ON CONFLICT DO NOTHING.
+    // Only the first request to claim the event_id proceeds; retries get 0 rows.
     if (messageSid) {
-        const { data: existing } = await supabaseAdmin
+        const { data: claimed } = await supabaseAdmin
             .from('webhook_events')
+            .insert({
+                event_id: messageSid,
+                event_type: 'sms',
+                status: 'processing',
+            })
             .select('id')
-            .eq('event_id', messageSid)
             .maybeSingle();
 
-        if (existing) {
+        if (!claimed) {
             logger.info('[SMS Webhook] Duplicate MessageSid, skipping', { messageSid });
             return new Response('<Response></Response>', { headers: { 'Content-Type': 'text/xml' } });
         }
@@ -52,16 +57,19 @@ export async function POST(request: Request) {
 
     if (!business) {
         logger.error(`[SMS Webhook] No business found for number`, null, { to });
+        if (messageSid) {
+            await supabaseAdmin.from('webhook_events')
+                .update({ status: 'failed' })
+                .eq('event_id', messageSid);
+        }
         return new Response('<Response></Response>', { headers: { 'Content-Type': 'text/xml' } });
     }
 
-    // Record this event for idempotency
+    // Update the claimed event with the business_id
     if (messageSid) {
-        await supabaseAdmin.from('webhook_events').insert({
-            event_id: messageSid,
-            event_type: 'sms',
-            business_id: business.id,
-        }); // unique constraint silently prevents duplicates
+        await supabaseAdmin.from('webhook_events')
+            .update({ business_id: business.id })
+            .eq('event_id', messageSid);
     }
 
     // 2.5. TCPA COMPLIANCE: Handle STOP keywords (STOP, UNSUBSCRIBE, CANCEL, END, QUIT)
@@ -205,6 +213,13 @@ export async function POST(request: Request) {
                 logger.error('Error notifying owner of SMS:', err);
             }
         }
+    }
+
+    // Mark event as fully processed after all side effects succeeded
+    if (messageSid) {
+        await supabaseAdmin.from('webhook_events')
+            .update({ status: 'processed', processed_at: new Date().toISOString() })
+            .eq('event_id', messageSid);
     }
 
     return new Response('<Response></Response>', {

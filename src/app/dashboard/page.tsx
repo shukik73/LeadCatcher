@@ -72,10 +72,10 @@ export default function Dashboard() {
                 setError('Failed to load leads. Please try again.');
             } else {
                 setError(null);
-                const processedLeads = data?.map(lead => ({
+                const processedLeads = data?.map((lead: Record<string, unknown>) => ({
                     ...lead,
-                    messages: lead.messages?.sort((a: Message, b: Message) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) || []
-                })) || [];
+                    messages: (lead.messages as Message[] | undefined)?.sort((a: Message, b: Message) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) || []
+                })) as Lead[] || [];
 
                 setLeads(processedLeads);
                 // On desktop, select first. On mobile, maybe don't? standard behavior: select first.
@@ -93,10 +93,10 @@ export default function Dashboard() {
     useEffect(() => {
         const channel = supabase
             .channel('dashboard-realtime')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, (payload) => {
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, (payload: { eventType: string; new: Record<string, unknown> }) => {
                 // Realtime lead update received
                 if (payload.eventType === 'INSERT') {
-                    const newLead = payload.new as Lead;
+                    const newLead = payload.new as unknown as Lead;
                     setLeads(prev => [{ ...newLead, messages: [] }, ...prev]);
                     toast.success('New Lead Received!', {
                         description: `Missed call from ${newLead.caller_phone}`,
@@ -111,8 +111,8 @@ export default function Dashboard() {
                 }
             }
             )
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
-                const newMsg = payload.new as Message;
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload: { new: Record<string, unknown> }) => {
+                const newMsg = payload.new as unknown as Message;
                 setLeads(prev => prev.map(lead => {
                     if (lead.id === newMsg.lead_id) {
                         return { ...lead, messages: [...lead.messages, newMsg] };

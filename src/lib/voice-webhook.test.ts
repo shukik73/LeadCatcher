@@ -70,7 +70,8 @@ function mockSupabaseChain(returnValue: { data: unknown; error: unknown }) {
         eq: vi.fn().mockReturnThis(),
         single: vi.fn().mockResolvedValue(returnValue),
         maybeSingle: vi.fn().mockResolvedValue(returnValue),
-        insert: vi.fn().mockResolvedValue({ error: null }),
+        insert: vi.fn().mockReturnThis(),
+        update: vi.fn().mockReturnThis(),
     };
 }
 
@@ -162,5 +163,32 @@ describe('Voice Webhook Route', () => {
         const res = await POST(req);
         const text = await res.text();
         expect(text).toContain('technical difficulties');
+    });
+
+    it('skips duplicate CallSid via atomic claim (idempotency)', async () => {
+        vi.mocked(validateTwilioRequest).mockResolvedValue(true);
+
+        // Simulate the atomic claim returning null (duplicate — already claimed)
+        const webhookChain = {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+            insert: vi.fn().mockReturnThis(),
+            update: vi.fn().mockReturnThis(),
+        };
+        mockSupabaseFrom.mockImplementation((table: string) => {
+            if (table === 'webhook_events') return webhookChain;
+            return mockSupabaseChain({ data: null, error: null });
+        });
+
+        const req = createFormDataRequest({
+            CallSid: 'CA123duplicate',
+            Caller: '+15551234567',
+            Called: '+15559876543',
+        });
+        const res = await POST(req);
+        const text = await res.text();
+        expect(text).toContain('Hangup');
+        expect(mockMessagesCreate).not.toHaveBeenCalled();
     });
 });
