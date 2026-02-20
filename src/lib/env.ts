@@ -4,27 +4,32 @@
  * Import this module early (e.g., from instrumentation.ts) to surface
  * missing configuration at startup rather than at first request time.
  *
- * Required vars throw on server startup; optional vars log a warning.
+ * Logs errors for missing required vars and warnings for missing optional vars.
+ * Does NOT throw — the server still starts so non-affected routes keep working.
  */
 
-function requireEnv(name: string): string {
+const missing: string[] = [];
+
+function requireEnv(name: string): string | undefined {
     const value = process.env[name];
     if (!value) {
-        throw new Error(`Missing required environment variable: ${name}`);
+        missing.push(name);
     }
     return value;
 }
 
-function optionalEnv(name: string, fallback?: string): string | undefined {
+function optionalEnv(name: string): string | undefined {
     const value = process.env[name];
-    if (!value && !fallback) {
+    if (!value) {
         console.warn(`[env] Optional variable ${name} is not set`);
     }
-    return value || fallback;
+    return value;
 }
 
 /** Validate all required env vars at startup. Call once from instrumentation.ts. */
 export function validateEnv() {
+    missing.length = 0;
+
     // Core infrastructure
     requireEnv('NEXT_PUBLIC_SUPABASE_URL');
     requireEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY');
@@ -44,4 +49,11 @@ export function validateEnv() {
     optionalEnv('CRON_SECRET');
     optionalEnv('UPSTASH_REDIS_REST_URL');
     optionalEnv('UPSTASH_REDIS_REST_TOKEN');
+
+    if (missing.length > 0) {
+        console.error(
+            `[env] MISSING REQUIRED ENV VARS: ${missing.join(', ')}. ` +
+            `Some features will not work until these are configured.`
+        );
+    }
 }

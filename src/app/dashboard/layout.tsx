@@ -11,31 +11,43 @@ export default async function DashboardLayout({
 }: {
     children: React.ReactNode;
 }) {
-    const supabase = await createSupabaseServerClient();
+    let supabase;
+    try {
+        supabase = await createSupabaseServerClient();
+    } catch {
+        redirect('/login');
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
         redirect('/login');
     }
 
-    // Fetch subscription status
-    const { data: business } = await supabaseAdmin
-        .from('businesses')
-        .select('stripe_status, stripe_plan, stripe_trial_ends_at, stripe_current_period_end')
-        .eq('user_id', user.id)
-        .single();
-
-    const stripeStatus = business?.stripe_status || null;
-    const trialEndsAt = business?.stripe_trial_ends_at || null;
-
-    // Compute trial days remaining on the server — Date.now() is safe in async server components
+    // Fetch subscription status — fail gracefully if DB call errors
+    let stripeStatus: string | null = null;
     let trialDaysLeft: number | null = null;
-    if (stripeStatus === 'trialing' && trialEndsAt) {
-        const now = Date.now(); // eslint-disable-line react-hooks/purity
-        trialDaysLeft = Math.max(
-            0,
-            Math.ceil((new Date(trialEndsAt).getTime() - now) / (1000 * 60 * 60 * 24))
-        );
+
+    try {
+        const { data: business } = await supabaseAdmin
+            .from('businesses')
+            .select('stripe_status, stripe_plan, stripe_trial_ends_at, stripe_current_period_end')
+            .eq('user_id', user.id)
+            .single();
+
+        stripeStatus = business?.stripe_status || null;
+        const trialEndsAt = business?.stripe_trial_ends_at || null;
+
+        if (stripeStatus === 'trialing' && trialEndsAt) {
+            const now = Date.now();
+            trialDaysLeft = Math.max(
+                0,
+                Math.ceil((new Date(trialEndsAt).getTime() - now) / (1000 * 60 * 60 * 24))
+            );
+        }
+    } catch {
+        // supabaseAdmin may throw if SUPABASE_SERVICE_ROLE_KEY is missing.
+        // Render the dashboard without subscription banner rather than 500.
     }
 
     return (
