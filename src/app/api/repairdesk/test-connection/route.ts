@@ -13,16 +13,16 @@ export async function POST(request: Request) {
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { apiKey, storeUrl } = await request.json() as {
+        const { apiKey, subdomain } = await request.json() as {
             apiKey: string;
-            storeUrl?: string;
+            subdomain?: string;
         };
 
         if (!apiKey) {
             return Response.json({ error: 'API key is required' }, { status: 400 });
         }
 
-        const client = new RepairDeskClient(apiKey, storeUrl);
+        const client = new RepairDeskClient(apiKey, subdomain);
         const result = await client.testConnection();
 
         if (result.success) {
