@@ -21,6 +21,10 @@ vi.mock('@/lib/ai-service', () => ({
     }),
 }));
 
+vi.mock('@/lib/billing-guard', () => ({
+    checkBillingStatus: vi.fn().mockResolvedValue({ allowed: true }),
+}));
+
 vi.mock('@/lib/logger', () => ({
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));

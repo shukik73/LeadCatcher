@@ -16,6 +16,10 @@ vi.mock('@/lib/phone-utils', () => ({
     normalizePhoneNumber: vi.fn((p: string) => `+1${p.replace(/\D/g, '').slice(-10)}`),
 }));
 
+vi.mock('@/lib/billing-guard', () => ({
+    checkBillingStatus: vi.fn().mockResolvedValue({ allowed: true }),
+}));
+
 vi.mock('@/lib/logger', () => ({
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));

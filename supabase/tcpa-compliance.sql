@@ -17,13 +17,16 @@ create table if not exists opt_outs (
 -- Enable RLS
 alter table opt_outs enable row level security;
 
--- Users can view opt-outs for their businesses
-create policy "Users can view own opt-outs" on opt_outs
-  for select using (
-    business_id in (
-      select id from businesses where user_id = auth.uid()
-    )
-  );
+-- Users can view opt-outs for their businesses (idempotent)
+DO $$ BEGIN
+  create policy "Users can view own opt-outs" on opt_outs
+    for select using (
+      business_id in (
+        select id from businesses where user_id = auth.uid()
+      )
+    );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Only service/admin can insert opt-outs (via webhook)
 -- Regular users cannot manually opt people out (privacy concern)

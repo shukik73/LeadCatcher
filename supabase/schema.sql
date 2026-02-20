@@ -12,6 +12,7 @@ create table if not exists businesses (
   twilio_sid text, -- Twilio phone number SID for API operations
   carrier text,
   verified boolean default false,
+  verification_token text, -- UUID token set during verification flow, cleared on success
   -- Phase 1.6 Additions
   timezone text default 'America/New_York',
   business_hours jsonb, -- { "monday": { "open": "09:00", "close": "17:00" }, ... }

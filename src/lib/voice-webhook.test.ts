@@ -20,6 +20,10 @@ vi.mock('@/lib/business-logic', () => ({
     isBusinessHours: vi.fn(() => true),
 }));
 
+vi.mock('@/lib/billing-guard', () => ({
+    checkBillingStatus: vi.fn().mockResolvedValue({ allowed: true }),
+}));
+
 vi.mock('@/lib/logger', () => ({
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -115,7 +119,7 @@ describe('Voice Webhook Route', () => {
         vi.mocked(validateTwilioRequest).mockResolvedValue(true);
         const businessData = {
             id: 'biz-1', owner_phone: '+15550001111', name: 'Test Biz',
-            business_hours: null, timezone: 'America/New_York', sms_template: null,
+            business_hours: null, timezone: 'America/New_York', sms_template: null, verification_token: null,
         };
         mockSupabaseFrom.mockImplementation((table: string) => {
             if (table === 'businesses') return mockSupabaseChain({ data: businessData, error: null });
@@ -135,7 +139,7 @@ describe('Voice Webhook Route', () => {
         vi.mocked(validateTwilioRequest).mockResolvedValue(true);
         const businessData = {
             id: 'biz-1', owner_phone: '+15550001111', name: 'Test Biz',
-            business_hours: null, timezone: 'America/New_York', sms_template: null,
+            business_hours: null, timezone: 'America/New_York', sms_template: null, verification_token: null,
         };
         mockSupabaseFrom.mockImplementation((table: string) => {
             if (table === 'businesses') return mockSupabaseChain({ data: businessData, error: null });
@@ -152,7 +156,7 @@ describe('Voice Webhook Route', () => {
         vi.mocked(validateTwilioRequest).mockResolvedValue(true);
         const businessData = {
             id: 'biz-1', owner_phone: '+15550001111', name: 'Test Biz',
-            business_hours: null, timezone: 'America/New_York', sms_template: null,
+            business_hours: null, timezone: 'America/New_York', sms_template: null, verification_token: null,
         };
         mockSupabaseFrom.mockImplementation((table: string) => {
             if (table === 'businesses') return mockSupabaseChain({ data: businessData, error: null });

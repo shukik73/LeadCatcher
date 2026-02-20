@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,11 +17,22 @@ import { toast } from 'sonner';
 import { CheckCircle2, Phone, Loader2, Copy, AlertCircle } from 'lucide-react';
 import { verifyTwilioPhoneNumber, linkTwilioNumberToBusiness } from '@/app/actions/twilio';
 
-// Validation Schemas
+// Strip non-digit characters (except leading +) for phone validation
+function normalizePhone(value: string): string {
+    const hasPlus = value.startsWith('+');
+    const digits = value.replace(/\D/g, '');
+    return hasPlus ? `+${digits}` : digits;
+}
+
+// Validation Schemas — normalize before validating to accept formatted input like (305) 555-0123
 const businessSchema = z.object({
     businessName: z.string().min(2, "Business name is required"),
-    businessPhone: z.string().min(10, "Valid phone number required").regex(/^\+?1?\d{10,14}$/, "Invalid phone format"),
-    ownerPhone: z.string().min(10, "Valid mobile number required").regex(/^\+?1?\d{10,14}$/, "Invalid phone format"),
+    businessPhone: z.string().transform(normalizePhone).pipe(
+        z.string().min(10, "Valid phone number required").regex(/^\+?1?\d{10,14}$/, "Invalid phone format")
+    ),
+    ownerPhone: z.string().transform(normalizePhone).pipe(
+        z.string().min(10, "Valid mobile number required").regex(/^\+?1?\d{10,14}$/, "Invalid phone format")
+    ),
 });
 
 const carrierSchema = z.object({
@@ -29,9 +40,10 @@ const carrierSchema = z.object({
 });
 
 const twilioNumberSchema = z.object({
-    twilioNumber: z.string()
-        .min(10, "Phone number is too short")
-        .regex(/^\+?1?\d{10,14}$/, "Invalid phone format. Use: +15551234567"),
+    twilioNumber: z.string().transform(normalizePhone).pipe(
+        z.string().min(10, "Phone number is too short")
+            .regex(/^\+?1?\d{10,14}$/, "Invalid phone format. Use: +15551234567")
+    ),
 });
 
 type BusinessFormData = z.infer<typeof businessSchema>;
@@ -152,19 +164,58 @@ export default function Wizard() {
         toast.success('Forwarding code copied!');
     };
 
+    // Poll verification status from DB instead of timer-based fake success
+    const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const pollCountRef = useRef(0);
+
+    const stopPolling = useCallback(() => {
+        if (pollRef.current) {
+            clearInterval(pollRef.current);
+            pollRef.current = null;
+        }
+        pollCountRef.current = 0;
+    }, []);
+
+    // Cleanup polling on unmount
+    useEffect(() => {
+        return () => stopPolling();
+    }, [stopPolling]);
+
     const runTestCall = async () => {
         setIsVerifying(true);
+        setVerificationError(null);
         try {
             const res = await fetch('/api/verify', { method: 'POST' });
             const data = await res.json();
             if (data.success) {
-                setTimeout(() => {
-                    setIsVerified(true);
-                    setIsVerifying(false);
-                }, 3000);
+                // Start polling for webhook-confirmed verification
+                pollCountRef.current = 0;
+                pollRef.current = setInterval(async () => {
+                    pollCountRef.current++;
+                    try {
+                        const pollRes = await fetch('/api/verify');
+                        const pollData = await pollRes.json();
+                        if (pollData.verified) {
+                            setIsVerified(true);
+                            setIsVerifying(false);
+                            stopPolling();
+                        } else if (pollCountRef.current >= 15) {
+                            // 30 seconds (15 * 2s) — give up
+                            setIsVerifying(false);
+                            setVerificationError('Verification timed out. Make sure you declined/ignored the call so it forwarded to your Twilio number, then try again.');
+                            stopPolling();
+                        }
+                    } catch {
+                        // Ignore individual poll failures
+                    }
+                }, 2000);
+            } else {
+                setVerificationError(data.error || 'Failed to initiate test call');
+                setIsVerifying(false);
             }
         } catch (e) {
             logger.error('Test call failed', e);
+            setVerificationError('Failed to connect to server. Please try again.');
             setIsVerifying(false);
         }
     };
@@ -394,7 +445,7 @@ export default function Wizard() {
                                     <p className="text-sm text-slate-500 mb-2">Dial this exactly:</p>
                                     <div className="text-3xl font-mono font-bold text-slate-900 tracking-wider flex items-center justify-center gap-3">
                                         {carrier === 'Verizon' ? '*71' : '*72'} {formatPhoneDisplay(forwardingNumber)}
-                                        <Button variant="ghost" size="icon" onClick={handleCopyCode}><Copy size={16} /></Button>
+                                        <Button variant="ghost" size="icon" onClick={handleCopyCode} aria-label="Copy forwarding code"><Copy size={16} /></Button>
                                     </div>
                                 </div>
                                 <div className="bg-blue-50 p-4 rounded-lg flex items-start gap-3">

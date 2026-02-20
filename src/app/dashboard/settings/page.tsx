@@ -59,7 +59,7 @@ export default function SettingsPage() {
 
         const { data: business } = await supabase
             .from('businesses')
-            .select('id, sms_template, sms_template_closed, timezone, business_hours, repairdesk_api_key, repairdesk_store_url')
+            .select('id, sms_template, sms_template_closed, timezone, business_hours, repairdesk_store_url')
             .eq('user_id', user.id)
             .single();
 
@@ -69,17 +69,27 @@ export default function SettingsPage() {
             setSmsTemplate(business.sms_template || "Hi! We missed your call — we were helping another customer. How can we help you? Would you like us to give you a call back in a few?");
             setSmsTemplateClosed(business.sms_template_closed || "Hi! Our store is currently closed. How can we help you? Would you like us to schedule an appointment for when we open?");
             setTimezone(business.timezone || 'America/New_York');
-                // Mask API key: show only last 4 chars if present
-                if (business.repairdesk_api_key) {
-                    const key = business.repairdesk_api_key;
-                    setRepairDeskApiKey('••••••••' + key.slice(-4));
+                setRepairDeskSubdomain(business.repairdesk_store_url || '');
+
+                // Check if API key exists server-side without fetching the raw value.
+                // We query a minimal select with the admin-protected column via RPC-like
+                // check: if repairdesk_store_url is set, the key is likely set too.
+                // For a definitive check, use a separate server-side endpoint.
+                // For now: query just the key's existence via a length check.
+                const { count } = await supabase
+                    .from('businesses')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('user_id', user.id)
+                    .not('repairdesk_api_key', 'is', null);
+
+                if (count && count > 0) {
+                    setRepairDeskApiKey('');
                     setHasExistingApiKey(true);
                     setApiKeyModified(false);
                 } else {
                     setRepairDeskApiKey('');
                     setHasExistingApiKey(false);
                 }
-                setRepairDeskSubdomain(business.repairdesk_store_url || '');
 
             // Initialize hours if empty - create new object to avoid mutating Supabase data
             const existingHours = (business.business_hours as BusinessHours) || {};

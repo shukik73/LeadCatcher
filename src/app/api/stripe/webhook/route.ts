@@ -44,7 +44,7 @@ export async function POST(request: Request) {
 
     // Idempotency: atomic claim via INSERT ... ON CONFLICT DO NOTHING.
     // Only the first request to claim the event.id proceeds; replays get 0 rows.
-    const { data: claimed } = await supabaseAdmin
+    const { data: claimed, error: claimError } = await supabaseAdmin
         .from('webhook_events')
         .insert({
             event_id: event.id,
@@ -53,6 +53,16 @@ export async function POST(request: Request) {
         })
         .select('id')
         .maybeSingle();
+
+    if (claimError) {
+        const isUniqueViolation = claimError.code === '23505';
+        if (isUniqueViolation) {
+            logger.info('[Stripe Webhook] Duplicate event, skipping', { eventId: event.id });
+            return new Response('OK', { status: 200 });
+        }
+        logger.error('[Stripe Webhook] Failed to claim event', claimError, { eventId: event.id });
+        return new Response('Internal Server Error', { status: 500 });
+    }
 
     if (!claimed) {
         logger.info('[Stripe Webhook] Duplicate event, skipping', { eventId: event.id });
