@@ -1,4 +1,4 @@
-import { createSupabaseServerClient, supabaseAdmin } from '@/lib/supabase-server';
+import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -6,29 +6,30 @@ export const dynamic = 'force-dynamic';
 /**
  * POST /api/settings
  *
- * Server-side settings save. Uses supabaseAdmin to bypass the
- * protect_stripe_columns trigger that can interfere with client-side updates.
- *
- * Accepts partial updates — only saves fields that are present in the body.
+ * Server-side settings save. Uses the authenticated user's Supabase client
+ * for business lookup, then attempts update via service role (to bypass
+ * the protect_stripe_columns trigger) with fallback to user's own client.
  */
 export async function POST(request: Request) {
     try {
         const supabase = await createSupabaseServerClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-        if (!user) {
+        if (!user || authError) {
+            logger.warn('[Settings] Auth failed', { error: authError?.message });
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Get the user's business
-        const { data: business } = await supabaseAdmin
+        // Use the authenticated client to find the business (works with RLS)
+        const { data: business, error: bizError } = await supabase
             .from('businesses')
             .select('id')
             .eq('user_id', user.id)
             .single();
 
-        if (!business) {
-            return Response.json({ error: 'Business not found' }, { status: 404 });
+        if (!business || bizError) {
+            logger.error('[Settings] Business not found', bizError, { userId: user.id });
+            return Response.json({ error: 'Business not found. Complete onboarding first.' }, { status: 404 });
         }
 
         const body = await request.json();
@@ -54,14 +55,30 @@ export async function POST(request: Request) {
             return Response.json({ error: 'No valid fields to update' }, { status: 400 });
         }
 
-        const { error } = await supabaseAdmin
-            .from('businesses')
-            .update(updateData)
-            .eq('id', business.id);
+        // Try supabaseAdmin first (bypasses protect_stripe_columns trigger),
+        // fall back to authenticated client if admin isn't available.
+        let saveError;
+        try {
+            const { supabaseAdmin } = await import('@/lib/supabase-server');
+            const { error } = await supabaseAdmin
+                .from('businesses')
+                .update(updateData)
+                .eq('id', business.id);
+            saveError = error;
+        } catch {
+            // supabaseAdmin not available (missing SUPABASE_SERVICE_ROLE_KEY)
+            // Fall back to authenticated client
+            logger.warn('[Settings] supabaseAdmin unavailable, using user client');
+            const { error } = await supabase
+                .from('businesses')
+                .update(updateData)
+                .eq('id', business.id);
+            saveError = error;
+        }
 
-        if (error) {
-            logger.error('[Settings] Save failed', error, { businessId: business.id });
-            return Response.json({ error: 'Failed to save settings' }, { status: 500 });
+        if (saveError) {
+            logger.error('[Settings] Save failed', saveError, { businessId: business.id });
+            return Response.json({ error: `Failed to save: ${saveError.message}` }, { status: 500 });
         }
 
         return Response.json({ success: true });
