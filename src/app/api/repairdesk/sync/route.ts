@@ -1,10 +1,19 @@
-import { supabaseAdmin } from '@/lib/supabase-server';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { RepairDeskClient } from '@/lib/repairdesk';
 import { logger } from '@/lib/logger';
 import { normalizePhoneNumber } from '@/lib/phone-utils';
 
 export const dynamic = 'force-dynamic';
+
+/** Get supabaseAdmin if available, else return null */
+async function getAdmin() {
+    try {
+        const { supabaseAdmin } = await import('@/lib/supabase-server');
+        return supabaseAdmin;
+    } catch {
+        return null;
+    }
+}
 
 export async function POST() {
     try {
@@ -16,7 +25,7 @@ export async function POST() {
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Get business with RepairDesk credentials
+        // Get business with RepairDesk credentials using authenticated client
         const { data: business } = await supabase
             .from('businesses')
             .select('id, repairdesk_api_key, repairdesk_store_url')
@@ -25,7 +34,7 @@ export async function POST() {
 
         if (!business?.repairdesk_api_key) {
             return Response.json(
-                { error: 'RepairDesk API key not configured. Go to Settings to add it.' },
+                { error: 'Please save your RepairDesk API key in Settings first, then try syncing again.' },
                 { status: 400 }
             );
         }
@@ -34,6 +43,9 @@ export async function POST() {
             business.repairdesk_api_key,
             business.repairdesk_store_url
         );
+
+        // Use supabaseAdmin for upserts if available (bypasses RLS), fall back to user client
+        const dbClient = await getAdmin() || supabase;
 
         // Fetch customers from RepairDesk
         let totalSynced = 0;
@@ -72,7 +84,7 @@ export async function POST() {
                     .join(' ') || null;
 
                 // Upsert lead — skip if already imported (external_id is unique per business+source)
-                const { error } = await supabaseAdmin
+                const { error } = await dbClient
                     .from('leads')
                     .upsert(
                         {
