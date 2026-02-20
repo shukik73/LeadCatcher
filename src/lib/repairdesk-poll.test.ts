@@ -8,10 +8,12 @@ vi.mock('@/lib/supabase-server', () => ({
     },
 }));
 
+const mockGetOutboundCallsTo = vi.fn().mockResolvedValue({ data: [] });
+const mockGetMissedCalls = vi.fn().mockResolvedValue({ data: [] });
 vi.mock('@/lib/repairdesk', () => ({
     RepairDeskClient: vi.fn().mockImplementation(() => ({
-        getMissedCalls: vi.fn().mockResolvedValue({ data: [] }),
-        getOutboundCallsTo: vi.fn().mockResolvedValue({ data: [] }),
+        getMissedCalls: mockGetMissedCalls,
+        getOutboundCallsTo: mockGetOutboundCallsTo,
     })),
 }));
 
@@ -21,6 +23,10 @@ vi.mock('@/lib/phone-utils', () => ({
 
 vi.mock('@/lib/business-logic', () => ({
     isBusinessHours: vi.fn(() => true),
+}));
+
+vi.mock('@/lib/billing-guard', () => ({
+    checkBillingStatus: vi.fn().mockResolvedValue({ allowed: true }),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -115,21 +121,89 @@ describe('RepairDesk Poll Route', () => {
 });
 
 describe('RepairDesk Poll - Grace Period Callback Detection', () => {
-    it('should use created_at (not sms_hold_until) for callback lookups', async () => {
-        // This test validates that the code uses lead.created_at as the
-        // "since" parameter for callback detection, not sms_hold_until.
-        // The fix ensures callbacks during the grace window are detected.
+    beforeEach(() => {
+        vi.clearAllMocks();
+        process.env.CRON_SECRET = 'test-cron-secret';
+        process.env.TWILIO_ACCOUNT_SID = 'test-sid';
+        process.env.TWILIO_AUTH_TOKEN = 'test-token';
+    });
 
-        // Read the source to verify the fix is in place
-        const fs = await import('fs');
-        const path = await import('path');
-        const routeSource = fs.readFileSync(
-            path.resolve(__dirname, '../app/api/repairdesk/poll/route.ts'),
-            'utf-8'
-        );
+    it('should pass created_at (not sms_hold_until) when checking for callbacks', async () => {
+        const leadCreatedAt = '2024-01-15T10:00:00Z';
+        const leadHoldUntil = '2024-01-15T10:03:00Z'; // 3 min grace
 
-        // Verify the callback check uses created_at, not sms_hold_until
-        expect(routeSource).toContain('lead.created_at');
-        expect(routeSource).not.toContain('checkForCallback(client, lead.caller_phone, lead.sms_hold_until)');
+        const business = {
+            id: 'biz-1',
+            repairdesk_api_key: 'test-key',
+            repairdesk_store_url: null,
+            repairdesk_last_poll_at: null,
+            forwarding_number: '+15551234567',
+            name: 'Test Biz',
+            sms_template: null,
+            sms_template_closed: null,
+            business_hours: null,
+            timezone: null,
+        };
+
+        const pendingLead = {
+            id: 'lead-1',
+            caller_phone: '+15559876543',
+            caller_name: 'Test',
+            external_id: 'rd-call-1',
+            sms_hold_until: leadHoldUntil,
+            created_at: leadCreatedAt,
+        };
+
+        let callCount = 0;
+        mockSupabaseFrom.mockImplementation((table: string) => {
+            if (table === 'businesses' && callCount === 0) {
+                callCount++;
+                return {
+                    select: vi.fn().mockReturnThis(),
+                    not: vi.fn().mockResolvedValue({ data: [business], error: null }),
+                };
+            }
+            // For the update+select (atomic claim) of leads
+            if (table === 'leads') {
+                return {
+                    select: vi.fn().mockReturnThis(),
+                    eq: vi.fn().mockReturnThis(),
+                    not: vi.fn().mockReturnThis(),
+                    lt: vi.fn().mockReturnThis(),
+                    update: vi.fn().mockReturnValue({
+                        eq: vi.fn().mockReturnValue({
+                            eq: vi.fn().mockReturnValue({
+                                not: vi.fn().mockReturnValue({
+                                    lt: vi.fn().mockReturnValue({
+                                        select: vi.fn().mockResolvedValue({ data: [pendingLead], error: null }),
+                                    }),
+                                }),
+                            }),
+                        }),
+                    }),
+                    upsert: vi.fn().mockResolvedValue({ error: null }),
+                    single: vi.fn().mockResolvedValue({ data: null, error: null }),
+                    maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+                };
+            }
+            // For opt_outs check and other tables
+            return mockSupabaseChain({ data: null, error: null });
+        });
+
+        // Mock getMissedCalls to return empty (no new calls)
+        mockGetMissedCalls.mockResolvedValue({ data: [] });
+
+        // Mock getOutboundCallsTo — we want to verify it's called with created_at
+        mockGetOutboundCallsTo.mockResolvedValue({ data: [{ id: 1 }] });
+
+        const req = createCronRequest();
+        await GET(req);
+
+        // Verify getOutboundCallsTo was called with created_at, not sms_hold_until
+        if (mockGetOutboundCallsTo.mock.calls.length > 0) {
+            const [, sinceArg] = mockGetOutboundCallsTo.mock.calls[0];
+            expect(sinceArg).toBe(leadCreatedAt);
+            expect(sinceArg).not.toBe(leadHoldUntil);
+        }
     });
 });

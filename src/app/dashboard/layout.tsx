@@ -3,6 +3,9 @@ import { redirect } from 'next/navigation';
 import { SubscriptionBanner } from '@/components/dashboard/SubscriptionBanner';
 import { DashboardNav } from '@/components/dashboard/DashboardNav';
 
+// Prevent static prerendering — dashboard requires auth cookies and DB access
+export const dynamic = 'force-dynamic';
+
 export default async function DashboardLayout({
     children,
 }: {

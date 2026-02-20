@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { checkBillingStatus } from '@/lib/billing-guard';
 import { logger } from '@/lib/logger';
 import twilio from 'twilio';
 import { z } from 'zod';
@@ -71,9 +72,21 @@ export async function POST(request: Request) {
             return new Response('Access denied', { status: 403 });
         }
 
-        // 3. TCPA COMPLIANCE: Check if user is opted out
-        // FAIL CLOSED: if the opt-out lookup errors, do NOT send SMS
+        // 3. BILLING GUARD: Check subscription before sending SMS
         const businessId = leadWithBusiness.businesses.id;
+        const billingCheck = await checkBillingStatus(businessId);
+        if (!billingCheck.allowed) {
+            return new Response(JSON.stringify({
+                success: false,
+                error: billingCheck.reason,
+            }), {
+                status: 403,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
+        // 4. TCPA COMPLIANCE: Check if user is opted out
+        // FAIL CLOSED: if the opt-out lookup errors, do NOT send SMS
         const toNumber = leadWithBusiness.caller_phone;
 
         const { data: optOut, error: optOutError } = await supabaseAdmin

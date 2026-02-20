@@ -90,6 +90,7 @@ export function DashboardNav() {
                         key={item.href}
                         onClick={() => router.push(item.href)}
                         title={item.label}
+                        aria-label={item.label}
                         className={cn(
                             "w-10 h-10 rounded-lg flex items-center justify-center transition-colors",
                             isActive(item.href)
@@ -106,6 +107,7 @@ export function DashboardNav() {
                 <button
                     onClick={handleSignOut}
                     title="Sign Out"
+                    aria-label="Sign Out"
                     className="w-10 h-10 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                 >
                     <LogOut className="h-5 w-5" />

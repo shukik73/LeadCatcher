@@ -1,16 +1,20 @@
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { validateTwilioRequest } from '@/lib/twilio-validator';
 import { normalizePhoneNumber } from '@/lib/phone-utils';
+import { checkBillingStatus } from '@/lib/billing-guard';
+import { claimWebhookEvent, markWebhookProcessed, markWebhookFailed, markWebhookFailedIfProcessing, setWebhookBusinessId } from '@/lib/webhook-common';
 import { logger } from '@/lib/logger';
 import twilio from 'twilio';
 
 export const dynamic = 'force-dynamic';
 
+const TAG = 'SMS Webhook';
+
 export async function POST(request: Request) {
     // 1. SECURITY: Validate request
     const isValid = await validateTwilioRequest(request);
     if (!isValid) {
-        logger.warn('[SMS Webhook] Invalid Twilio signature');
+        logger.warn(`[${TAG}] Invalid Twilio signature`);
         return new Response('Unauthorized', { status: 403 });
     }
 
@@ -22,33 +26,38 @@ export async function POST(request: Request) {
 
     if (!fromRaw || !body) return new Response('Invalid Request', { status: 400 });
 
-    // Idempotency: atomic claim via INSERT ... ON CONFLICT DO NOTHING.
-    // Only the first request to claim the event_id proceeds; retries get 0 rows.
+    // Idempotency: atomic claim
     if (messageSid) {
-        const { data: claimed } = await supabaseAdmin
-            .from('webhook_events')
-            .insert({
-                event_id: messageSid,
-                event_type: 'sms',
-                status: 'processing',
-            })
-            .select('id')
-            .maybeSingle();
-
-        if (!claimed) {
-            logger.info('[SMS Webhook] Duplicate MessageSid, skipping', { messageSid });
+        const claim = await claimWebhookEvent(messageSid, 'sms', TAG);
+        if (claim.status === 'duplicate') {
             return new Response('<Response></Response>', { headers: { 'Content-Type': 'text/xml' } });
+        }
+        if (claim.status === 'error') {
+            return new Response('Internal Server Error', { status: 500 });
         }
     }
 
+    // Wrap in try/finally to ensure webhook_events.status always reaches a terminal state
+    try {
+        return await handleSmsWebhook(messageSid, fromRaw, toRaw, body);
+    } catch (error) {
+        logger.error(`[${TAG}] Unhandled error`, error, { messageSid });
+        return new Response('Internal Server Error', { status: 500 });
+    } finally {
+        if (messageSid) {
+            await markWebhookFailedIfProcessing(messageSid);
+        }
+    }
+}
+
+async function handleSmsWebhook(messageSid: string | null, fromRaw: string, toRaw: string, body: string) {
     const from = normalizePhoneNumber(fromRaw);
     const to = normalizePhoneNumber(toRaw);
     const bodyUpper = body.trim().toUpperCase();
 
-    logger.info(`[SMS Webhook] Message received`, { from, to, bodyLength: body.length });
+    logger.info(`[${TAG}] Message received`, { from, to, bodyLength: body.length });
 
     // 2. ISOLATION: Find lead based on caller AND business number
-    // First find the business associated with the 'To' number
     const { data: business } = await supabaseAdmin
         .from('businesses')
         .select('id, owner_phone, name')
@@ -56,21 +65,12 @@ export async function POST(request: Request) {
         .single();
 
     if (!business) {
-        logger.error(`[SMS Webhook] No business found for number`, null, { to });
-        if (messageSid) {
-            await supabaseAdmin.from('webhook_events')
-                .update({ status: 'failed' })
-                .eq('event_id', messageSid);
-        }
+        logger.error(`[${TAG}] No business found for number`, null, { to });
+        if (messageSid) await markWebhookFailed(messageSid);
         return new Response('<Response></Response>', { headers: { 'Content-Type': 'text/xml' } });
     }
 
-    // Update the claimed event with the business_id
-    if (messageSid) {
-        await supabaseAdmin.from('webhook_events')
-            .update({ business_id: business.id })
-            .eq('event_id', messageSid);
-    }
+    if (messageSid) await setWebhookBusinessId(messageSid, business.id);
 
     // 2.5. TCPA COMPLIANCE: Handle STOP keywords (STOP, UNSUBSCRIBE, CANCEL, END, QUIT)
     const stopKeywords = ['STOP', 'UNSUBSCRIBE', 'CANCEL', 'END', 'QUIT'];
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
 
     if (isOptOut) {
         const optOutKeyword = stopKeywords.find(keyword => bodyUpper.startsWith(keyword)) || 'STOP';
-        
+
         // Add to opt-out table (upsert to handle re-opts)
         await supabaseAdmin.from('opt_outs').upsert({
             business_id: business.id,
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
             onConflict: 'business_id,phone_number'
         });
 
-        logger.info('[SMS Webhook] Opt-out registered', { from, businessId: business.id, keyword: optOutKeyword });
+        logger.info(`[${TAG}] Opt-out registered`, { from, businessId: business.id, keyword: optOutKeyword });
 
         // Send confirmation message (TCPA requirement)
         const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
@@ -103,7 +103,7 @@ export async function POST(request: Request) {
             logger.error('Error sending opt-out confirmation', err);
         }
 
-        // Return TwiML response (don't process as normal message)
+        if (messageSid) await markWebhookProcessed(messageSid);
         return new Response('<Response></Response>', { headers: { 'Content-Type': 'text/xml' } });
     }
 
@@ -115,7 +115,7 @@ export async function POST(request: Request) {
             .eq('business_id', business.id)
             .eq('phone_number', from);
 
-        logger.info('[SMS Webhook] Re-subscription', { from, businessId: business.id });
+        logger.info(`[${TAG}] Re-subscription`, { from, businessId: business.id });
 
         // Send confirmation
         const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
@@ -129,6 +129,7 @@ export async function POST(request: Request) {
             logger.error('Error sending resubscription confirmation', err);
         }
 
+        if (messageSid) await markWebhookProcessed(messageSid);
         return new Response('<Response></Response>', { headers: { 'Content-Type': 'text/xml' } });
     }
 
@@ -141,10 +142,13 @@ export async function POST(request: Request) {
         .maybeSingle();
 
     if (optOut) {
-        logger.info('[SMS Webhook] Message from opted-out user ignored', { from, businessId: business.id });
-        // Don't process message, but don't send error (TCPA compliance)
+        logger.info(`[${TAG}] Message from opted-out user ignored`, { from, businessId: business.id });
+        if (messageSid) await markWebhookProcessed(messageSid);
         return new Response('<Response></Response>', { headers: { 'Content-Type': 'text/xml' } });
     }
+
+    // BILLING GUARD: Check subscription before sending outbound SMS
+    const billing = await checkBillingStatus(business.id);
 
     // Find or Create Lead
     let leadId: string | null = null;
@@ -182,7 +186,6 @@ export async function POST(request: Request) {
 
         // 4. AI Analysis (Async-ish)
         try {
-            // We run this "inline" for MVP, but in prod this should be a background job
             const { analyzeIntent } = await import('@/lib/ai-service');
             const analysis = await analyzeIntent(body);
 
@@ -200,8 +203,8 @@ export async function POST(request: Request) {
             logger.error('AI Analysis failed', error);
         }
 
-        // 5. Notify Owner
-        if (business.owner_phone) {
+        // 5. Notify Owner (only if billing is active)
+        if (business.owner_phone && billing.allowed) {
             const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
             try {
                 await client.messages.create({
@@ -212,15 +215,13 @@ export async function POST(request: Request) {
             } catch (err) {
                 logger.error('Error notifying owner of SMS:', err);
             }
+        } else if (!billing.allowed) {
+            logger.warn(`[${TAG}] Skipping owner notification - billing inactive`, { businessId: business.id });
         }
     }
 
-    // Mark event as fully processed after all side effects succeeded
-    if (messageSid) {
-        await supabaseAdmin.from('webhook_events')
-            .update({ status: 'processed', processed_at: new Date().toISOString() })
-            .eq('event_id', messageSid);
-    }
+    // Mark event as fully processed
+    if (messageSid) await markWebhookProcessed(messageSid);
 
     return new Response('<Response></Response>', {
         headers: { 'Content-Type': 'text/xml' },

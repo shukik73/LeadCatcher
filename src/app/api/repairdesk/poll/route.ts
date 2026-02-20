@@ -2,6 +2,7 @@ import { supabaseAdmin } from '@/lib/supabase-server';
 import { RepairDeskClient } from '@/lib/repairdesk';
 import { normalizePhoneNumber } from '@/lib/phone-utils';
 import { isBusinessHours, type BusinessHours } from '@/lib/business-logic';
+import { checkBillingStatus } from '@/lib/billing-guard';
 import { logger } from '@/lib/logger';
 import twilio from 'twilio';
 
@@ -152,27 +153,31 @@ async function pollBusiness(business: BusinessRow) {
     }
 
     // --- Phase 2: Process leads whose grace period has expired ---
-    const { data: pendingLeads, error: pendingError } = await supabaseAdmin
+    // Atomically claim leads by updating status to 'Processing' in a single query.
+    // This prevents concurrent cron runs from double-selecting the same leads.
+    const { data: claimedLeads, error: claimError } = await supabaseAdmin
         .from('leads')
-        .select('id, caller_phone, caller_name, external_id, sms_hold_until, created_at')
+        .update({ status: 'Processing' })
         .eq('business_id', business.id)
         .eq('source', 'repairdesk')
         .eq('status', 'New')
         .not('sms_hold_until', 'is', null)
-        .lt('sms_hold_until', new Date().toISOString());
+        .lt('sms_hold_until', new Date().toISOString())
+        .select('id, caller_phone, caller_name, external_id, sms_hold_until, created_at');
 
-    if (pendingError) {
-        logger.error('[RepairDesk Poll] Failed to fetch pending leads', pendingError);
+    if (claimError) {
+        logger.error('[RepairDesk Poll] Failed to claim pending leads', claimError);
     }
 
-    if (pendingLeads && pendingLeads.length > 0) {
+    // Billing guard: check once per business before sending any SMS
+    const billing = await checkBillingStatus(business.id);
+
+    if (claimedLeads && claimedLeads.length > 0) {
         const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
-        for (const lead of pendingLeads) {
+        for (const lead of claimedLeads) {
             try {
                 // Check if user returned the call since the lead was created
-                // (not since sms_hold_until, which is the future grace period end —
-                // using hold_until would miss callbacks during the grace window)
                 const callbackDetected = await checkForCallback(client, lead.caller_phone, lead.created_at);
 
                 if (callbackDetected) {
@@ -187,6 +192,16 @@ async function pollBusiness(business: BusinessRow) {
                         leadId: lead.id,
                         phone: lead.caller_phone,
                     });
+                } else if (!billing.allowed) {
+                    // Billing inactive — revert to New so it can be retried later
+                    await supabaseAdmin
+                        .from('leads')
+                        .update({ status: 'New' })
+                        .eq('id', lead.id);
+                    logger.warn('[RepairDesk Poll] Skipping SMS - billing inactive', {
+                        leadId: lead.id,
+                        businessId: business.id,
+                    });
                 } else {
                     // No callback — send SMS
                     const sent = await sendMissedCallSms(
@@ -197,12 +212,23 @@ async function pollBusiness(business: BusinessRow) {
 
                     if (sent) {
                         smsSent++;
+                    } else {
+                        // Revert to New if SMS failed so it can be retried
+                        await supabaseAdmin
+                            .from('leads')
+                            .update({ status: 'New' })
+                            .eq('id', lead.id);
                     }
                 }
             } catch (error) {
                 logger.error('[RepairDesk Poll] Error processing pending lead', error, {
                     leadId: lead.id,
                 });
+                // Revert to New on unexpected errors
+                await supabaseAdmin
+                    .from('leads')
+                    .update({ status: 'New' })
+                    .eq('id', lead.id);
             }
         }
     }

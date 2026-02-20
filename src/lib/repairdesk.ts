@@ -92,6 +92,9 @@ export class RepairDeskClient {
         this.baseUrl = `https://${cleanSubdomain}.repairdesk.co/api/web/v1`;
     }
 
+    // NOTE: RepairDesk's API requires `api_key` as a query parameter — header-based
+    // auth is not supported. The key is never included in log output (only `endpoint`
+    // is logged). This is a third-party API constraint, not a design choice.
     private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
         const separator = endpoint.includes('?') ? '&' : '?';
         const url = `${this.baseUrl}${endpoint}${separator}api_key=${this.apiKey}`;

@@ -1,9 +1,12 @@
 import { stripe } from '@/lib/stripe';
 import { supabaseAdmin } from '@/lib/supabase-server';
+import { claimWebhookEvent, markWebhookProcessed, markWebhookFailed } from '@/lib/webhook-common';
 import { logger } from '@/lib/logger';
 import type Stripe from 'stripe';
 
 export const dynamic = 'force-dynamic';
+
+const TAG = 'Stripe Webhook';
 
 /**
  * POST /api/stripe/webhook
@@ -20,13 +23,13 @@ export async function POST(request: Request) {
     const signature = request.headers.get('stripe-signature');
 
     if (!signature) {
-        logger.warn('[Stripe Webhook] Missing stripe-signature header');
+        logger.warn(`[${TAG}] Missing stripe-signature header`);
         return new Response('Missing signature', { status: 400 });
     }
 
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
     if (!webhookSecret) {
-        logger.error('[Stripe Webhook] STRIPE_WEBHOOK_SECRET not configured');
+        logger.error(`[${TAG}] STRIPE_WEBHOOK_SECRET not configured`);
         return new Response('Webhook not configured', { status: 500 });
     }
 
@@ -36,27 +39,19 @@ export async function POST(request: Request) {
         event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
     } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error';
-        logger.warn('[Stripe Webhook] Signature verification failed', { error: message });
+        logger.warn(`[${TAG}] Signature verification failed`, { error: message });
         return new Response(`Webhook Error: ${message}`, { status: 400 });
     }
 
-    logger.info('[Stripe Webhook] Event received', { type: event.type, eventId: event.id });
+    logger.info(`[${TAG}] Event received`, { type: event.type, eventId: event.id });
 
-    // Idempotency: atomic claim via INSERT ... ON CONFLICT DO NOTHING.
-    // Only the first request to claim the event.id proceeds; replays get 0 rows.
-    const { data: claimed } = await supabaseAdmin
-        .from('webhook_events')
-        .insert({
-            event_id: event.id,
-            event_type: 'stripe',
-            status: 'processing',
-        })
-        .select('id')
-        .maybeSingle();
-
-    if (!claimed) {
-        logger.info('[Stripe Webhook] Duplicate event, skipping', { eventId: event.id });
+    // Idempotency: atomic claim
+    const claim = await claimWebhookEvent(event.id, 'stripe', TAG);
+    if (claim.status === 'duplicate') {
         return new Response('OK', { status: 200 });
+    }
+    if (claim.status === 'error') {
+        return new Response('Internal Server Error', { status: 500 });
     }
 
     try {
@@ -78,19 +73,13 @@ export async function POST(request: Request) {
                 break;
 
             default:
-                logger.info('[Stripe Webhook] Unhandled event type', { type: event.type });
+                logger.info(`[${TAG}] Unhandled event type`, { type: event.type });
         }
 
-        // Mark as processed after all side effects succeed
-        await supabaseAdmin.from('webhook_events')
-            .update({ status: 'processed', processed_at: new Date().toISOString() })
-            .eq('event_id', event.id);
+        await markWebhookProcessed(event.id);
     } catch (error) {
-        logger.error('[Stripe Webhook] Error handling event', error, { type: event.type });
-        // Mark as failed so we can investigate / allow manual retry
-        await supabaseAdmin.from('webhook_events')
-            .update({ status: 'failed' })
-            .eq('event_id', event.id);
+        logger.error(`[${TAG}] Error handling event`, error, { type: event.type });
+        await markWebhookFailed(event.id);
         return new Response('Webhook handler error', { status: 500 });
     }
 
@@ -103,7 +92,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     const subscriptionId = session.subscription as string;
 
     if (!businessId || !subscriptionId) {
-        logger.warn('[Stripe Webhook] Missing metadata in checkout session', {
+        logger.warn(`[${TAG}] Missing metadata in checkout session`, {
             sessionId: session.id,
         });
         return;
@@ -127,7 +116,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         })
         .eq('id', businessId);
 
-    logger.info('[Stripe Webhook] Checkout completed', {
+    logger.info(`[${TAG}] Checkout completed`, {
         businessId,
         planId: planId || 'unknown',
         status: subscription.status,
@@ -149,7 +138,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription, even
         .single();
 
     if (!business) {
-        logger.warn('[Stripe Webhook] No business for customer', { customerId });
+        logger.warn(`[${TAG}] No business for customer`, { customerId });
         return;
     }
 
@@ -172,7 +161,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription, even
         .limit(1);
 
     if (newerEvents && newerEvents.length > 0) {
-        logger.info('[Stripe Webhook] Skipping out-of-order subscription update', {
+        logger.info(`[${TAG}] Skipping out-of-order subscription update`, {
             businessId: business.id,
             eventTimestamp,
         });
@@ -197,7 +186,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription, even
         })
         .eq('id', business.id);
 
-    logger.info('[Stripe Webhook] Subscription updated', {
+    logger.info(`[${TAG}] Subscription updated`, {
         businessId: business.id,
         status: subscription.status,
         planId,
@@ -214,7 +203,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
         .single();
 
     if (!business) {
-        logger.warn('[Stripe Webhook] No business for customer', { customerId });
+        logger.warn(`[${TAG}] No business for customer`, { customerId });
         return;
     }
 
@@ -226,7 +215,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
         })
         .eq('id', business.id);
 
-    logger.info('[Stripe Webhook] Subscription canceled', {
+    logger.info(`[${TAG}] Subscription canceled`, {
         businessId: business.id,
     });
 }
@@ -247,7 +236,7 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
         .update({ stripe_status: 'past_due' })
         .eq('id', business.id);
 
-    logger.warn('[Stripe Webhook] Payment failed', {
+    logger.warn(`[${TAG}] Payment failed`, {
         businessId: business.id,
         invoiceId: invoice.id,
     });
