@@ -5,7 +5,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase-client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Check, Loader2, ExternalLink } from 'lucide-react';
+import { Check, Loader2, ExternalLink, CreditCard, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSearchParams } from 'next/navigation';
 
@@ -46,6 +46,7 @@ export default function BillingPage() {
     const [billing, setBilling] = useState<BillingInfo | null>(null);
     const [checkingOut, setCheckingOut] = useState<string | null>(null);
     const [openingPortal, setOpeningPortal] = useState(false);
+    const [checkoutError, setCheckoutError] = useState<string | null>(null);
     const searchParams = useSearchParams();
     const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
@@ -78,6 +79,7 @@ export default function BillingPage() {
 
     const handleCheckout = async (planId: string) => {
         setCheckingOut(planId);
+        setCheckoutError(null);
         try {
             const res = await fetch('/api/stripe/checkout', {
                 method: 'POST',
@@ -88,10 +90,13 @@ export default function BillingPage() {
             if (data.url) {
                 window.location.assign(data.url);
             } else {
-                toast.error(data.error || 'Failed to start checkout');
+                const errorMsg = data.error || 'Failed to start checkout';
+                setCheckoutError(errorMsg);
+                toast.error(errorMsg);
                 setCheckingOut(null);
             }
         } catch {
+            setCheckoutError('Network error. Please try again.');
             toast.error('Failed to start checkout');
             setCheckingOut(null);
         }
@@ -131,7 +136,7 @@ export default function BillingPage() {
                 <Card>
                     <CardHeader>
                         <CardTitle>Current Plan</CardTitle>
-                        <CardDescription>Manage your subscription and billing.</CardDescription>
+                        <CardDescription>Manage your subscription and payment method.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="flex items-center gap-3">
@@ -156,20 +161,70 @@ export default function BillingPage() {
                             </p>
                         )}
 
-                        <Button
-                            onClick={handleManageBilling}
-                            disabled={openingPortal}
-                            variant="outline"
-                        >
-                            {openingPortal ? (
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            ) : (
+                        {isPastDue && (
+                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start gap-2">
+                                <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                                <div>
+                                    <p className="text-sm font-medium text-yellow-800">Payment past due</p>
+                                    <p className="text-sm text-yellow-700">Please update your payment method to avoid service interruption.</p>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex gap-3">
+                            <Button
+                                onClick={handleManageBilling}
+                                disabled={openingPortal}
+                                variant="outline"
+                            >
+                                {openingPortal ? (
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                ) : (
+                                    <CreditCard className="h-4 w-4 mr-2" />
+                                )}
+                                Update Payment Method
+                            </Button>
+                            <Button
+                                onClick={handleManageBilling}
+                                disabled={openingPortal}
+                                variant="ghost"
+                                size="sm"
+                            >
                                 <ExternalLink className="h-4 w-4 mr-2" />
-                            )}
-                            Manage Billing
-                        </Button>
+                                Full Billing Portal
+                            </Button>
+                        </div>
                     </CardContent>
                 </Card>
+            )}
+
+            {/* No subscription prompt */}
+            {!hasSubscription && (
+                <Card className="border-blue-200 bg-blue-50/50">
+                    <CardContent className="py-6">
+                        <div className="flex items-start gap-3">
+                            <CreditCard className="h-6 w-6 text-blue-600 flex-shrink-0 mt-0.5" />
+                            <div>
+                                <h3 className="font-semibold text-blue-900">Get started with a 14-day free trial</h3>
+                                <p className="text-sm text-blue-700 mt-1">
+                                    Choose a plan below to start your free trial. You&apos;ll enter your credit card on the next page
+                                    and won&apos;t be charged until the trial ends.
+                                </p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Checkout error */}
+            {checkoutError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                        <p className="text-sm font-medium text-red-800">Checkout failed</p>
+                        <p className="text-sm text-red-700">{checkoutError}</p>
+                    </div>
+                </div>
             )}
 
             {/* Plan Selection */}
@@ -217,7 +272,14 @@ export default function BillingPage() {
                                         {checkingOut === planId && (
                                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                                         )}
-                                        {hasSubscription ? 'Switch Plan' : 'Start 14-Day Free Trial'}
+                                        {checkingOut === planId ? 'Redirecting to checkout...' : (
+                                            hasSubscription ? 'Switch Plan' : (
+                                                <>
+                                                    <CreditCard className="h-4 w-4 mr-2" />
+                                                    Start 14-Day Free Trial
+                                                </>
+                                            )
+                                        )}
                                     </Button>
                                 )}
                             </CardContent>
@@ -225,6 +287,10 @@ export default function BillingPage() {
                     );
                 })}
             </div>
+
+            <p className="text-center text-sm text-gray-500">
+                All plans include a 14-day free trial. Cancel anytime from the billing portal.
+            </p>
         </div>
     );
 }
