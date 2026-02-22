@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,7 +19,7 @@ export default function LoginPage() {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [viewMode, setViewMode] = useState<ViewMode>('signIn');
-    const supabase = createSupabaseBrowserClient();
+    const supabase = useMemo(() => createSupabaseBrowserClient(), []);
     const router = useRouter();
 
     const handleSubmit = async (e: React.FormEvent) => {

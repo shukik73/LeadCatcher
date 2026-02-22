@@ -119,7 +119,30 @@ export default function BillingPage() {
         }
     };
 
-    if (loading) return <div className="p-8">Loading billing...</div>;
+    if (loading) return (
+        <div className="container mx-auto p-6 max-w-4xl space-y-8">
+            <div className="h-9 w-24 bg-slate-200 rounded animate-pulse" />
+            <div className="rounded-lg border border-slate-200 p-6 space-y-4">
+                <div className="h-6 w-40 bg-slate-200 rounded animate-pulse" />
+                <div className="h-4 w-64 bg-slate-100 rounded animate-pulse" />
+                <div className="h-10 w-48 bg-slate-100 rounded animate-pulse" />
+            </div>
+            <div className="grid md:grid-cols-2 gap-6">
+                {[1, 2].map(i => (
+                    <div key={i} className="rounded-lg border border-slate-200 p-6 space-y-4">
+                        <div className="h-6 w-24 bg-slate-200 rounded animate-pulse" />
+                        <div className="h-8 w-32 bg-slate-200 rounded animate-pulse" />
+                        <div className="space-y-2">
+                            {Array.from({ length: 4 }).map((_, j) => (
+                                <div key={j} className="h-4 bg-slate-100 rounded animate-pulse" />
+                            ))}
+                        </div>
+                        <div className="h-10 bg-slate-100 rounded animate-pulse" />
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
 
     const hasSubscription = billing?.stripe_status && billing.stripe_status !== 'canceled';
     const currentPlan = billing?.stripe_plan || null;

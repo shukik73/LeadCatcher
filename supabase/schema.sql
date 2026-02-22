@@ -119,10 +119,4 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- Performance Indexes
-CREATE INDEX IF NOT EXISTS idx_businesses_forwarding_number ON businesses(forwarding_number);
-CREATE INDEX IF NOT EXISTS idx_leads_business_id ON leads(business_id);
-CREATE INDEX IF NOT EXISTS idx_leads_caller_phone ON leads(caller_phone);
-CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
-CREATE INDEX IF NOT EXISTS idx_messages_lead_id ON messages(lead_id);
-CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at DESC);
+-- Performance Indexes: see indexes.sql for the canonical index definitions.
