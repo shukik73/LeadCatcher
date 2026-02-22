@@ -248,7 +248,33 @@ export default function SettingsPage() {
         setSyncing(false);
     };
 
-    if (loading) return <div className="p-8">Loading settings...</div>;
+    if (loading) return (
+        <div className="container mx-auto p-6 max-w-6xl space-y-8">
+            <div className="h-9 w-32 bg-slate-200 rounded animate-pulse" />
+            <div className="rounded-lg border border-slate-200 p-6 space-y-4">
+                <div className="h-6 w-56 bg-slate-200 rounded animate-pulse" />
+                <div className="h-4 w-80 bg-slate-100 rounded animate-pulse" />
+                <div className="space-y-3">
+                    <div className="h-24 bg-slate-100 rounded animate-pulse" />
+                    <div className="h-24 bg-slate-100 rounded animate-pulse" />
+                </div>
+            </div>
+            <div className="grid lg:grid-cols-2 gap-6">
+                <div className="rounded-lg border border-slate-200 p-6 space-y-4">
+                    <div className="h-6 w-40 bg-slate-200 rounded animate-pulse" />
+                    {Array.from({ length: 7 }).map((_, i) => (
+                        <div key={i} className="h-10 bg-slate-100 rounded animate-pulse" />
+                    ))}
+                </div>
+                <div className="rounded-lg border border-slate-200 p-6 space-y-4">
+                    <div className="h-6 w-48 bg-slate-200 rounded animate-pulse" />
+                    <div className="h-10 bg-slate-100 rounded animate-pulse" />
+                    <div className="h-10 bg-slate-100 rounded animate-pulse" />
+                    <div className="h-9 w-36 bg-slate-100 rounded animate-pulse" />
+                </div>
+            </div>
+        </div>
+    );
 
     return (
         <div className="container mx-auto p-6 max-w-6xl space-y-8">

@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Phone, Send, User, Loader2, Menu, AlertCircle, RefreshCw } from 'lucide-react';
+import { Phone, Send, User, Loader2, Menu, AlertCircle, RefreshCw, PhoneOff } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-client';
 import { logger } from '@/lib/logger';
 import { Sidebar } from '@/components/dashboard/Sidebar';
@@ -32,6 +32,8 @@ interface Message {
     lead_id: string;
 }
 
+const PAGE_SIZE = 50;
+
 export default function Dashboard() {
     const [searchQuery, setSearchQuery] = useState('');
     const [leads, setLeads] = useState<Lead[]>([]);
@@ -41,7 +43,15 @@ export default function Dashboard() {
     const [sending, setSending] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [hasMore, setHasMore] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
     const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const selectedLeadRef = useRef<Lead | null>(null);
+
+    // Keep ref in sync with state so realtime callback sees latest selectedLead
+    // without re-subscribing the channel
+    selectedLeadRef.current = selectedLead;
 
     const updateStatus = async (status: string) => {
         if (!selectedLead) return;
@@ -49,7 +59,6 @@ export default function Dashboard() {
         if (error) {
             toast.error('Failed to update status');
         } else {
-            // Update local state
             setSelectedLead(prev => prev ? { ...prev, status } : null);
             setLeads(prev => prev.map(lead =>
                 lead.id === selectedLead.id ? { ...lead, status } : lead
@@ -58,14 +67,14 @@ export default function Dashboard() {
         }
     };
 
-    // ... (Fetch and Realtime effects same) ...
-    // Initial Fetch
+    // Initial Fetch with pagination
     useEffect(() => {
         async function fetchLeads() {
             const { data, error } = await supabase
                 .from('leads')
                 .select(`*, messages (*)`)
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .range(0, PAGE_SIZE - 1);
 
             if (error) {
                 logger.error('Error fetching leads', error);
@@ -78,7 +87,7 @@ export default function Dashboard() {
                 })) as Lead[] || [];
 
                 setLeads(processedLeads);
-                // On desktop, select first. On mobile, maybe don't? standard behavior: select first.
+                setHasMore(processedLeads.length === PAGE_SIZE);
                 if (window.innerWidth >= 768 && processedLeads.length > 0) {
                     setSelectedLead(processedLeads[0]);
                 }
@@ -88,13 +97,32 @@ export default function Dashboard() {
         fetchLeads();
     }, [supabase]);
 
-    // ... (Realtime effect same) ...
-    // Real-time Subscription
+    // Load more leads (pagination)
+    const loadMore = useCallback(async () => {
+        if (loadingMore || !hasMore) return;
+        setLoadingMore(true);
+        const { data, error } = await supabase
+            .from('leads')
+            .select(`*, messages (*)`)
+            .order('created_at', { ascending: false })
+            .range(leads.length, leads.length + PAGE_SIZE - 1);
+
+        if (!error && data) {
+            const processedLeads = data.map((lead: Record<string, unknown>) => ({
+                ...lead,
+                messages: (lead.messages as Message[] | undefined)?.sort((a: Message, b: Message) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) || []
+            })) as Lead[];
+            setLeads(prev => [...prev, ...processedLeads]);
+            setHasMore(processedLeads.length === PAGE_SIZE);
+        }
+        setLoadingMore(false);
+    }, [loadingMore, hasMore, leads.length, supabase]);
+
+    // Real-time Subscription — uses ref for selectedLead to avoid re-subscribing
     useEffect(() => {
         const channel = supabase
             .channel('dashboard-realtime')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, (payload: { eventType: string; new: Record<string, unknown> }) => {
-                // Realtime lead update received
                 if (payload.eventType === 'INSERT') {
                     const newLead = payload.new as unknown as Lead;
                     setLeads(prev => [{ ...newLead, messages: [] }, ...prev]);
@@ -109,8 +137,7 @@ export default function Dashboard() {
                         }
                     });
                 }
-            }
-            )
+            })
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload: { new: Record<string, unknown> }) => {
                 const newMsg = payload.new as unknown as Message;
                 setLeads(prev => prev.map(lead => {
@@ -119,17 +146,22 @@ export default function Dashboard() {
                     }
                     return lead;
                 }));
-                if (selectedLead?.id === newMsg.lead_id) {
+                // Use ref to avoid stale closure
+                if (selectedLeadRef.current?.id === newMsg.lead_id) {
                     setSelectedLead(prev => prev ? { ...prev, messages: [...prev.messages, newMsg] } : null);
                 }
-            }
-            )
+            })
             .subscribe();
 
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [selectedLead, supabase]);
+    }, [supabase]);
+
+    // Auto-scroll to bottom when messages change
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [selectedLead?.messages.length]);
 
     const handleSendReply = async () => {
         if (!replyText || !selectedLead) return;
@@ -215,6 +247,20 @@ export default function Dashboard() {
                     onSearchChange={setSearchQuery}
                     onSelectLead={handleSelectLead}
                 />
+                {hasMore && (
+                    <div className="p-3 border-t border-slate-200">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full"
+                            onClick={loadMore}
+                            disabled={loadingMore}
+                        >
+                            {loadingMore ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                            {loadingMore ? 'Loading...' : 'Load More Leads'}
+                        </Button>
+                    </div>
+                )}
             </div>
 
             {/* Main Chat Area */}
@@ -255,8 +301,11 @@ export default function Dashboard() {
                         </header>
 
                         {/* Messages */}
-                        <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50/50 flex flex-col-reverse">
+                        <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50/50 flex flex-col">
                             <div className="flex-1" />
+                            {selectedLead.messages.length === 0 && (
+                                <div className="text-center text-slate-400 text-sm py-10">Start the conversation...</div>
+                            )}
                             {selectedLead.messages.map(msg => (
                                 <div key={msg.id} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
                                     <div className={`max-w-[85%] md:max-w-[70%] p-3 rounded-2xl ${msg.direction === 'outbound' ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-white border border-slate-200 text-slate-800 rounded-bl-sm shadow-sm'}`}>
@@ -267,9 +316,7 @@ export default function Dashboard() {
                                     </div>
                                 </div>
                             ))}
-                            {selectedLead.messages.length === 0 && (
-                                <div className="text-center text-slate-400 text-sm py-10">Start the conversation...</div>
-                            )}
+                            <div ref={messagesEndRef} />
                         </div>
 
                         {/* Input */}
@@ -308,6 +355,26 @@ export default function Dashboard() {
                             <p className="text-xs text-slate-400 mt-2 text-center">Reply STOP to opt out.</p>
                         </div>
                     </>
+                ) : leads.length === 0 ? (
+                    /* UX-01: Empty state for zero leads */
+                    <div className="flex-1 flex items-center justify-center p-8">
+                        <div className="max-w-sm text-center space-y-4">
+                            <div className="flex justify-center">
+                                <div className="rounded-full bg-blue-50 p-4">
+                                    <PhoneOff className="h-10 w-10 text-blue-400" />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <h2 className="text-xl font-bold text-slate-900">No leads yet</h2>
+                                <p className="text-slate-500 text-sm">
+                                    When someone calls your business and you miss the call, LeadCatcher will automatically text them and the lead will appear here.
+                                </p>
+                            </div>
+                            <p className="text-xs text-slate-400">
+                                Make sure call forwarding is set up on your phone. Check Settings for more options.
+                            </p>
+                        </div>
+                    </div>
                 ) : (
                     <div className="flex-1 flex items-center justify-center text-slate-400 p-8 text-center">
                         Select a lead to view conversation

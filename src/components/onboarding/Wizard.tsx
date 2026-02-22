@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -58,7 +58,7 @@ export default function Wizard() {
     const [twilioVerified, setTwilioVerified] = useState(false);
     const [verificationError, setVerificationError] = useState<string | null>(null);
     const router = useRouter();
-    const supabase = createSupabaseBrowserClient();
+    const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
     // Forms
     const businessForm = useForm<BusinessFormData>({

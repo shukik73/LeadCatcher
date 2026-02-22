@@ -35,6 +35,15 @@ const nextConfig: NextConfig = {
             value: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.twilio.com https://api.openai.com https://api.stripe.com; frame-ancestors 'self';"
           }
         ]
+      },
+      {
+        // Restrict user-facing API routes — no cross-origin access
+        source: '/api/:path((?!webhooks|cron).*)',
+        headers: [
+          { key: 'Access-Control-Allow-Origin', value: '' },
+          { key: 'Access-Control-Allow-Methods', value: 'GET, POST' },
+          { key: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization' }
+        ]
       }
     ]
   }
