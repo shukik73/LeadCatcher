@@ -49,6 +49,8 @@ export function validateEnv() {
     optionalEnv('CRON_SECRET');
     optionalEnv('UPSTASH_REDIS_REST_URL');
     optionalEnv('UPSTASH_REDIS_REST_TOKEN');
+    optionalEnv('TELNYX_API_KEY');
+    optionalEnv('TELNYX_PUBLIC_KEY');
 
     if (missing.length > 0) {
         console.error(
