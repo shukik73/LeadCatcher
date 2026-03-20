@@ -1,9 +1,15 @@
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { stripe, PLANS, TRIAL_DAYS, type PlanId } from '@/lib/stripe';
+import { validateCsrfOrigin } from '@/lib/csrf';
 import { logger } from '@/lib/logger';
 
 export async function POST(request: Request) {
+    // CSRF protection: validate Origin header
+    if (!validateCsrfOrigin(request)) {
+        return Response.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     try {
         // 1. Authenticate
         const supabase = await createSupabaseServerClient();

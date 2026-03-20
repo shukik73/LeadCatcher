@@ -5,7 +5,7 @@ import { logger } from '@/lib/logger';
  * Checks whether a business has an active subscription that allows
  * SMS-spending operations.
  *
- * Allowed statuses: 'active', 'trialing'.
+ * Allowed statuses: 'active', 'trialing' (only if stripe_trial_ends_at is set and in the future).
  * Blocked statuses: 'canceled', 'past_due', 'unpaid', null (no subscription).
  *
  * Returns { allowed: true } or { allowed: false, reason: string }.
@@ -15,7 +15,7 @@ export async function checkBillingStatus(businessId: string): Promise<
 > {
   const { data: business, error } = await supabaseAdmin
     .from('businesses')
-    .select('stripe_status')
+    .select('stripe_status, stripe_trial_ends_at')
     .eq('id', businessId)
     .single();
 
@@ -27,7 +27,14 @@ export async function checkBillingStatus(businessId: string): Promise<
   }
 
   const status = business.stripe_status;
-  if (status === 'active' || status === 'trialing') {
+  if (status === 'active') {
+    return { allowed: true };
+  }
+  if (
+    status === 'trialing' &&
+    business.stripe_trial_ends_at &&
+    new Date(business.stripe_trial_ends_at) > new Date()
+  ) {
     return { allowed: true };
   }
 

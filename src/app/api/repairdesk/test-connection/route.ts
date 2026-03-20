@@ -1,10 +1,16 @@
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { RepairDeskClient } from '@/lib/repairdesk';
+import { validateCsrfOrigin } from '@/lib/csrf';
 import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
+    // CSRF protection: validate Origin header
+    if (!validateCsrfOrigin(request)) {
+        return Response.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     try {
         const supabase = await createSupabaseServerClient();
         const { data: { user } } = await supabase.auth.getUser();

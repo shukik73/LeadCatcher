@@ -3,6 +3,7 @@ import { RepairDeskClient } from '@/lib/repairdesk';
 import { normalizePhoneNumber } from '@/lib/phone-utils';
 import { isBusinessHours, type BusinessHours } from '@/lib/business-logic';
 import { checkBillingStatus } from '@/lib/billing-guard';
+import { checkSmsRateLimit } from '@/lib/sms-rate-limit';
 import { logger } from '@/lib/logger';
 import twilio from 'twilio';
 import { timingSafeEqual } from 'crypto';
@@ -330,6 +331,17 @@ async function sendMissedCallSms(
             .from('leads')
             .update({ sms_hold_until: null })
             .eq('id', lead.id);
+        return false;
+    }
+
+    // SMS rate limit check
+    const rateLimit = await checkSmsRateLimit(business.id, lead.caller_phone);
+    if (!rateLimit.allowed) {
+        logger.warn('[RepairDesk Poll] Skipping SMS - rate limited', {
+            leadId: lead.id,
+            phone: lead.caller_phone,
+            reason: rateLimit.reason,
+        });
         return false;
     }
 

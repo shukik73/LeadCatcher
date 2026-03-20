@@ -4,6 +4,7 @@ import { analyzeIntent } from '@/lib/ai-service';
 import { checkBillingStatus } from '@/lib/billing-guard';
 import { claimWebhookEvent, markWebhookProcessed, markWebhookFailedIfProcessing, checkOptOut } from '@/lib/webhook-common';
 import { verifyCallbackSignature } from '@/lib/callback-signature';
+import { checkSmsRateLimit } from '@/lib/sms-rate-limit';
 import { logger } from '@/lib/logger';
 import twilio from 'twilio';
 
@@ -128,8 +129,11 @@ async function handleTranscriptionWebhook(
     // 5. TCPA COMPLIANCE: Check opt-out (fail closed)
     const optOutResult = await checkOptOut(businessId, caller, TAG);
 
-    // 6. Send Smart SMS Reply (only if billing active, not opted out, AND lookup succeeded)
-    if (analysis.suggestedReply && billing.allowed && !optOutResult.optedOut && !optOutResult.error) {
+    // 5b. SMS RATE LIMIT
+    const rateLimit = await checkSmsRateLimit(businessId, caller);
+
+    // 6. Send Smart SMS Reply (only if billing active, not opted out, rate limit OK, AND lookup succeeded)
+    if (analysis.suggestedReply && billing.allowed && !optOutResult.optedOut && !optOutResult.error && rateLimit.allowed) {
         const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
         try {
             await client.messages.create({
@@ -154,6 +158,8 @@ async function handleTranscriptionWebhook(
         }
     } else if (!billing.allowed) {
         logger.warn(`[${TAG}] Skipping auto-reply - billing inactive`, { businessId });
+    } else if (!rateLimit.allowed) {
+        logger.warn(`[${TAG}] Skipping auto-reply - rate limited`, { businessId, caller, reason: rateLimit.reason });
     } else if (optOutResult.optedOut || optOutResult.error) {
         logger.info(`[${TAG}] Skipping auto-reply - user opted out or lookup failed`, { caller, businessId });
     }

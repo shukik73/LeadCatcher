@@ -1,9 +1,15 @@
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { stripe } from '@/lib/stripe';
+import { validateCsrfOrigin } from '@/lib/csrf';
 import { logger } from '@/lib/logger';
 
-export async function POST() {
+export async function POST(request: Request) {
+    // CSRF protection: validate Origin header
+    if (!validateCsrfOrigin(request)) {
+        return Response.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     try {
         const supabase = await createSupabaseServerClient();
         const { data: { user } } = await supabase.auth.getUser();

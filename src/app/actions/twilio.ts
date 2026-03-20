@@ -2,7 +2,7 @@
 
 import twilio from 'twilio';
 import { z } from 'zod';
-import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { createSupabaseServerClient, supabaseAdmin } from '@/lib/supabase-server';
 import { logger } from '@/lib/logger';
 
 // Validation schema for phone number (E.164 format)
@@ -196,14 +196,25 @@ export async function linkTwilioNumberToBusiness(
             return { success: false, error: 'You must be logged in' };
         }
 
-        // Update the business with the verified Twilio number
-        const { error: updateError } = await supabase
+        // Verify user owns a business (via RLS-scoped client)
+        const { data: business, error: bizError } = await supabase
+            .from('businesses')
+            .select('id')
+            .eq('user_id', user.id)
+            .single();
+
+        if (bizError || !business) {
+            return { success: false, error: 'Business not found. Complete onboarding first.' };
+        }
+
+        // Use supabaseAdmin to update protected telephony fields (bypasses trigger)
+        const { error: updateError } = await supabaseAdmin
             .from('businesses')
             .update({
                 forwarding_number: phoneNumber,
                 twilio_sid: twilioSid
             })
-            .eq('user_id', user.id);
+            .eq('id', business.id);
 
         if (updateError) {
             logger.error('[linkTwilioNumberToBusiness] DB error', updateError);

@@ -3,6 +3,7 @@ import { validateTelnyxRequest } from '@/lib/telnyx-validator';
 import { normalizePhoneNumber } from '@/lib/phone-utils';
 import { checkBillingStatus } from '@/lib/billing-guard';
 import { claimWebhookEvent, markWebhookProcessed, markWebhookFailed, markWebhookFailedIfProcessing, setWebhookBusinessId } from '@/lib/webhook-common';
+import { checkSmsRateLimit } from '@/lib/sms-rate-limit';
 import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -237,8 +238,9 @@ async function handleSmsWebhook(eventId: string | null, fromRaw: string, toRaw: 
             logger.error('AI Analysis failed', error);
         }
 
-        // 5. Notify Owner (only if billing is active)
-        if (business.owner_phone && billing.allowed) {
+        // 5. Notify Owner (only if billing is active and rate limit OK)
+        const ownerRateLimit = await checkSmsRateLimit(business.id, business.owner_phone);
+        if (business.owner_phone && billing.allowed && ownerRateLimit.allowed) {
             try {
                 await sendTelnyxSms(
                     to,
@@ -250,6 +252,8 @@ async function handleSmsWebhook(eventId: string | null, fromRaw: string, toRaw: 
             }
         } else if (!billing.allowed) {
             logger.warn(`[${TAG}] Skipping owner notification - billing inactive`, { businessId: business.id });
+        } else if (!ownerRateLimit.allowed) {
+            logger.warn(`[${TAG}] Skipping owner notification - rate limited`, { businessId: business.id });
         }
     }
 
