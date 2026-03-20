@@ -5,10 +5,19 @@ import { isBusinessHours, type BusinessHours } from '@/lib/business-logic';
 import { checkBillingStatus } from '@/lib/billing-guard';
 import { logger } from '@/lib/logger';
 import twilio from 'twilio';
+import { timingSafeEqual } from 'crypto';
 
 export const dynamic = 'force-dynamic';
 
 const GRACE_PERIOD_MINUTES = 3;
+
+function verifyCronSecret(header: string | null): boolean {
+    const secret = process.env.CRON_SECRET;
+    if (!secret || !header) return false;
+    const expected = `Bearer ${secret}`;
+    if (header.length !== expected.length) return false;
+    return timingSafeEqual(Buffer.from(header), Buffer.from(expected));
+}
 
 /**
  * GET /api/repairdesk/poll
@@ -22,11 +31,8 @@ const GRACE_PERIOD_MINUTES = 3;
  * Secured via CRON_SECRET bearer token (Vercel Cron).
  */
 export async function GET(request: Request) {
-    // Authenticate cron request
-    const authHeader = request.headers.get('authorization');
-    const cronSecret = process.env.CRON_SECRET;
-
-    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+    // Authenticate cron request (timing-safe comparison)
+    if (!verifyCronSecret(request.headers.get('authorization'))) {
         logger.warn('[RepairDesk Poll] Unauthorized cron request');
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }

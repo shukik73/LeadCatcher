@@ -1,6 +1,15 @@
 import { logger } from '@/lib/logger';
+import { timingSafeEqual } from 'crypto';
 
 export const dynamic = 'force-dynamic';
+
+function verifyCronSecret(header: string | null): boolean {
+    const secret = process.env.CRON_SECRET;
+    if (!secret || !header) return false;
+    const expected = `Bearer ${secret}`;
+    if (header.length !== expected.length) return false;
+    return timingSafeEqual(Buffer.from(header), Buffer.from(expected));
+}
 
 /**
  * GET /api/cron/cleanup
@@ -9,9 +18,8 @@ export const dynamic = 'force-dynamic';
  * Triggered by Vercel Cron (daily at 3 AM UTC).
  */
 export async function GET(request: Request) {
-    // Authenticate via CRON_SECRET
-    const authHeader = request.headers.get('authorization');
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    // Authenticate via CRON_SECRET (timing-safe comparison)
+    if (!verifyCronSecret(request.headers.get('authorization'))) {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
