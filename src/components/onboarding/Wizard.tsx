@@ -24,7 +24,7 @@ function normalizePhone(value: string): string {
     return hasPlus ? `+${digits}` : digits;
 }
 
-// Validation Schemas — normalize before validating to accept formatted input like (305) 555-0123
+// Validation Schema
 const businessSchema = z.object({
     businessName: z.string().min(2, "Business name is required"),
     businessPhone: z.string().transform(normalizePhone).pipe(
@@ -33,100 +33,74 @@ const businessSchema = z.object({
     ownerPhone: z.string().transform(normalizePhone).pipe(
         z.string().min(10, "Valid mobile number required").regex(/^\+?1?\d{10,14}$/, "Invalid phone format")
     ),
-});
-
-const carrierSchema = z.object({
     carrier: z.string().min(1, "Please select a carrier"),
 });
 
 type BusinessFormData = z.infer<typeof businessSchema>;
-type CarrierFormData = z.infer<typeof carrierSchema>;
 
 export default function Wizard() {
     const [step, setStep] = useState(1);
     const [forwardingNumber, setForwardingNumber] = useState('');
     const [isVerifying, setIsVerifying] = useState(false);
     const [isVerified, setIsVerified] = useState(false);
-    const [twilioVerified, setTwilioVerified] = useState(false);
+    const [isConnecting, setIsConnecting] = useState(false);
     const [verificationError, setVerificationError] = useState<string | null>(null);
     const router = useRouter();
     const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
-    // Forms
     const businessForm = useForm<BusinessFormData>({
         resolver: zodResolver(businessSchema),
-        defaultValues: { businessName: '', businessPhone: '', ownerPhone: '' }
+        defaultValues: { businessName: '', businessPhone: '', ownerPhone: '', carrier: '' }
     });
 
-    const carrierForm = useForm<CarrierFormData>({
-        resolver: zodResolver(carrierSchema),
-        defaultValues: { carrier: '' }
-    });
+    const carrier = useWatch({ control: businessForm.control, name: 'carrier' });
 
-    // Derived state
-    const carrier = useWatch({ control: carrierForm.control, name: 'carrier' });
-
-    // Handlers
+    // Step 1 → Save business info + auto-connect Twilio → Step 2
     const onBusinessSubmit = async (data: BusinessFormData) => {
-        const { data: { user } } = await supabase.auth.getUser();
+        setIsConnecting(true);
+        setVerificationError(null);
 
+        const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
             toast.error("You must be logged in");
+            setIsConnecting(false);
             return;
         }
 
-        // Create business without forwarding number (will be added in Step 3)
+        // Save business info
         const { error } = await supabase.from('businesses').upsert({
             user_id: user.id,
             name: data.businessName,
             business_phone: data.businessPhone,
             owner_phone: data.ownerPhone,
-            carrier: 'Pending'
+            carrier: data.carrier,
         }, { onConflict: 'user_id' }).select().single();
 
         if (error) {
             logger.error('Failed to save business', error);
             toast.error("Failed to save business");
+            setIsConnecting(false);
             return;
         }
 
-        setStep(2);
-    };
-
-    const onCarrierSubmit = async (data: CarrierFormData) => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-            await supabase.from('businesses').update({ carrier: data.carrier }).eq('user_id', user.id);
-        }
-        setStep(3);
-    };
-
-    const connectPhone = async () => {
-        setIsVerifying(true);
-        setVerificationError(null);
-
+        // Auto-connect Twilio number
         try {
             const result = await autoLinkTwilioNumber();
 
             if (!result.success) {
                 setVerificationError(result.error || 'Failed to connect phone number');
-                setIsVerifying(false);
+                setIsConnecting(false);
                 return;
             }
 
             setForwardingNumber(result.forwardingNumber || '');
-            setTwilioVerified(true);
             toast.success('Phone number connected!');
-
-            setTimeout(() => {
-                setIsVerifying(false);
-                setStep(4);
-            }, 1500);
-
-        } catch (error) {
-            logger.error('Connection error', error);
+            setIsConnecting(false);
+            setStep(2);
+        } catch (err) {
+            logger.error('Connection error', err);
             setVerificationError('An unexpected error occurred. Please try again.');
-            setIsVerifying(false);
+            setIsConnecting(false);
         }
     };
 
@@ -136,7 +110,7 @@ export default function Wizard() {
         toast.success('Forwarding code copied!');
     };
 
-    // Poll verification status from DB instead of timer-based fake success
+    // Poll verification status from DB
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const pollCountRef = useRef(0);
 
@@ -148,7 +122,6 @@ export default function Wizard() {
         pollCountRef.current = 0;
     }, []);
 
-    // Cleanup polling on unmount
     useEffect(() => {
         return () => stopPolling();
     }, [stopPolling]);
@@ -160,7 +133,6 @@ export default function Wizard() {
             const res = await fetch('/api/verify', { method: 'POST' });
             const data = await res.json();
             if (data.success) {
-                // Start polling for webhook-confirmed verification
                 pollCountRef.current = 0;
                 pollRef.current = setInterval(async () => {
                     pollCountRef.current++;
@@ -172,7 +144,6 @@ export default function Wizard() {
                             setIsVerifying(false);
                             stopPolling();
                         } else if (pollCountRef.current >= 15) {
-                            // 30 seconds (15 * 2s) — give up
                             setIsVerifying(false);
                             setVerificationError('Verification timed out. Make sure you declined/ignored the call so it forwarded to your Twilio number, then try again.');
                             stopPolling();
@@ -192,7 +163,6 @@ export default function Wizard() {
         }
     };
 
-    // Format phone number for display
     const formatPhoneDisplay = (phone: string) => {
         const cleaned = phone.replace(/\D/g, '');
         if (cleaned.length === 11 && cleaned.startsWith('1')) {
@@ -204,10 +174,10 @@ export default function Wizard() {
     return (
         <div className="max-w-xl mx-auto">
             {/* Progress Bar */}
-            <div className="mb-8 flex justify-between relative" role="progressbar" aria-valuenow={step} aria-valuemin={1} aria-valuemax={5} aria-label={`Onboarding progress: step ${step} of 5`}>
+            <div className="mb-8 flex justify-between relative" role="progressbar" aria-valuenow={step} aria-valuemin={1} aria-valuemax={3} aria-label={`Onboarding progress: step ${step} of 3`}>
                 <div className="absolute top-1/2 left-0 w-full h-1 bg-slate-100 -z-10 rounded-full"></div>
-                <div className={`absolute top-1/2 left-0 h-1 bg-blue-600 -z-10 rounded-full transition-all duration-500`} style={{ width: `${((step - 1) / 4) * 100}%` }}></div>
-                {[1, 2, 3, 4, 5].map((s) => (
+                <div className={`absolute top-1/2 left-0 h-1 bg-blue-600 -z-10 rounded-full transition-all duration-500`} style={{ width: `${((step - 1) / 2) * 100}%` }}></div>
+                {[1, 2, 3].map((s) => (
                     <div key={s} className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${step >= s ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
                         {s}
                     </div>
@@ -216,7 +186,7 @@ export default function Wizard() {
 
             <AnimatePresence mode="wait">
 
-                {/* STEP 1: Business Info */}
+                {/* STEP 1: Business Info + Carrier */}
                 {step === 1 && (
                     <motion.div
                         key="step1"
@@ -226,8 +196,8 @@ export default function Wizard() {
                     >
                         <Card className="border-slate-200 shadow-sm">
                             <CardHeader>
-                                <CardTitle>Tell us about your business</CardTitle>
-                                <CardDescription>We need this to route your calls and send notifications.</CardDescription>
+                                <CardTitle>Set up your business</CardTitle>
+                                <CardDescription>Enter your info and we will connect everything automatically.</CardDescription>
                             </CardHeader>
                             <form onSubmit={businessForm.handleSubmit(onBusinessSubmit)}>
                                 <CardContent className="space-y-4">
@@ -249,16 +219,52 @@ export default function Wizard() {
                                         <p className="text-xs text-slate-500">We will text this number when you miss a call.</p>
                                         {businessForm.formState.errors.ownerPhone && <p className="text-xs text-red-500">{businessForm.formState.errors.ownerPhone.message}</p>}
                                     </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="carrier">Phone Carrier</Label>
+                                        <Select onValueChange={(val) => businessForm.setValue('carrier', val)}>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select your carrier" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Verizon">Verizon</SelectItem>
+                                                <SelectItem value="AT&T">AT&amp;T</SelectItem>
+                                                <SelectItem value="T-Mobile">T-Mobile</SelectItem>
+                                                <SelectItem value="Other">Other</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        {businessForm.formState.errors.carrier && <p className="text-xs text-red-500">{businessForm.formState.errors.carrier.message}</p>}
+                                    </div>
+
+                                    {/* Connection Error */}
+                                    {verificationError && (
+                                        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+                                            <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                                            <div>
+                                                <p className="text-sm text-red-800 font-medium">Connection Failed</p>
+                                                <p className="text-sm text-red-600 mt-1">{verificationError}</p>
+                                            </div>
+                                        </div>
+                                    )}
                                 </CardContent>
                                 <CardFooter>
-                                    <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">Continue</Button>
+                                    <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isConnecting}>
+                                        {isConnecting ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Setting up...
+                                            </>
+                                        ) : (
+                                            'Continue'
+                                        )}
+                                    </Button>
                                 </CardFooter>
                             </form>
                         </Card>
                     </motion.div>
                 )}
 
-                {/* STEP 2: Carrier */}
+                {/* STEP 2: Activate Call Forwarding */}
                 {step === 2 && (
                     <motion.div
                         key="step2"
@@ -268,37 +274,50 @@ export default function Wizard() {
                     >
                         <Card className="border-slate-200 shadow-sm">
                             <CardHeader>
-                                <CardTitle>Select your carrier</CardTitle>
-                                <CardDescription>Different carriers have different activation codes.</CardDescription>
+                                <CardTitle>Activate Call Forwarding</CardTitle>
+                                <CardDescription>One quick dial from your business phone and you are all set.</CardDescription>
                             </CardHeader>
-                            <form onSubmit={carrierForm.handleSubmit(onCarrierSubmit)}>
-                                <CardContent className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="carrier">Service Provider</Label>
-                                        <Select onValueChange={(val) => carrierForm.setValue('carrier', val)}>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select carrier" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="Verizon">Verizon</SelectItem>
-                                                <SelectItem value="AT&T">AT&T</SelectItem>
-                                                <SelectItem value="T-Mobile">T-Mobile</SelectItem>
-                                                <SelectItem value="Other">Other</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                        {carrierForm.formState.errors.carrier && <p className="text-xs text-red-500">{carrierForm.formState.errors.carrier.message}</p>}
+                            <CardContent className="space-y-6">
+                                {/* Success banner */}
+                                <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
+                                    <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                                    <div>
+                                        <p className="text-sm text-green-800 font-medium">Phone Connected!</p>
+                                        <p className="text-sm text-green-600 mt-1">Your business line is linked to LeadCatcher.</p>
                                     </div>
-                                </CardContent>
-                                <CardFooter className="flex gap-2">
-                                    <Button variant="outline" className="w-full" onClick={() => setStep(1)}>Back</Button>
-                                    <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">Continue</Button>
-                                </CardFooter>
-                            </form>
+                                </div>
+
+                                {/* Dial code */}
+                                <div className="bg-slate-50 p-6 rounded-xl border border-dashed border-slate-300 text-center">
+                                    <p className="text-sm text-slate-500 mb-1">Pick up your business phone and dial:</p>
+                                    <div className="text-3xl font-mono font-bold text-slate-900 tracking-wider flex items-center justify-center gap-3 mt-2">
+                                        {carrier === 'Verizon' ? '*71' : '*72'} {formatPhoneDisplay(forwardingNumber)}
+                                        <Button variant="ghost" size="icon" onClick={handleCopyCode} aria-label="Copy forwarding code"><Copy size={16} /></Button>
+                                    </div>
+                                </div>
+
+                                {/* Explanation */}
+                                <div className="bg-blue-50 p-4 rounded-lg flex items-start gap-3">
+                                    <div className="bg-blue-100 p-2 rounded-full text-blue-600">
+                                        <Phone size={16} />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-semibold text-blue-900 text-sm">What does this do?</h4>
+                                        <p className="text-xs text-blue-700 mt-1">
+                                            This tells your carrier to forward calls to LeadCatcher <strong>only when you don&apos;t answer</strong>. Your phone still rings normally — we only catch the ones you miss.
+                                        </p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                            <CardFooter className="flex gap-2">
+                                <Button variant="outline" className="w-full" onClick={() => setStep(1)}>Back</Button>
+                                <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={() => setStep(3)}>I dialed the code</Button>
+                            </CardFooter>
                         </Card>
                     </motion.div>
                 )}
 
-                {/* STEP 3: Connect Phone Number */}
+                {/* STEP 3: Verify */}
                 {step === 3 && (
                     <motion.div
                         key="step3"
@@ -308,138 +327,13 @@ export default function Wizard() {
                     >
                         <Card className="border-slate-200 shadow-sm">
                             <CardHeader>
-                                <CardTitle>Connect Your Phone</CardTitle>
+                                <CardTitle>{isVerified ? 'You are all set!' : 'Verify It Works'}</CardTitle>
                                 <CardDescription>
-                                    We will set up call forwarding so missed calls from your business line are caught by LeadCatcher.
+                                    {isVerified
+                                        ? 'Your missed calls are now being caught by LeadCatcher.'
+                                        : 'We will call your business phone. Let it ring — do not answer — so the call forwards to us.'
+                                    }
                                 </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                                    <p className="text-sm text-slate-600">
-                                        Your business phone: <span className="font-semibold text-slate-900">{formatPhoneDisplay(businessForm.getValues('businessPhone'))}</span>
-                                    </p>
-                                </div>
-
-                                {/* Connection Error */}
-                                {verificationError && (
-                                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-                                        <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-                                        <div>
-                                            <p className="text-sm text-red-800 font-medium">Connection Failed</p>
-                                            <p className="text-sm text-red-600 mt-1">{verificationError}</p>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Connection Success */}
-                                {twilioVerified && (
-                                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
-                                        <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-                                        <div>
-                                            <p className="text-sm text-green-800 font-medium">Phone Connected!</p>
-                                            <p className="text-sm text-green-600 mt-1">
-                                                Your business line is now linked to LeadCatcher.
-                                            </p>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Info Box */}
-                                <div className="bg-blue-50 p-4 rounded-lg">
-                                    <h4 className="font-semibold text-blue-900 text-sm mb-2">How it works:</h4>
-                                    <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside">
-                                        <li>We assign a dedicated forwarding number to your business</li>
-                                        <li>You dial a short code on your business phone to enable forwarding</li>
-                                        <li>Missed calls get caught by LeadCatcher automatically</li>
-                                    </ol>
-                                </div>
-                            </CardContent>
-                            <CardFooter className="flex gap-2">
-                                <Button
-                                    variant="outline"
-                                    className="w-full"
-                                    onClick={() => setStep(2)}
-                                    disabled={isVerifying}
-                                >
-                                    Back
-                                </Button>
-                                <Button
-                                    className="w-full bg-blue-600 hover:bg-blue-700"
-                                    onClick={connectPhone}
-                                    disabled={isVerifying || twilioVerified}
-                                >
-                                    {isVerifying ? (
-                                        <>
-                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                            Connecting...
-                                        </>
-                                    ) : twilioVerified ? (
-                                        <>
-                                            <CheckCircle2 className="mr-2 h-4 w-4" />
-                                            Connected
-                                        </>
-                                    ) : (
-                                        'Connect My Phone'
-                                    )}
-                                </Button>
-                            </CardFooter>
-                        </Card>
-                    </motion.div>
-                )}
-
-                {/* STEP 4: Setup Instructions */}
-                {step === 4 && (
-                    <motion.div
-                        key="step4"
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -20 }}
-                    >
-                        <Card className="border-slate-200 shadow-sm">
-                            <CardHeader>
-                                <CardTitle>Activate Call Forwarding</CardTitle>
-                                <CardDescription>Dial this code on your business phone to forward missed calls to LeadCatcher.</CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-6">
-                                <div className="bg-slate-50 p-6 rounded-xl border border-dashed border-slate-300 text-center">
-                                    <p className="text-sm text-slate-500 mb-2">Dial this exactly:</p>
-                                    <div className="text-3xl font-mono font-bold text-slate-900 tracking-wider flex items-center justify-center gap-3">
-                                        {carrier === 'Verizon' ? '*71' : '*72'} {formatPhoneDisplay(forwardingNumber)}
-                                        <Button variant="ghost" size="icon" onClick={handleCopyCode} aria-label="Copy forwarding code"><Copy size={16} /></Button>
-                                    </div>
-                                </div>
-                                <div className="bg-blue-50 p-4 rounded-lg flex items-start gap-3">
-                                    <div className="bg-blue-100 p-2 rounded-full text-blue-600">
-                                        <Phone size={16} />
-                                    </div>
-                                    <div>
-                                        <h4 className="font-semibold text-blue-900 text-sm">Conditional Forwarding</h4>
-                                        <p className="text-xs text-blue-700 mt-1">
-                                            This code ({carrier === 'Verizon' ? '*71' : '*72'}) only forwards calls when you do not answer or are busy. Your phone still rings!
-                                        </p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                            <CardFooter className="flex gap-2">
-                                <Button variant="outline" className="w-full" onClick={() => setStep(3)}>Back</Button>
-                                <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={() => setStep(5)}>I have dialed the code</Button>
-                            </CardFooter>
-                        </Card>
-                    </motion.div>
-                )}
-
-                {/* STEP 5: Verify */}
-                {step === 5 && (
-                    <motion.div
-                        key="step5"
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -20 }}
-                    >
-                        <Card className="border-slate-200 shadow-sm">
-                            <CardHeader>
-                                <CardTitle>Testing Connection...</CardTitle>
-                                <CardDescription>We will give your business line a call to make sure forwarding works.</CardDescription>
                             </CardHeader>
                             <CardContent className="py-10 text-center">
                                 {isVerified ? (
@@ -455,17 +349,25 @@ export default function Wizard() {
                                         <div className={`h-20 w-20 rounded-full flex items-center justify-center mb-4 transition-colors ${isVerifying ? 'bg-blue-50 text-blue-600 animate-pulse' : 'bg-slate-100 text-slate-400'}`}>
                                             <Phone size={40} className={isVerifying ? 'animate-bounce' : ''} />
                                         </div>
-                                        {isVerifying && <p className="text-slate-600 font-medium">Calling {businessForm.getValues('businessPhone')}...</p>}
-                                        {!isVerifying && <p className="text-slate-500">Ready to test?</p>}
+                                        {isVerifying && <p className="text-slate-600 font-medium">Calling your business phone...</p>}
+                                        {isVerifying && <p className="text-xs text-slate-400 mt-1">Do not answer — let it forward.</p>}
+                                        {!isVerifying && !verificationError && <p className="text-slate-500">Ready to test?</p>}
+                                        {verificationError && (
+                                            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mt-4 text-left flex items-start gap-3">
+                                                <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                                                <p className="text-sm text-red-600">{verificationError}</p>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </CardContent>
                             <CardFooter className="flex gap-2">
                                 {!isVerified ? (
                                     <>
-                                        <Button variant="outline" className="w-full" onClick={() => setStep(4)} disabled={isVerifying}>Back</Button>
+                                        <Button variant="outline" className="w-full" onClick={() => setStep(2)} disabled={isVerifying}>Back</Button>
                                         <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={runTestCall} disabled={isVerifying}>
-                                            {isVerifying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Run Test Call'}
+                                            {isVerifying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Phone className="mr-2 h-4 w-4" />}
+                                            {isVerifying ? 'Calling...' : 'Run Test Call'}
                                         </Button>
                                     </>
                                 ) : (
