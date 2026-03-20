@@ -3,6 +3,7 @@ import { validateTwilioRequest } from '@/lib/twilio-validator';
 import { analyzeIntent } from '@/lib/ai-service';
 import { checkBillingStatus } from '@/lib/billing-guard';
 import { claimWebhookEvent, markWebhookProcessed, markWebhookFailedIfProcessing, checkOptOut } from '@/lib/webhook-common';
+import { verifyCallbackSignature } from '@/lib/callback-signature';
 import { logger } from '@/lib/logger';
 import twilio from 'twilio';
 
@@ -71,6 +72,13 @@ async function handleTranscriptionWebhook(
     if (!uuidRegex.test(businessId) || !e164Regex.test(caller) || !e164Regex.test(called)) {
         logger.warn(`[${TAG}] Invalid param format`, { businessId, caller, called });
         return new Response('Invalid params', { status: 400 });
+    }
+
+    // Verify HMAC signature to prevent IDOR via crafted callback URLs
+    const sig = url.searchParams.get('sig');
+    if (!sig || !verifyCallbackSignature(businessId, caller, called, sig)) {
+        logger.warn(`[${TAG}] Invalid callback signature — possible IDOR attempt`, { businessId });
+        return new Response('Invalid signature', { status: 403 });
     }
 
     if (transcriptionStatus !== 'completed') {

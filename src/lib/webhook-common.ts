@@ -13,13 +13,15 @@ export type ClaimResult =
 
 /**
  * Atomic claim for webhook idempotency.
- * Uses INSERT ... ON CONFLICT DO NOTHING so only the first request proceeds.
+ * Uses INSERT ... ON CONFLICT to claim new events.
+ * If the event previously failed, reclaims it for reprocessing (provider retries).
  */
 export async function claimWebhookEvent(
     eventId: string,
     eventType: string,
     tag: string,
 ): Promise<ClaimResult> {
+    // First, attempt a plain insert for the common case (new event).
     const { data: claimed, error: claimError } = await supabaseAdmin
         .from('webhook_events')
         .insert({
@@ -33,19 +35,47 @@ export async function claimWebhookEvent(
     if (claimError) {
         const isUniqueViolation = claimError.code === '23505';
         if (isUniqueViolation) {
-            logger.info(`[${tag}] Duplicate event, skipping`, { eventId });
-            return { status: 'duplicate' };
+            // Event already exists — check if it previously failed and can be reclaimed.
+            return reclaimIfFailed(eventId, tag);
         }
         logger.error(`[${tag}] Failed to claim event`, claimError, { eventId });
         return { status: 'error' };
     }
 
     if (!claimed) {
-        logger.info(`[${tag}] Duplicate event, skipping`, { eventId });
-        return { status: 'duplicate' };
+        // Row existed (ON CONFLICT DO NOTHING returned 0 rows) — try reclaim.
+        return reclaimIfFailed(eventId, tag);
     }
 
     return { status: 'claimed' };
+}
+
+/**
+ * Attempt to reclaim a previously-failed event for reprocessing.
+ * Only transitions 'failed' → 'processing'; already-processed or
+ * in-flight events are treated as duplicates.
+ */
+async function reclaimIfFailed(eventId: string, tag: string): Promise<ClaimResult> {
+    const { data: reclaimed, error: reclaimError } = await supabaseAdmin
+        .from('webhook_events')
+        .update({ status: 'processing', processed_at: null })
+        .eq('event_id', eventId)
+        .eq('status', 'failed')
+        .select('id')
+        .maybeSingle();
+
+    if (reclaimError) {
+        logger.error(`[${tag}] Failed to reclaim event`, reclaimError, { eventId });
+        return { status: 'error' };
+    }
+
+    if (reclaimed) {
+        logger.info(`[${tag}] Reclaimed previously-failed event for reprocessing`, { eventId });
+        return { status: 'claimed' };
+    }
+
+    logger.info(`[${tag}] Duplicate event (already processed or in-flight), skipping`, { eventId });
+    return { status: 'duplicate' };
 }
 
 /**

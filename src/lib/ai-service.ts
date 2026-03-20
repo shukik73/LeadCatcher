@@ -45,6 +45,15 @@ export async function analyzeIntent(text: string, context?: string): Promise<Ana
         if (!content) throw new Error('No content from OpenAI');
 
         const result = JSON.parse(content) as AnalysisResult;
+
+        // Sanitize AI output: strip URLs from suggestedReply to prevent
+        // prompt injection from injecting phishing/malicious links into SMS
+        if (result.suggestedReply) {
+            result.suggestedReply = result.suggestedReply
+                .replace(/https?:\/\/\S+/gi, '[link removed]')
+                .replace(/www\.\S+/gi, '[link removed]');
+        }
+
         return result;
 
     } catch (error) {

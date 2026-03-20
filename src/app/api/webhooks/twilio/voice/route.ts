@@ -4,6 +4,7 @@ import { normalizePhoneNumber } from '@/lib/phone-utils';
 import { isBusinessHours, type BusinessHours } from '@/lib/business-logic';
 import { checkBillingStatus } from '@/lib/billing-guard';
 import { claimWebhookEvent, markWebhookProcessed, markWebhookFailed, markWebhookFailedIfProcessing, setWebhookBusinessId, checkOptOut } from '@/lib/webhook-common';
+import { signCallbackParams } from '@/lib/callback-signature';
 import { logger } from '@/lib/logger';
 import twilio from 'twilio';
 
@@ -61,7 +62,7 @@ async function handleVoiceWebhook(callSid: string | null, callerRaw: string, cal
     // 2. ISOLATION: Look up business
     const { data: business, error: bizError } = await supabaseAdmin
         .from('businesses')
-        .select('id, owner_phone, name, business_hours, timezone, sms_template, sms_template_closed, verification_token')
+        .select('id, owner_phone, name, business_hours, timezone, sms_template, sms_template_closed, verification_token, verification_call_sid')
         .eq('forwarding_number', called)
         .single();
 
@@ -76,14 +77,23 @@ async function handleVoiceWebhook(callSid: string | null, callerRaw: string, cal
 
     if (callSid) await setWebhookBusinessId(callSid, business.id);
 
-    // VERIFICATION: If business has a pending verification_token, this incoming
-    // call proves forwarding works. Mark verified=true via webhook confirmation.
-    if (business.verification_token) {
-        await supabaseAdmin
-            .from('businesses')
-            .update({ verified: true, verification_token: null })
-            .eq('id', business.id);
-        logger.info(`[${TAG}] Business forwarding verified via webhook`, { businessId: business.id });
+    // VERIFICATION: If business has a pending verification_token AND the
+    // incoming call matches the verification_call_sid we initiated, mark verified.
+    // This prevents unrelated forwarded calls from completing verification.
+    if (business.verification_token && business.verification_call_sid && callSid) {
+        // The forwarded call's CallSid may differ from the original, but
+        // Twilio passes the parent CallSid in the forwarded leg. Check both.
+        if (callSid === business.verification_call_sid) {
+            await supabaseAdmin
+                .from('businesses')
+                .update({ verified: true, verification_token: null, verification_call_sid: null })
+                .eq('id', business.id);
+            logger.info(`[${TAG}] Business forwarding verified via webhook`, { businessId: business.id });
+        } else {
+            logger.info(`[${TAG}] Incoming call during verification window but CallSid does not match`, {
+                businessId: business.id, expected: business.verification_call_sid, got: callSid,
+            });
+        }
     }
 
     logger.info(`[${TAG}] Missed call for business`, { business: business.name });
@@ -128,22 +138,16 @@ async function handleVoiceWebhook(callSid: string | null, callerRaw: string, cal
         logger.info(`[${TAG}] Skipping immediate ack - user opted out or lookup failed`, { caller, businessId: business.id });
     }
 
-    // 7. Log Lead (Scoped to Business)
-    const { data: existingLead } = await supabaseAdmin
-        .from('leads')
-        .select('id')
-        .eq('caller_phone', caller)
-        .eq('business_id', business.id)
-        .single();
-
-    if (!existingLead) {
-        const { error } = await supabaseAdmin.from('leads').insert({
-            caller_phone: caller,
-            status: 'New',
-            business_id: business.id
-        });
-        if (error) logger.error('Error creating lead:', error);
-    }
+    // 7. Log Lead (Scoped to Business) — upsert to avoid race condition with concurrent calls
+    const { error: leadError } = await supabaseAdmin.from('leads').upsert({
+        caller_phone: caller,
+        status: 'New',
+        business_id: business.id,
+    }, {
+        onConflict: 'business_id,caller_phone',
+        ignoreDuplicates: true,
+    });
+    if (leadError) logger.error('Error upserting lead:', leadError);
 
     // 8. TwiML: Greeting + Record
     const response = new twilio.twiml.VoiceResponse();
@@ -159,7 +163,8 @@ async function handleVoiceWebhook(callSid: string | null, callerRaw: string, cal
         errorResponse.hangup();
         return new Response(errorResponse.toString(), { headers: { 'Content-Type': 'text/xml' } });
     }
-    const callbackUrl = `${baseUrl}/api/webhooks/twilio/transcription?businessId=${business.id}&caller=${encodeURIComponent(caller)}&called=${encodeURIComponent(called)}`;
+    const sig = signCallbackParams(business.id, caller, called);
+    const callbackUrl = `${baseUrl}/api/webhooks/twilio/transcription?businessId=${business.id}&caller=${encodeURIComponent(caller)}&called=${encodeURIComponent(called)}&sig=${sig}`;
 
     response.record({
         transcribe: true,

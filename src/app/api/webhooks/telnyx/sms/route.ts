@@ -185,29 +185,29 @@ async function handleSmsWebhook(eventId: string | null, fromRaw: string, toRaw: 
     // BILLING GUARD: Check subscription before sending outbound SMS
     const billing = await checkBillingStatus(business.id);
 
-    // Find or Create Lead
-    let leadId: string | null = null;
-
-    const { data: lead } = await supabaseAdmin
+    // Find or Create Lead — upsert to avoid race condition
+    const { data: upsertedLead } = await supabaseAdmin
         .from('leads')
+        .upsert({
+            caller_phone: from,
+            status: 'New',
+            business_id: business.id,
+        }, {
+            onConflict: 'business_id,caller_phone',
+            ignoreDuplicates: true,
+        })
         .select('id')
-        .eq('caller_phone', from)
-        .eq('business_id', business.id)
         .single();
 
-    if (lead) {
-        leadId = lead.id;
-    } else {
-        const { data: newLead } = await supabaseAdmin
+    let leadId: string | null = upsertedLead?.id ?? null;
+    if (!leadId) {
+        const { data: existingLead } = await supabaseAdmin
             .from('leads')
-            .insert({
-                caller_phone: from,
-                status: 'New',
-                business_id: business.id
-            })
             .select('id')
+            .eq('caller_phone', from)
+            .eq('business_id', business.id)
             .single();
-        if (newLead) leadId = newLead.id;
+        leadId = existingLead?.id ?? null;
     }
 
     if (leadId) {

@@ -61,9 +61,12 @@ function mockSupabaseChain(returnValue: { data: unknown; error: unknown }) {
         single: vi.fn().mockResolvedValue(returnValue),
         maybeSingle: vi.fn().mockResolvedValue(returnValue),
         insert: vi.fn().mockResolvedValue({ data: null, error: null }),
-        upsert: vi.fn().mockResolvedValue({ error: null }),
+        upsert: vi.fn().mockReturnThis(),
         update: vi.fn().mockReturnThis(),
         delete: vi.fn().mockReturnThis(),
+        in: vi.fn().mockReturnThis(),
+        not: vi.fn().mockReturnThis(),
+        lt: vi.fn().mockReturnThis(),
     };
 }
 
