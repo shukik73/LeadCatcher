@@ -9,7 +9,7 @@ const settingsSchema = z.object({
     sms_template: z.string().min(1).max(1600).optional(),
     sms_template_closed: z.string().min(1).max(1600).optional(),
     timezone: z.string().min(1).max(100).regex(/^[A-Za-z_/]+$/).optional(),
-    business_hours: z.record(z.object({
+    business_hours: z.record(z.string(), z.object({
         open: z.string().regex(/^\d{2}:\d{2}$/),
         close: z.string().regex(/^\d{2}:\d{2}$/),
         isOpen: z.boolean(),
