@@ -20,10 +20,10 @@ export async function checkBillingStatus(businessId: string): Promise<
     .single();
 
   if (error || !business) {
-    logger.error('[BillingGuard] Failed to fetch business', error, { businessId });
-    // Fail open for DB errors so we don't break existing users during outages.
-    // The SMS cost risk of a brief DB failure is much lower than blocking all users.
-    return { allowed: true };
+    logger.error('[BillingGuard] Failed to fetch business — failing closed', error, { businessId });
+    // Fail closed: block SMS on DB errors to prevent unbilled usage.
+    // Brief outages are preferable to uncontrolled SMS spend.
+    return { allowed: false, reason: 'Unable to verify billing status. Please try again later.' };
   }
 
   const status = business.stripe_status;
