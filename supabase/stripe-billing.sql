@@ -44,6 +44,17 @@ BEGIN
     RAISE EXCEPTION 'Updating billing fields is not allowed from client';
   END IF;
 
+  -- Prevent client-side tampering with telephony fields
+  -- These should only be set via server actions (autoLinkTwilioNumber) or webhooks
+  IF NEW.forwarding_number IS DISTINCT FROM OLD.forwarding_number
+     OR NEW.twilio_sid IS DISTINCT FROM OLD.twilio_sid
+     OR NEW.verified IS DISTINCT FROM OLD.verified
+     OR NEW.verification_token IS DISTINCT FROM OLD.verification_token
+     OR NEW.verification_call_sid IS DISTINCT FROM OLD.verification_call_sid
+  THEN
+    RAISE EXCEPTION 'Updating telephony fields is not allowed from client';
+  END IF;
+
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

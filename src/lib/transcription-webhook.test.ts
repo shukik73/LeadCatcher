@@ -25,6 +25,10 @@ vi.mock('@/lib/billing-guard', () => ({
     checkBillingStatus: vi.fn().mockResolvedValue({ allowed: true }),
 }));
 
+vi.mock('@/lib/callback-signature', () => ({
+    verifyCallbackSignature: vi.fn().mockReturnValue(true),
+}));
+
 vi.mock('@/lib/logger', () => ({
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -53,6 +57,10 @@ function createFormDataRequest(
     for (const [key, value] of Object.entries(params)) {
         url.searchParams.set(key, value);
     }
+    // Add dummy sig param (the verifyCallbackSignature mock always returns true)
+    if (params.businessId && params.caller && params.called) {
+        url.searchParams.set('sig', 'test-signature');
+    }
     return new Request(url.toString(), { method: 'POST', body: formData });
 }
 
@@ -63,6 +71,7 @@ function mockSupabaseChain(returnValue: { data: unknown; error: unknown }) {
         single: vi.fn().mockResolvedValue(returnValue),
         maybeSingle: vi.fn().mockResolvedValue(returnValue),
         insert: vi.fn().mockResolvedValue({ error: null }),
+        upsert: vi.fn().mockReturnThis(),
         update: vi.fn().mockReturnThis(),
     };
 }

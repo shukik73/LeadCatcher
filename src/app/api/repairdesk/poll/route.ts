@@ -101,58 +101,74 @@ async function pollBusiness(business: BusinessRow) {
     let smsSent = 0;
     let callbacksDetected = 0;
 
-    // --- Phase 1: Fetch new missed calls and create leads with grace period ---
+    // --- Phase 1: Fetch ALL new missed calls (paginate until exhaustion) ---
+    let allCallsFetched = true;
     try {
         const since = business.repairdesk_last_poll_at || undefined;
-        const missedCalls = await client.getMissedCalls(1, since);
+        let page = 1;
+        const MAX_PAGES = 50; // Safety limit to prevent infinite loops
 
-        for (const call of missedCalls.data) {
-            if (!call.phone) continue;
+        while (page <= MAX_PAGES) {
+            const missedCalls = await client.getMissedCalls(page, since);
 
-            let normalizedPhone: string;
-            try {
-                normalizedPhone = normalizePhoneNumber(call.phone);
-            } catch {
-                logger.warn('[RepairDesk Poll] Skipping call with invalid phone', {
-                    callId: call.id.toString(),
-                    phone: call.phone,
-                });
-                continue;
+            for (const call of missedCalls.data) {
+                if (!call.phone) continue;
+
+                let normalizedPhone: string;
+                try {
+                    normalizedPhone = normalizePhoneNumber(call.phone);
+                } catch {
+                    logger.warn('[RepairDesk Poll] Skipping call with invalid phone', {
+                        callId: call.id.toString(),
+                        phone: call.phone,
+                    });
+                    continue;
+                }
+
+                const externalId = `rd-call-${call.id}`;
+                const holdUntil = new Date(Date.now() + GRACE_PERIOD_MINUTES * 60 * 1000).toISOString();
+
+                const callerName = call.customer_name || null;
+
+                // Create lead with grace period — skip if already imported
+                const { error } = await supabaseAdmin
+                    .from('leads')
+                    .upsert(
+                        {
+                            business_id: business.id,
+                            caller_phone: normalizedPhone,
+                            caller_name: callerName,
+                            source: 'repairdesk',
+                            external_id: externalId,
+                            status: 'New',
+                            sms_hold_until: holdUntil,
+                        },
+                        {
+                            onConflict: 'business_id,source,external_id',
+                            ignoreDuplicates: true,
+                        }
+                    );
+
+                if (error) {
+                    logger.error('[RepairDesk Poll] Failed to upsert missed call lead', error, {
+                        callId: call.id.toString(),
+                    });
+                } else {
+                    newMissedCalls++;
+                }
             }
 
-            const externalId = `rd-call-${call.id}`;
-            const holdUntil = new Date(Date.now() + GRACE_PERIOD_MINUTES * 60 * 1000).toISOString();
-
-            const callerName = call.customer_name || null;
-
-            // Create lead with grace period — skip if already imported
-            const { error } = await supabaseAdmin
-                .from('leads')
-                .upsert(
-                    {
-                        business_id: business.id,
-                        caller_phone: normalizedPhone,
-                        caller_name: callerName,
-                        source: 'repairdesk',
-                        external_id: externalId,
-                        status: 'New',
-                        sms_hold_until: holdUntil,
-                    },
-                    {
-                        onConflict: 'business_id,source,external_id',
-                        ignoreDuplicates: true,
-                    }
-                );
-
-            if (error) {
-                logger.error('[RepairDesk Poll] Failed to upsert missed call lead', error, {
-                    callId: call.id.toString(),
-                });
-            } else {
-                newMissedCalls++;
+            // Check if there are more pages
+            const meta = missedCalls.meta;
+            if (!meta || page >= meta.last_page || missedCalls.data.length === 0) {
+                break;
             }
+            page++;
         }
     } catch (error) {
+        // If fetching fails mid-pagination, do NOT advance the watermark
+        // so the next poll retries from the same point.
+        allCallsFetched = false;
         logger.error('[RepairDesk Poll] Failed to fetch missed calls', error, {
             businessId: business.id,
         });
@@ -239,11 +255,18 @@ async function pollBusiness(business: BusinessRow) {
         }
     }
 
-    // Update last poll timestamp
-    await supabaseAdmin
-        .from('businesses')
-        .update({ repairdesk_last_poll_at: new Date().toISOString() })
-        .eq('id', business.id);
+    // Only advance the watermark if ALL pages were fetched successfully.
+    // If fetching failed mid-way, keep the old watermark so the next poll retries.
+    if (allCallsFetched) {
+        await supabaseAdmin
+            .from('businesses')
+            .update({ repairdesk_last_poll_at: new Date().toISOString() })
+            .eq('id', business.id);
+    } else {
+        logger.warn('[RepairDesk Poll] Skipping watermark update due to fetch failure', {
+            businessId: business.id,
+        });
+    }
 
     return { newMissedCalls, smsSent, callbacksDetected };
 }

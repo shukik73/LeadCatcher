@@ -24,6 +24,10 @@ vi.mock('@/lib/billing-guard', () => ({
     checkBillingStatus: vi.fn().mockResolvedValue({ allowed: true }),
 }));
 
+vi.mock('@/lib/callback-signature', () => ({
+    signCallbackParams: vi.fn().mockReturnValue('test-hmac-signature'),
+}));
+
 vi.mock('@/lib/logger', () => ({
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -75,6 +79,7 @@ function mockSupabaseChain(returnValue: { data: unknown; error: unknown }) {
         single: vi.fn().mockResolvedValue(returnValue),
         maybeSingle: vi.fn().mockResolvedValue(returnValue),
         insert: vi.fn().mockReturnThis(),
+        upsert: vi.fn().mockReturnThis(),
         update: vi.fn().mockReturnThis(),
     };
 }

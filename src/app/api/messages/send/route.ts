@@ -1,6 +1,8 @@
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { checkBillingStatus } from '@/lib/billing-guard';
+import { checkSmsRateLimit } from '@/lib/sms-rate-limit';
+import { validateCsrfOrigin } from '@/lib/csrf';
 import { logger } from '@/lib/logger';
 import twilio from 'twilio';
 import { z } from 'zod';
@@ -14,6 +16,11 @@ const sendMessageSchema = z.object({
 });
 
 export async function POST(request: Request) {
+    // CSRF protection: validate Origin header
+    if (!validateCsrfOrigin(request)) {
+        return new Response('Forbidden', { status: 403 });
+    }
+
     try {
         const rawBody = await request.json();
         const parsed = sendMessageSchema.safeParse(rawBody);
@@ -114,6 +121,18 @@ export async function POST(request: Request) {
                 error: 'Cannot send message: user has opted out' 
             }), {
                 status: 403,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
+        // 4a. SMS RATE LIMIT: Prevent abuse / cost explosion
+        const rateCheck = await checkSmsRateLimit(businessId, toNumber);
+        if (!rateCheck.allowed) {
+            return new Response(JSON.stringify({
+                success: false,
+                error: rateCheck.reason,
+            }), {
+                status: 429,
                 headers: { 'Content-Type': 'application/json' }
             });
         }

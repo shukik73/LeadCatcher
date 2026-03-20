@@ -1,24 +1,26 @@
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { logger } from '@/lib/logger';
+import { validateCsrfOrigin } from '@/lib/csrf';
 import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
 
-/** Zod schema for settings payload — validates types and constraints. */
+/** Zod schema for settings payload — validates types and constraints.
+ *  Clearable fields accept null so the UI can explicitly clear them. */
 const settingsSchema = z.object({
-    sms_template: z.string().min(1).max(1600).optional(),
-    sms_template_closed: z.string().min(1).max(1600).optional(),
+    sms_template: z.string().min(1).max(1600).nullable().optional(),
+    sms_template_closed: z.string().min(1).max(1600).nullable().optional(),
     timezone: z.string().min(1).max(100).regex(/^[A-Za-z_/]+$/).optional(),
     business_hours: z.record(z.string(), z.object({
         open: z.string().regex(/^\d{2}:\d{2}$/),
         close: z.string().regex(/^\d{2}:\d{2}$/),
         isOpen: z.boolean(),
-    })).optional(),
-    repairdesk_api_key: z.string().min(1).max(256).optional(),
-    repairdesk_store_url: z.string().min(1).max(256).regex(/^[a-zA-Z0-9.-]+$/).optional(),
+    })).nullable().optional(),
+    repairdesk_api_key: z.string().min(1).max(256).nullable().optional(),
+    repairdesk_store_url: z.string().min(1).max(256).regex(/^[a-zA-Z0-9.-]+$/).nullable().optional(),
     business_phone: z.string().min(1).max(20).optional(),
-    owner_phone: z.string().min(1).max(20).optional(),
-    carrier: z.string().min(1).max(50).optional(),
+    owner_phone: z.string().min(1).max(20).nullable().optional(),
+    carrier: z.string().min(1).max(50).nullable().optional(),
 }).strict();
 
 /**
@@ -29,6 +31,11 @@ const settingsSchema = z.object({
  * the protect_stripe_columns trigger) with fallback to user's own client.
  */
 export async function POST(request: Request) {
+    // CSRF protection: validate Origin header
+    if (!validateCsrfOrigin(request)) {
+        return Response.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     try {
         const supabase = await createSupabaseServerClient();
         const { data: { user }, error: authError } = await supabase.auth.getUser();

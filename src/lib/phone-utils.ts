@@ -34,7 +34,9 @@ export function normalizePhoneNumber(phone: string): string {
     return phone;
   }
 
-  throw new Error(`Invalid phone number format: ${phone}. Expected 10 or 11 digits.`);
+  // Do not include the raw phone number in the error — it's PII that could leak into logs
+  const digitCount = digits.length;
+  throw new Error(`Invalid phone number format (got ${digitCount} digits). Expected 10 or 11 digit US number.`);
 }
 
 /**

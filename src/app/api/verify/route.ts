@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import twilio from 'twilio';
 import { logger } from '@/lib/logger';
+import { validateCsrfOrigin } from '@/lib/csrf';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +12,12 @@ export const dynamic = 'force-dynamic';
  * Initiates a verification call and stores a verification token.
  * The voice webhook will detect the forwarded call and mark verified=true.
  */
-export async function POST() {
+export async function POST(request: Request) {
+    // CSRF protection: validate Origin header
+    if (!validateCsrfOrigin(request)) {
+        return new Response('Forbidden', { status: 403 });
+    }
+
     const cookieStore = await cookies();
 
     const supabase = createServerClient(
@@ -57,13 +63,20 @@ export async function POST() {
     try {
         // Call the business phone. User should decline/ignore so it forwards to Twilio.
         // When the forwarded call hits our voice webhook, it will see the
-        // business has a pending verification_token and mark verified=true.
-        await client.calls.create({
+        // business has a pending verification_token and matching verification_call_sid,
+        // and mark verified=true.
+        const call = await client.calls.create({
             url: `${baseUrl}/api/verify/webhook`,
             to: business.business_phone,
             from: business.forwarding_number,
             timeout: 20,
         });
+
+        // Store the CallSid so the voice webhook can correlate the forwarded call
+        await supabaseAdmin
+            .from('businesses')
+            .update({ verification_call_sid: call.sid })
+            .eq('id', business.id);
 
         return new Response(JSON.stringify({
             success: true,

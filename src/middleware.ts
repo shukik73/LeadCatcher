@@ -98,7 +98,13 @@ export async function middleware(request: NextRequest) {
                 response.headers.set('X-RateLimit-Reset', reset.toString());
             } catch (error) {
                 logger.error('Rate Limit Middleware Error', error);
-                // Fail open
+                // Fail closed for webhook routes (prevent abuse when Redis is down)
+                // Fail open for user-facing routes (don't break the UI)
+                if (isWebhookPath(request.nextUrl.pathname)) {
+                    // Webhooks have their own signature validation as a second line of defense,
+                    // so failing closed here is safe — legitimate providers will retry.
+                    return new NextResponse('Service Unavailable', { status: 503 });
+                }
             }
         }
     }
