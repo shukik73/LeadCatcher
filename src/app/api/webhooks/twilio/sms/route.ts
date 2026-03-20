@@ -3,6 +3,7 @@ import { validateTwilioRequest } from '@/lib/twilio-validator';
 import { normalizePhoneNumber } from '@/lib/phone-utils';
 import { checkBillingStatus } from '@/lib/billing-guard';
 import { claimWebhookEvent, markWebhookProcessed, markWebhookFailed, markWebhookFailedIfProcessing, setWebhookBusinessId } from '@/lib/webhook-common';
+import { checkSmsRateLimit } from '@/lib/sms-rate-limit';
 import { logger } from '@/lib/logger';
 import twilio from 'twilio';
 
@@ -203,8 +204,9 @@ async function handleSmsWebhook(messageSid: string | null, fromRaw: string, toRa
             logger.error('AI Analysis failed', error);
         }
 
-        // 5. Notify Owner (only if billing is active)
-        if (business.owner_phone && billing.allowed) {
+        // 5. Notify Owner (only if billing is active and rate limit OK)
+        const ownerRateLimit = await checkSmsRateLimit(business.id, business.owner_phone);
+        if (business.owner_phone && billing.allowed && ownerRateLimit.allowed) {
             const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
             try {
                 await client.messages.create({
@@ -217,6 +219,8 @@ async function handleSmsWebhook(messageSid: string | null, fromRaw: string, toRa
             }
         } else if (!billing.allowed) {
             logger.warn(`[${TAG}] Skipping owner notification - billing inactive`, { businessId: business.id });
+        } else if (!ownerRateLimit.allowed) {
+            logger.warn(`[${TAG}] Skipping owner notification - rate limited`, { businessId: business.id });
         }
     }
 

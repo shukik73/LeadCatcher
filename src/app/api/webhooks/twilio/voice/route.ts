@@ -5,6 +5,7 @@ import { isBusinessHours, type BusinessHours } from '@/lib/business-logic';
 import { checkBillingStatus } from '@/lib/billing-guard';
 import { claimWebhookEvent, markWebhookProcessed, markWebhookFailed, markWebhookFailedIfProcessing, setWebhookBusinessId, checkOptOut } from '@/lib/webhook-common';
 import { signCallbackParams } from '@/lib/callback-signature';
+import { checkSmsRateLimit } from '@/lib/sms-rate-limit';
 import { logger } from '@/lib/logger';
 import twilio from 'twilio';
 
@@ -113,8 +114,11 @@ async function handleVoiceWebhook(callSid: string | null, callerRaw: string, cal
 
     const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
-    // 6. PREPARE MESSAGE (only if billing active, not opted out, AND lookup succeeded)
-    if (billing.allowed && !optOutResult.optedOut && !optOutResult.error) {
+    // 5b. SMS RATE LIMIT
+    const rateLimit = await checkSmsRateLimit(business.id, caller);
+
+    // 6. PREPARE MESSAGE (only if billing active, not opted out, rate limit OK, AND lookup succeeded)
+    if (billing.allowed && !optOutResult.optedOut && !optOutResult.error && rateLimit.allowed) {
         try {
             const defaultOpen = "Hi! We missed your call — we were helping another customer. How can we help you? Would you like us to give you a call back in a few?";
             const defaultClosed = "Hi! Our store is currently closed. How can we help you? Would you like us to schedule an appointment for when we open?";
@@ -134,6 +138,8 @@ async function handleVoiceWebhook(callSid: string | null, callerRaw: string, cal
         }
     } else if (!billing.allowed) {
         logger.warn(`[${TAG}] Skipping SMS - billing inactive`, { businessId: business.id });
+    } else if (!rateLimit.allowed) {
+        logger.warn(`[${TAG}] Skipping SMS - rate limited`, { businessId: business.id, caller, reason: rateLimit.reason });
     } else {
         logger.info(`[${TAG}] Skipping immediate ack - user opted out or lookup failed`, { caller, businessId: business.id });
     }

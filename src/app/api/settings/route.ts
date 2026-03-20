@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { logger } from '@/lib/logger';
 import { validateCsrfOrigin } from '@/lib/csrf';
+import { normalizePhoneNumber } from '@/lib/phone-utils';
 import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
@@ -18,8 +19,11 @@ const settingsSchema = z.object({
     })).nullable().optional(),
     repairdesk_api_key: z.string().min(1).max(256).nullable().optional(),
     repairdesk_store_url: z.string().min(1).max(256).regex(/^[a-zA-Z0-9.-]+$/).nullable().optional(),
-    business_phone: z.string().min(1).max(20).optional(),
-    owner_phone: z.string().min(1).max(20).nullable().optional(),
+    business_phone: z.string().min(1).max(20).transform((val) => normalizePhoneNumber(val)).optional(),
+    owner_phone: z.union([
+        z.string().min(1).max(20).transform((val) => normalizePhoneNumber(val)),
+        z.null(),
+    ]).optional(),
     carrier: z.string().min(1).max(50).nullable().optional(),
 }).strict();
 

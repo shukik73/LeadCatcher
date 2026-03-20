@@ -37,8 +37,8 @@ CREATE TABLE IF NOT EXISTS businesses (
   stripe_customer_id text,
   stripe_subscription_id text,
   stripe_plan text DEFAULT 'starter',
-  stripe_status text DEFAULT 'trialing'
-    CHECK (stripe_status IN ('trialing', 'active', 'past_due', 'canceled', 'unpaid')),
+  stripe_status text DEFAULT NULL
+    CHECK (stripe_status IS NULL OR stripe_status IN ('trialing', 'active', 'past_due', 'canceled', 'unpaid')),
   stripe_trial_ends_at timestamptz,
   stripe_current_period_end timestamptz,
   -- RepairDesk integration
@@ -246,3 +246,36 @@ CREATE TRIGGER trg_protect_stripe_columns
   BEFORE UPDATE ON businesses
   FOR EACH ROW
   EXECUTE FUNCTION protect_stripe_columns();
+
+-- Protect sensitive columns on INSERT (prevents seeding forged billing/telephony values)
+CREATE OR REPLACE FUNCTION protect_stripe_columns_on_insert()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF current_setting('role', true) = 'service_role' THEN
+    RETURN NEW;
+  END IF;
+
+  -- Force billing fields to safe defaults on client-side inserts
+  NEW.stripe_customer_id := NULL;
+  NEW.stripe_subscription_id := NULL;
+  NEW.stripe_plan := 'starter';
+  NEW.stripe_status := NULL;
+  NEW.stripe_trial_ends_at := NULL;
+  NEW.stripe_current_period_end := NULL;
+
+  -- Force telephony fields to safe defaults
+  NEW.forwarding_number := NULL;
+  NEW.twilio_sid := NULL;
+  NEW.verified := false;
+  NEW.verification_token := NULL;
+  NEW.verification_call_sid := NULL;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_protect_stripe_columns_on_insert ON businesses;
+CREATE TRIGGER trg_protect_stripe_columns_on_insert
+  BEFORE INSERT ON businesses
+  FOR EACH ROW
+  EXECUTE FUNCTION protect_stripe_columns_on_insert();

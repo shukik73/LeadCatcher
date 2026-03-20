@@ -1,5 +1,6 @@
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { RepairDeskClient } from '@/lib/repairdesk';
+import { validateCsrfOrigin } from '@/lib/csrf';
 import { logger } from '@/lib/logger';
 import { normalizePhoneNumber } from '@/lib/phone-utils';
 
@@ -15,7 +16,12 @@ async function getAdmin() {
     }
 }
 
-export async function POST() {
+export async function POST(request: Request) {
+    // CSRF protection: validate Origin header
+    if (!validateCsrfOrigin(request)) {
+        return Response.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     try {
         // Auth: verify the user owns this business
         const supabase = await createSupabaseServerClient();

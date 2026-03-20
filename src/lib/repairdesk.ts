@@ -1,4 +1,5 @@
 import { logger } from '@/lib/logger';
+import { validateRepairDeskUrl } from '@/lib/url-validator';
 
 /**
  * RepairDesk API Client
@@ -89,7 +90,15 @@ export class RepairDeskClient {
             );
         }
 
-        this.baseUrl = `https://${cleanSubdomain}.repairdesk.co/api/web/v1`;
+        const candidateUrl = `https://${cleanSubdomain}.repairdesk.co/api/web/v1`;
+
+        // SSRF validation: ensure the constructed URL is safe for server-side fetching
+        const urlValidation = validateRepairDeskUrl(candidateUrl);
+        if (!urlValidation.valid) {
+            throw new Error(`Invalid RepairDesk URL: ${urlValidation.error}`);
+        }
+
+        this.baseUrl = candidateUrl;
     }
 
     // NOTE: RepairDesk's API requires `api_key` as a query parameter — header-based
