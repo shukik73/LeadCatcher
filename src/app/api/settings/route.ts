@@ -42,6 +42,9 @@ export async function POST(request: Request) {
             'business_hours',
             'repairdesk_api_key',
             'repairdesk_store_url',
+            'business_phone',
+            'owner_phone',
+            'carrier',
         ];
 
         const updateData: Record<string, unknown> = {};

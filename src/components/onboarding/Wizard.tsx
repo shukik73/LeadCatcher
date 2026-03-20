@@ -15,7 +15,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase-client';
 import { logger } from '@/lib/logger';
 import { toast } from 'sonner';
 import { CheckCircle2, Phone, Loader2, Copy, AlertCircle } from 'lucide-react';
-import { verifyTwilioPhoneNumber, linkTwilioNumberToBusiness } from '@/app/actions/twilio';
+import { autoLinkTwilioNumber } from '@/app/actions/twilio';
 
 // Strip non-digit characters (except leading +) for phone validation
 function normalizePhone(value: string): string {
@@ -39,16 +39,8 @@ const carrierSchema = z.object({
     carrier: z.string().min(1, "Please select a carrier"),
 });
 
-const twilioNumberSchema = z.object({
-    twilioNumber: z.string().transform(normalizePhone).pipe(
-        z.string().min(10, "Phone number is too short")
-            .regex(/^\+?1?\d{10,14}$/, "Invalid phone format. Use: +15551234567")
-    ),
-});
-
 type BusinessFormData = z.infer<typeof businessSchema>;
 type CarrierFormData = z.infer<typeof carrierSchema>;
-type TwilioNumberFormData = z.infer<typeof twilioNumberSchema>;
 
 export default function Wizard() {
     const [step, setStep] = useState(1);
@@ -69,11 +61,6 @@ export default function Wizard() {
     const carrierForm = useForm<CarrierFormData>({
         resolver: zodResolver(carrierSchema),
         defaultValues: { carrier: '' }
-    });
-
-    const twilioForm = useForm<TwilioNumberFormData>({
-        resolver: zodResolver(twilioNumberSchema),
-        defaultValues: { twilioNumber: '' }
     });
 
     // Derived state
@@ -114,45 +101,30 @@ export default function Wizard() {
         setStep(3);
     };
 
-    const onTwilioNumberSubmit = async (data: TwilioNumberFormData) => {
+    const connectPhone = async () => {
         setIsVerifying(true);
         setVerificationError(null);
 
         try {
-            // Verify the number exists in their Twilio account
-            const result = await verifyTwilioPhoneNumber(data.twilioNumber);
+            const result = await autoLinkTwilioNumber();
 
             if (!result.success) {
-                setVerificationError(result.error);
+                setVerificationError(result.error || 'Failed to connect phone number');
                 setIsVerifying(false);
                 return;
             }
 
-            // Link the verified number to their business
-            const linkResult = await linkTwilioNumberToBusiness(
-                result.phoneNumber,
-                result.sid
-            );
-
-            if (!linkResult.success) {
-                setVerificationError(linkResult.error || 'Failed to save number');
-                setIsVerifying(false);
-                return;
-            }
-
-            // Success!
-            setForwardingNumber(result.phoneNumber);
+            setForwardingNumber(result.forwardingNumber || '');
             setTwilioVerified(true);
-            toast.success('Twilio number verified and linked!');
+            toast.success('Phone number connected!');
 
-            // Move to next step after brief delay
             setTimeout(() => {
                 setIsVerifying(false);
                 setStep(4);
             }, 1500);
 
         } catch (error) {
-            logger.error('Verification error', error);
+            logger.error('Connection error', error);
             setVerificationError('An unexpected error occurred. Please try again.');
             setIsVerifying(false);
         }
@@ -326,7 +298,7 @@ export default function Wizard() {
                     </motion.div>
                 )}
 
-                {/* STEP 3: Link Twilio Number */}
+                {/* STEP 3: Connect Phone Number */}
                 {step === 3 && (
                     <motion.div
                         key="step3"
@@ -336,93 +308,81 @@ export default function Wizard() {
                     >
                         <Card className="border-slate-200 shadow-sm">
                             <CardHeader>
-                                <CardTitle>Link Your Twilio Number</CardTitle>
+                                <CardTitle>Connect Your Phone</CardTitle>
                                 <CardDescription>
-                                    Enter the Twilio phone number you purchased. We will verify it belongs to your account.
+                                    We will set up call forwarding so missed calls from your business line are caught by LeadCatcher.
                                 </CardDescription>
                             </CardHeader>
-                            <form onSubmit={twilioForm.handleSubmit(onTwilioNumberSubmit)}>
-                                <CardContent className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="twilioNumber">Twilio Phone Number</Label>
-                                        <Input
-                                            id="twilioNumber"
-                                            placeholder="+15551234567"
-                                            {...twilioForm.register('twilioNumber')}
-                                            disabled={isVerifying || twilioVerified}
-                                        />
-                                        <p className="text-xs text-slate-500">
-                                            Use E.164 format (e.g., +15551234567). Find this in your Twilio Console.
-                                        </p>
-                                        {twilioForm.formState.errors.twilioNumber && (
-                                            <p className="text-xs text-red-500">{twilioForm.formState.errors.twilioNumber.message}</p>
-                                        )}
-                                    </div>
+                            <CardContent className="space-y-4">
+                                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                                    <p className="text-sm text-slate-600">
+                                        Your business phone: <span className="font-semibold text-slate-900">{formatPhoneDisplay(businessForm.getValues('businessPhone'))}</span>
+                                    </p>
+                                </div>
 
-                                    {/* Verification Error */}
-                                    {verificationError && (
-                                        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-                                            <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-                                            <div>
-                                                <p className="text-sm text-red-800 font-medium">Verification Failed</p>
-                                                <p className="text-sm text-red-600 mt-1">{verificationError}</p>
-                                            </div>
+                                {/* Connection Error */}
+                                {verificationError && (
+                                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+                                        <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="text-sm text-red-800 font-medium">Connection Failed</p>
+                                            <p className="text-sm text-red-600 mt-1">{verificationError}</p>
                                         </div>
-                                    )}
-
-                                    {/* Verification Success */}
-                                    {twilioVerified && (
-                                        <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
-                                            <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-                                            <div>
-                                                <p className="text-sm text-green-800 font-medium">Number Verified!</p>
-                                                <p className="text-sm text-green-600 mt-1">
-                                                    {formatPhoneDisplay(forwardingNumber)} is now linked to your account.
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Help Box */}
-                                    <div className="bg-blue-50 p-4 rounded-lg">
-                                        <h4 className="font-semibold text-blue-900 text-sm mb-2">Where to find your Twilio number:</h4>
-                                        <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside">
-                                            <li>Log in to your Twilio Console</li>
-                                            <li>Go to Phone Numbers → Manage → Active Numbers</li>
-                                            <li>Copy the number in E.164 format (+1...)</li>
-                                        </ol>
                                     </div>
-                                </CardContent>
-                                <CardFooter className="flex gap-2">
-                                    <Button
-                                        variant="outline"
-                                        className="w-full"
-                                        onClick={() => setStep(2)}
-                                        disabled={isVerifying}
-                                    >
-                                        Back
-                                    </Button>
-                                    <Button
-                                        type="submit"
-                                        className="w-full bg-blue-600 hover:bg-blue-700"
-                                        disabled={isVerifying || twilioVerified}
-                                    >
-                                        {isVerifying ? (
-                                            <>
-                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                Verifying...
-                                            </>
-                                        ) : twilioVerified ? (
-                                            <>
-                                                <CheckCircle2 className="mr-2 h-4 w-4" />
-                                                Verified
-                                            </>
-                                        ) : (
-                                            'Verify & Link Number'
-                                        )}
-                                    </Button>
-                                </CardFooter>
-                            </form>
+                                )}
+
+                                {/* Connection Success */}
+                                {twilioVerified && (
+                                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
+                                        <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="text-sm text-green-800 font-medium">Phone Connected!</p>
+                                            <p className="text-sm text-green-600 mt-1">
+                                                Your business line is now linked to LeadCatcher.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Info Box */}
+                                <div className="bg-blue-50 p-4 rounded-lg">
+                                    <h4 className="font-semibold text-blue-900 text-sm mb-2">How it works:</h4>
+                                    <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside">
+                                        <li>We assign a dedicated forwarding number to your business</li>
+                                        <li>You dial a short code on your business phone to enable forwarding</li>
+                                        <li>Missed calls get caught by LeadCatcher automatically</li>
+                                    </ol>
+                                </div>
+                            </CardContent>
+                            <CardFooter className="flex gap-2">
+                                <Button
+                                    variant="outline"
+                                    className="w-full"
+                                    onClick={() => setStep(2)}
+                                    disabled={isVerifying}
+                                >
+                                    Back
+                                </Button>
+                                <Button
+                                    className="w-full bg-blue-600 hover:bg-blue-700"
+                                    onClick={connectPhone}
+                                    disabled={isVerifying || twilioVerified}
+                                >
+                                    {isVerifying ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Connecting...
+                                        </>
+                                    ) : twilioVerified ? (
+                                        <>
+                                            <CheckCircle2 className="mr-2 h-4 w-4" />
+                                            Connected
+                                        </>
+                                    ) : (
+                                        'Connect My Phone'
+                                    )}
+                                </Button>
+                            </CardFooter>
                         </Card>
                     </motion.div>
                 )}

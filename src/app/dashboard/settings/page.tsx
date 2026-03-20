@@ -11,7 +11,8 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TIMEZONES } from '@/lib/timezones';
 import { toast } from 'sonner';
-import { Loader2, CheckCircle2, XCircle, RefreshCw, Save } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, RefreshCw, Save, Phone, AlertCircle } from 'lucide-react';
+import { autoLinkTwilioNumber } from '@/app/actions/twilio';
 
 interface BusinessHours {
     [key: string]: {
@@ -52,6 +53,16 @@ export default function SettingsPage() {
         return init;
     });
 
+    // Phone Connection State
+    const [businessPhone, setBusinessPhone] = useState('');
+    const [ownerPhone, setOwnerPhone] = useState('');
+    const [carrier, setCarrier] = useState('');
+    const [forwardingNumber, setForwardingNumber] = useState('');
+    const [isConnected, setIsConnected] = useState(false);
+    const [connecting, setConnecting] = useState(false);
+    const [connectError, setConnectError] = useState('');
+    const [savingPhone, setSavingPhone] = useState(false);
+
     // RepairDesk State
     const [repairDeskApiKey, setRepairDeskApiKey] = useState('');
     const [repairDeskSubdomain, setRepairDeskSubdomain] = useState('');
@@ -78,12 +89,17 @@ export default function SettingsPage() {
 
         const { data: business } = await supabase
             .from('businesses')
-            .select('id, sms_template, sms_template_closed, timezone, business_hours, repairdesk_store_url')
+            .select('id, sms_template, sms_template_closed, timezone, business_hours, repairdesk_store_url, business_phone, owner_phone, carrier, forwarding_number')
             .eq('user_id', user.id)
             .single();
 
         if (signal?.cancelled) return;
         if (business) {
+            setBusinessPhone(business.business_phone || '');
+            setOwnerPhone(business.owner_phone || '');
+            setCarrier(business.carrier || '');
+            setForwardingNumber(business.forwarding_number || '');
+            setIsConnected(!!business.forwarding_number);
             setSmsTemplate(business.sms_template || OPEN_PRESETS[0]);
             setSmsTemplateClosed(business.sms_template_closed || CLOSED_PRESETS[0]);
             setTimezone(business.timezone || 'America/New_York');
@@ -199,6 +215,68 @@ export default function SettingsPage() {
         setSavingApi(false);
     };
 
+    const handleSavePhone = async () => {
+        if (!businessPhone.trim()) {
+            toast.error('Business phone number is required');
+            return;
+        }
+        setSavingPhone(true);
+        try {
+            await saveSettings({
+                business_phone: businessPhone,
+                owner_phone: ownerPhone || null,
+                carrier: carrier || null,
+            });
+            toast.success('Phone settings saved!');
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Failed to save phone settings');
+        }
+        setSavingPhone(false);
+    };
+
+    const handleConnectPhone = async () => {
+        if (!businessPhone.trim()) {
+            toast.error('Enter your business phone number first');
+            return;
+        }
+        setConnecting(true);
+        setConnectError('');
+        try {
+            // Save the business phone first
+            await saveSettings({
+                business_phone: businessPhone,
+                owner_phone: ownerPhone || null,
+                carrier: carrier || null,
+            });
+
+            // Auto-link the Twilio number
+            const result = await autoLinkTwilioNumber();
+            if (result.success) {
+                setForwardingNumber(result.forwardingNumber || '');
+                setIsConnected(true);
+                toast.success('Phone connected to LeadCatcher!');
+            } else {
+                setConnectError(result.error || 'Failed to connect phone');
+                toast.error(result.error || 'Connection failed');
+            }
+        } catch {
+            setConnectError('Failed to connect. Please try again.');
+            toast.error('Connection failed');
+        }
+        setConnecting(false);
+    };
+
+    const formatPhoneDisplay = (phone: string) => {
+        const cleaned = phone.replace(/\D/g, '');
+        if (cleaned.length === 11 && cleaned.startsWith('1')) {
+            return `+1 (${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
+        }
+        if (cleaned.length === 10) {
+            return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+        }
+        return phone;
+    };
+
     const handleTestRepairDesk = async () => {
         if (!repairDeskApiKey) {
             toast.error('Enter your RepairDesk API key first');
@@ -279,6 +357,111 @@ export default function SettingsPage() {
     return (
         <div className="container mx-auto p-6 max-w-6xl space-y-8">
             <h1 className="text-3xl font-bold">Settings</h1>
+
+            {/* Phone Connection */}
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle className="flex items-center gap-2">
+                                <Phone className="h-5 w-5" />
+                                Phone Connection
+                            </CardTitle>
+                            <CardDescription>Connect your business phone to catch missed calls.</CardDescription>
+                        </div>
+                        <Button onClick={handleSavePhone} disabled={savingPhone} size="sm" className="gap-2">
+                            {savingPhone ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                            Save
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="grid sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="business-phone">Business Phone Number</Label>
+                            <Input
+                                id="business-phone"
+                                type="tel"
+                                value={businessPhone}
+                                onChange={(e) => setBusinessPhone(e.target.value)}
+                                placeholder="(305) 555-0123"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="owner-phone">Owner Mobile (for notifications)</Label>
+                            <Input
+                                id="owner-phone"
+                                type="tel"
+                                value={ownerPhone}
+                                onChange={(e) => setOwnerPhone(e.target.value)}
+                                placeholder="(786) 555-9876"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="carrier-select">Carrier</Label>
+                        <Select value={carrier} onValueChange={setCarrier}>
+                            <SelectTrigger id="carrier-select" className="w-full sm:w-48">
+                                <SelectValue placeholder="Select carrier" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Verizon">Verizon</SelectItem>
+                                <SelectItem value="AT&T">AT&T</SelectItem>
+                                <SelectItem value="T-Mobile">T-Mobile</SelectItem>
+                                <SelectItem value="Other">Other</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    {/* Connection Status */}
+                    {isConnected ? (
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
+                            <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                            <div>
+                                <p className="text-sm text-green-800 font-medium">Phone Connected</p>
+                                <p className="text-sm text-green-600 mt-1">
+                                    Forwarding to: {formatPhoneDisplay(forwardingNumber)}
+                                </p>
+                                {carrier && (
+                                    <p className="text-xs text-green-600 mt-2">
+                                        Dial <span className="font-mono font-semibold">{carrier === 'Verizon' ? '*71' : '*72'}{forwardingNumber.replace(/\D/g, '')}</span> on your business phone to activate forwarding.
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {connectError && (
+                                <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+                                    <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                                    <div>
+                                        <p className="text-sm text-red-800 font-medium">Connection Failed</p>
+                                        <p className="text-sm text-red-600 mt-1">{connectError}</p>
+                                    </div>
+                                </div>
+                            )}
+                            <Button
+                                onClick={handleConnectPhone}
+                                disabled={connecting || !businessPhone.trim()}
+                                className="bg-blue-600 hover:bg-blue-700"
+                            >
+                                {connecting ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Connecting...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Phone className="mr-2 h-4 w-4" />
+                                        Connect Phone
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
 
             {/* Smart Response Templates */}
             <Card>
