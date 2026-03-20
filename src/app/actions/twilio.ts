@@ -26,6 +26,65 @@ interface VerifyNumberError {
 
 type VerifyNumberResult = VerifyNumberSuccess | VerifyNumberError;
 
+interface AutoLinkResult {
+    success: boolean;
+    forwardingNumber?: string;
+    error?: string;
+}
+
+/**
+ * Automatically links the platform's Twilio phone number (from TWILIO_PHONE_NUMBER env var)
+ * to the current user's business. The user only provides their business phone —
+ * the Twilio number is assigned in the background.
+ */
+export async function autoLinkTwilioNumber(): Promise<AutoLinkResult> {
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
+
+    if (!accountSid || !authToken) {
+        logger.error('[autoLinkTwilioNumber] Missing Twilio credentials');
+        return { success: false, error: 'Server configuration error. Please contact support.' };
+    }
+
+    if (!twilioPhoneNumber) {
+        logger.error('[autoLinkTwilioNumber] TWILIO_PHONE_NUMBER env var not set');
+        return { success: false, error: 'Twilio phone number not configured. Please contact support.' };
+    }
+
+    try {
+        // Verify the number exists in the Twilio account
+        const client = twilio(accountSid, authToken);
+        const numbers = await client.incomingPhoneNumbers.list({
+            phoneNumber: twilioPhoneNumber,
+            limit: 1
+        });
+
+        if (numbers.length === 0) {
+            logger.error('[autoLinkTwilioNumber] TWILIO_PHONE_NUMBER not found in account', { twilioPhoneNumber });
+            return { success: false, error: 'Twilio number not found in account. Please contact support.' };
+        }
+
+        const foundNumber = numbers[0];
+
+        // Link to the user's business
+        const linkResult = await linkTwilioNumberToBusiness(
+            foundNumber.phoneNumber,
+            foundNumber.sid
+        );
+
+        if (!linkResult.success) {
+            return { success: false, error: linkResult.error || 'Failed to link number' };
+        }
+
+        return { success: true, forwardingNumber: foundNumber.phoneNumber };
+
+    } catch (error) {
+        logger.error('[autoLinkTwilioNumber] Error', error);
+        return { success: false, error: 'Failed to connect phone number. Please try again.' };
+    }
+}
+
 /**
  * Verifies that a phone number exists in the user's Twilio account
  * and returns the SID if found.
