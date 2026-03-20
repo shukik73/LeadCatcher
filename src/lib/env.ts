@@ -42,9 +42,11 @@ export function validateEnv() {
     // Stripe (required for billing)
     requireEnv('STRIPE_SECRET_KEY');
 
+    // Stripe webhook verification (required for production safety)
+    requireEnv('STRIPE_WEBHOOK_SECRET');
+
     // Optional but important — warn if missing
     optionalEnv('NEXT_PUBLIC_APP_URL');
-    optionalEnv('STRIPE_WEBHOOK_SECRET');
     optionalEnv('OPENAI_API_KEY');
     optionalEnv('CRON_SECRET');
     optionalEnv('UPSTASH_REDIS_REST_URL');
