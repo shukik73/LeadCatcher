@@ -48,14 +48,11 @@ export function SubscriptionBanner({ status, trialDaysLeft }: SubscriptionBanner
         );
     }
 
-    // No subscription at all
+    // No subscription / first-run — simple trial banner
     if (!status) {
         return (
             <div className="bg-blue-600 text-white text-center py-2 px-4 text-sm">
-                Start your 14-day free trial.{' '}
-                <Link href="/dashboard/billing" className="underline font-semibold">
-                    Choose a plan
-                </Link>
+                You&apos;re on trial — get your first missed-call lead today.
             </div>
         );
     }
