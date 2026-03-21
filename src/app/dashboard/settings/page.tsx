@@ -9,10 +9,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { TIMEZONES } from '@/lib/timezones';
 import { toast } from 'sonner';
-import { Loader2, CheckCircle2, XCircle, RefreshCw, Save, Phone, AlertCircle } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, RefreshCw, Save, Phone, AlertCircle, Pencil, Settings2 } from 'lucide-react';
 import { autoLinkTwilioNumber } from '@/app/actions/twilio';
+import { ForwardingStatus } from '@/components/dashboard/ForwardingStatus';
 
 interface BusinessHours {
     [key: string]: {
@@ -24,16 +26,17 @@ interface BusinessHours {
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
-// Preset SMS templates for business hours
-const OPEN_PRESETS = [
+const DEFAULT_TEMPLATE = "Hi {{first_name}}, thanks for calling {{business_name}}. Sorry we missed you. Reply here and we'll get back to you shortly.";
+
+// Additional templates hidden behind "More Templates"
+const MORE_OPEN_TEMPLATES = [
     "Hi! We missed your call — we were helping another customer. How can we help you? Would you like us to give you a call back in a few?",
     "Hey there! Sorry we missed your call, we were busy at the service desk helping another customer. How can we assist you? Reply here and we'll get right back to you!",
     "Hi! We're sorry we couldn't answer — all of our team members are currently assisting other customers. Text us what you need and we'll respond ASAP!",
     "Hey! We just missed your call but we're here. Let us know how we can help and we'll get back to you in just a moment!",
 ];
 
-// Preset SMS templates for after hours
-const CLOSED_PRESETS = [
+const MORE_CLOSED_TEMPLATES = [
     "Hi! Our store is currently closed. How can we help you? Would you like us to schedule an appointment for when we open?",
     "Hey there! We're closed for the day but got your call. Text us what you need and we'll get back to you first thing when we open!",
     "Hi! We're currently closed but your call is important to us. Leave us a message here and we'll reach out as soon as we're back!",
@@ -46,6 +49,8 @@ export default function SettingsPage() {
     // Form State
     const [smsTemplate, setSmsTemplate] = useState('');
     const [smsTemplateClosed, setSmsTemplateClosed] = useState('');
+    const [editingTemplate, setEditingTemplate] = useState(false);
+    const [showMoreTemplates, setShowMoreTemplates] = useState(false);
     const [timezone, setTimezone] = useState('America/New_York');
     const [hours, setHours] = useState<BusinessHours>(() => {
         const init: BusinessHours = {};
@@ -100,8 +105,8 @@ export default function SettingsPage() {
             setCarrier(business.carrier || '');
             setForwardingNumber(business.forwarding_number || '');
             setIsConnected(!!business.forwarding_number);
-            setSmsTemplate(business.sms_template || OPEN_PRESETS[0]);
-            setSmsTemplateClosed(business.sms_template_closed || CLOSED_PRESETS[0]);
+            setSmsTemplate(business.sms_template || DEFAULT_TEMPLATE);
+            setSmsTemplateClosed(business.sms_template_closed || MORE_CLOSED_TEMPLATES[0]);
             setTimezone(business.timezone || 'America/New_York');
             setRepairDeskSubdomain(business.repairdesk_store_url || '');
 
@@ -152,7 +157,6 @@ export default function SettingsPage() {
         });
     };
 
-    // Server-side save via API route (bypasses trigger issues)
     const saveSettings = async (data: Record<string, unknown>) => {
         const res = await fetch('/api/settings', {
             method: 'POST',
@@ -173,9 +177,10 @@ export default function SettingsPage() {
                 sms_template: smsTemplate,
                 sms_template_closed: smsTemplateClosed || null,
             });
-            toast.success('Response templates saved!');
+            setEditingTemplate(false);
+            toast.success('Auto-reply message saved!');
         } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Failed to save templates');
+            toast.error(error instanceof Error ? error.message : 'Failed to save message');
         }
         setSavingTemplates(false);
     };
@@ -208,9 +213,9 @@ export default function SettingsPage() {
                 setHasExistingApiKey(true);
                 setApiKeyModified(false);
             }
-            toast.success('API settings saved!');
+            toast.success('Connection settings saved!');
         } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Failed to save API settings');
+            toast.error(error instanceof Error ? error.message : 'Failed to save settings');
         }
         setSavingApi(false);
     };
@@ -242,14 +247,12 @@ export default function SettingsPage() {
         setConnecting(true);
         setConnectError('');
         try {
-            // Save the business phone first
             await saveSettings({
                 business_phone: businessPhone,
                 owner_phone: ownerPhone || null,
                 carrier: carrier || null,
             });
 
-            // Auto-link the Twilio number
             const result = await autoLinkTwilioNumber();
             if (result.success) {
                 setForwardingNumber(result.forwardingNumber || '');
@@ -327,7 +330,7 @@ export default function SettingsPage() {
     };
 
     if (loading) return (
-        <div className="container mx-auto p-6 max-w-6xl space-y-8">
+        <div className="container mx-auto p-6 max-w-3xl space-y-8">
             <div className="h-9 w-32 bg-slate-200 rounded animate-pulse" />
             <div className="rounded-lg border border-slate-200 p-6 space-y-4">
                 <div className="h-6 w-56 bg-slate-200 rounded animate-pulse" />
@@ -337,26 +340,14 @@ export default function SettingsPage() {
                     <div className="h-24 bg-slate-100 rounded animate-pulse" />
                 </div>
             </div>
-            <div className="grid lg:grid-cols-2 gap-6">
-                <div className="rounded-lg border border-slate-200 p-6 space-y-4">
-                    <div className="h-6 w-40 bg-slate-200 rounded animate-pulse" />
-                    {Array.from({ length: 7 }).map((_, i) => (
-                        <div key={i} className="h-10 bg-slate-100 rounded animate-pulse" />
-                    ))}
-                </div>
-                <div className="rounded-lg border border-slate-200 p-6 space-y-4">
-                    <div className="h-6 w-48 bg-slate-200 rounded animate-pulse" />
-                    <div className="h-10 bg-slate-100 rounded animate-pulse" />
-                    <div className="h-10 bg-slate-100 rounded animate-pulse" />
-                    <div className="h-9 w-36 bg-slate-100 rounded animate-pulse" />
-                </div>
-            </div>
         </div>
     );
 
     return (
-        <div className="container mx-auto p-6 max-w-6xl space-y-8">
+        <div className="container mx-auto p-6 max-w-3xl space-y-8">
             <h1 className="text-3xl font-bold">Settings</h1>
+
+            {/* ===== BASIC SETTINGS ===== */}
 
             {/* Phone Connection */}
             <Card>
@@ -388,7 +379,7 @@ export default function SettingsPage() {
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="owner-phone">Owner Mobile (for notifications)</Label>
+                            <Label htmlFor="owner-phone">Owner Mobile (where alerts go)</Label>
                             <Input
                                 id="owner-phone"
                                 type="tel"
@@ -414,23 +405,16 @@ export default function SettingsPage() {
                         </Select>
                     </div>
 
-                    {/* Connection Status */}
-                    {isConnected ? (
-                        <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
-                            <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-                            <div>
-                                <p className="text-sm text-green-800 font-medium">Phone Connected</p>
-                                <p className="text-sm text-green-600 mt-1">
-                                    Forwarding to: {formatPhoneDisplay(forwardingNumber)}
-                                </p>
-                                {carrier && (
-                                    <p className="text-xs text-green-600 mt-2">
-                                        Dial <span className="font-mono font-semibold">{carrier === 'Verizon' ? '*71' : '*72'}{forwardingNumber.replace(/\D/g, '')}</span> on your business phone to activate forwarding.
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-                    ) : (
+                    {/* Forwarding Status — clear single state */}
+                    <ForwardingStatus
+                        isConnected={isConnected}
+                        forwardingNumber={forwardingNumber}
+                        carrier={carrier}
+                        formatPhoneDisplay={formatPhoneDisplay}
+                    />
+
+                    {/* Connect button when not connected */}
+                    {!isConnected && (
                         <div className="space-y-3">
                             {connectError && (
                                 <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
@@ -463,219 +447,261 @@ export default function SettingsPage() {
                 </CardContent>
             </Card>
 
-            {/* Smart Response Templates */}
+            {/* Auto-Reply Message (Simplified Template) */}
             <Card>
                 <CardHeader>
                     <div className="flex items-center justify-between">
                         <div>
-                            <CardTitle>Smart Response Templates</CardTitle>
-                            <CardDescription>Choose a preset or write your own message for missed calls.</CardDescription>
+                            <CardTitle>Auto-Reply Message</CardTitle>
+                            <CardDescription>This message is sent automatically when you miss a call.</CardDescription>
                         </div>
-                        <Button onClick={handleSaveTemplates} disabled={savingTemplates} size="sm" className="gap-2">
-                            {savingTemplates ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                            Save Templates
+                        {editingTemplate ? (
+                            <Button onClick={handleSaveTemplates} disabled={savingTemplates} size="sm" className="gap-2">
+                                {savingTemplates ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                Save Message
+                            </Button>
+                        ) : (
+                            <Button variant="outline" size="sm" onClick={() => setEditingTemplate(true)} className="gap-2">
+                                <Pencil className="h-4 w-4" />
+                                Edit Message
+                            </Button>
+                        )}
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    {editingTemplate ? (
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <Label className="text-sm font-medium">During business hours</Label>
+                                <Textarea
+                                    value={smsTemplate}
+                                    onChange={(e) => setSmsTemplate(e.target.value)}
+                                    placeholder="Hi! We missed your call..."
+                                    className="h-24"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-sm font-medium">After hours / closed</Label>
+                                <Textarea
+                                    value={smsTemplateClosed}
+                                    onChange={(e) => setSmsTemplateClosed(e.target.value)}
+                                    placeholder="Hi! Our store is currently closed..."
+                                    className="h-24"
+                                />
+                            </div>
+                            <p className="text-sm text-gray-500">
+                                Use {'{{first_name}}'} for caller name and {'{{business_name}}'} for your business name.
+                            </p>
+
+                            {/* More Templates — hidden by default */}
+                            {!showMoreTemplates ? (
+                                <button
+                                    onClick={() => setShowMoreTemplates(true)}
+                                    className="text-sm text-blue-600 hover:underline"
+                                >
+                                    More Templates
+                                </button>
+                            ) : (
+                                <div className="space-y-4 border-t pt-4">
+                                    <p className="text-sm font-medium text-slate-700">Pick a template:</p>
+                                    <div className="space-y-3">
+                                        <Label className="text-xs text-slate-500">Business Hours</Label>
+                                        {MORE_OPEN_TEMPLATES.map((t, i) => (
+                                            <button
+                                                key={i}
+                                                onClick={() => { setSmsTemplate(t); setShowMoreTemplates(false); }}
+                                                className="block w-full text-left p-3 text-sm rounded-lg border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                                            >
+                                                {t}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="space-y-3">
+                                        <Label className="text-xs text-slate-500">After Hours</Label>
+                                        {MORE_CLOSED_TEMPLATES.map((t, i) => (
+                                            <button
+                                                key={i}
+                                                onClick={() => { setSmsTemplateClosed(t); setShowMoreTemplates(false); }}
+                                                className="block w-full text-left p-3 text-sm rounded-lg border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                                            >
+                                                {t}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="bg-slate-50 rounded-lg p-4 text-sm text-slate-700 leading-relaxed">
+                            &ldquo;{smsTemplate}&rdquo;
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* Business Hours */}
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle>Business Hours</CardTitle>
+                            <CardDescription>Auto-replies change based on whether you&apos;re open or closed.</CardDescription>
+                        </div>
+                        <Button onClick={handleSaveHours} disabled={savingHours} size="sm" className="gap-2">
+                            {savingHours ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                            Save Hours
                         </Button>
                     </div>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                    <div className="space-y-3">
-                        <Label className="text-base font-semibold">During Business Hours</Label>
-                        <div className="flex flex-wrap gap-2">
-                            {OPEN_PRESETS.map((preset, i) => (
-                                <Button
-                                    key={i}
-                                    variant={smsTemplate === preset ? 'default' : 'outline'}
-                                    size="sm"
-                                    onClick={() => setSmsTemplate(preset)}
-                                    className="text-xs h-auto py-1.5 px-3"
-                                >
-                                    Option {i + 1}
-                                </Button>
-                            ))}
-                        </div>
-                        <Textarea
-                            value={smsTemplate}
-                            onChange={(e) => setSmsTemplate(e.target.value)}
-                            placeholder="Hi! We missed your call..."
-                            className="h-24"
-                        />
-                        <p className="text-sm text-gray-500">Use {'{{business_name}}'} as a placeholder for your business name.</p>
+                <CardContent className="space-y-4">
+                    <div className="flex items-center gap-4">
+                        <Label htmlFor="timezone-select">Timezone</Label>
+                        <Select value={timezone} onValueChange={setTimezone}>
+                            <SelectTrigger id="timezone-select" className="w-full">
+                                <SelectValue placeholder="Select timezone" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {TIMEZONES.map(tz => (
+                                    <SelectItem key={tz.value} value={tz.value}>
+                                        {tz.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
-                    <div className="space-y-3">
-                        <Label className="text-base font-semibold">After Hours / Closed</Label>
-                        <div className="flex flex-wrap gap-2">
-                            {CLOSED_PRESETS.map((preset, i) => (
-                                <Button
-                                    key={i}
-                                    variant={smsTemplateClosed === preset ? 'default' : 'outline'}
-                                    size="sm"
-                                    onClick={() => setSmsTemplateClosed(preset)}
-                                    className="text-xs h-auto py-1.5 px-3"
-                                >
-                                    Option {i + 1}
-                                </Button>
-                            ))}
-                        </div>
-                        <Textarea
-                            value={smsTemplateClosed}
-                            onChange={(e) => setSmsTemplateClosed(e.target.value)}
-                            placeholder="Hi! Our store is currently closed..."
-                            className="h-24"
-                        />
-                        <p className="text-sm text-gray-500">Use {'{{business_name}}'} as a placeholder for your business name.</p>
+
+                    <div className="space-y-2">
+                        {DAYS.map(day => (
+                            <div key={day} className="flex items-center justify-between p-2 border rounded-lg">
+                                <div className="flex items-center gap-3 w-28">
+                                    <Switch
+                                        checked={hours[day]?.isOpen ?? true}
+                                        onCheckedChange={() => handleToggleDay(day)}
+                                        aria-label={`Toggle ${day} business hours`}
+                                    />
+                                    <span className="capitalize text-sm font-medium">{day.slice(0, 3)}</span>
+                                </div>
+
+                                {(hours[day]?.isOpen ?? true) ? (
+                                    <div className="flex items-center gap-1">
+                                        <Input
+                                            type="time"
+                                            value={hours[day]?.open ?? '09:00'}
+                                            onChange={(e) => handleHourChange(day, 'open', e.target.value)}
+                                            className="w-28 text-sm"
+                                        />
+                                        <span className="text-xs text-gray-400">to</span>
+                                        <Input
+                                            type="time"
+                                            value={hours[day]?.close ?? '17:00'}
+                                            onChange={(e) => handleHourChange(day, 'close', e.target.value)}
+                                            className="w-28 text-sm"
+                                        />
+                                    </div>
+                                ) : (
+                                    <span className="text-gray-400 italic text-sm pr-4">Closed</span>
+                                )}
+                            </div>
+                        ))}
                     </div>
                 </CardContent>
             </Card>
 
-            {/* Two-column: Business Hours + RepairDesk Integration */}
-            <div className="grid lg:grid-cols-2 gap-6">
-                {/* Business Hours */}
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <CardTitle>Business Hours</CardTitle>
-                                <CardDescription>Smart responses respect these times.</CardDescription>
-                            </div>
-                            <Button onClick={handleSaveHours} disabled={savingHours} size="sm" className="gap-2">
-                                {savingHours ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                                Save Hours
-                            </Button>
+            {/* ===== ADVANCED SETTINGS (collapsed) ===== */}
+            <Accordion type="single" collapsible>
+                <AccordionItem value="advanced" className="border rounded-lg">
+                    <AccordionTrigger className="px-6 hover:no-underline">
+                        <div className="flex items-center gap-2">
+                            <Settings2 className="h-5 w-5 text-slate-500" />
+                            <span className="text-base font-semibold">Advanced Settings (for technical setup)</span>
                         </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex items-center gap-4">
-                            <Label htmlFor="timezone-select">Timezone</Label>
-                            <Select value={timezone} onValueChange={setTimezone}>
-                                <SelectTrigger id="timezone-select" className="w-full">
-                                    <SelectValue placeholder="Select timezone" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {TIMEZONES.map(tz => (
-                                        <SelectItem key={tz.value} value={tz.value}>
-                                            {tz.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="px-6">
+                        <div className="space-y-6 pt-2">
 
-                        <div className="space-y-2">
-                            {DAYS.map(day => (
-                                <div key={day} className="flex items-center justify-between p-2 border rounded-lg">
-                                    <div className="flex items-center gap-3 w-28">
-                                        <Switch
-                                            checked={hours[day]?.isOpen ?? true}
-                                            onCheckedChange={() => handleToggleDay(day)}
-                                            aria-label={`Toggle ${day} business hours`}
-                                        />
-                                        <span className="capitalize text-sm font-medium">{day.slice(0, 3)}</span>
+                            {/* RepairDesk Integration */}
+                            <Card>
+                                <CardHeader>
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <CardTitle>RepairDesk Connection</CardTitle>
+                                            <CardDescription>Connect RepairDesk to sync customers.</CardDescription>
+                                        </div>
+                                        <Button onClick={handleSaveApi} disabled={savingApi} size="sm" className="gap-2">
+                                            {savingApi ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                            Save
+                                        </Button>
                                     </div>
-
-                                    {(hours[day]?.isOpen ?? true) ? (
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="rd-api-key">API Key</Label>
+                                        <Input
+                                            id="rd-api-key"
+                                            type="password"
+                                            value={repairDeskApiKey}
+                                            onChange={(e) => {
+                                                setRepairDeskApiKey(e.target.value);
+                                                setApiKeyModified(true);
+                                            }}
+                                            onFocus={() => {
+                                                if (hasExistingApiKey && !apiKeyModified) {
+                                                    setRepairDeskApiKey('');
+                                                    setApiKeyModified(true);
+                                                }
+                                            }}
+                                            placeholder={hasExistingApiKey ? 'Key saved (click to change)' : 'Enter your RepairDesk API key'}
+                                        />
+                                        <p className="text-sm text-gray-500">
+                                            RepairDesk: Store Settings &rarr; Other Info &rarr; API Key.
+                                        </p>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="rd-subdomain">Subdomain (optional)</Label>
                                         <div className="flex items-center gap-1">
                                             <Input
-                                                type="time"
-                                                value={hours[day]?.open ?? '09:00'}
-                                                onChange={(e) => handleHourChange(day, 'open', e.target.value)}
-                                                className="w-28 text-sm"
+                                                id="rd-subdomain"
+                                                type="text"
+                                                value={repairDeskSubdomain}
+                                                onChange={(e) => setRepairDeskSubdomain(e.target.value)}
+                                                placeholder="yourshop"
+                                                className="max-w-40"
                                             />
-                                            <span className="text-xs text-gray-400">to</span>
-                                            <Input
-                                                type="time"
-                                                value={hours[day]?.close ?? '17:00'}
-                                                onChange={(e) => handleHourChange(day, 'close', e.target.value)}
-                                                className="w-28 text-sm"
-                                            />
+                                            <span className="text-sm text-gray-500 whitespace-nowrap">.repairdesk.co</span>
                                         </div>
-                                    ) : (
-                                        <span className="text-gray-400 italic text-sm pr-4">Closed</span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={handleTestRepairDesk}
+                                            disabled={rdTestStatus === 'testing' || !repairDeskApiKey}
+                                        >
+                                            {rdTestStatus === 'testing' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                                            {rdTestStatus === 'success' && <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" />}
+                                            {rdTestStatus === 'error' && <XCircle className="h-4 w-4 mr-2 text-red-600" />}
+                                            Test Connection
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={handleSyncRepairDesk}
+                                            disabled={syncing || !repairDeskApiKey}
+                                        >
+                                            {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                                            Sync Customers
+                                        </Button>
+                                    </div>
+                                    {rdTestError && (
+                                        <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{rdTestError}</p>
                                     )}
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
+                                </CardContent>
+                            </Card>
 
-                {/* RepairDesk Integration */}
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <CardTitle>RepairDesk Integration</CardTitle>
-                                <CardDescription>Connect RepairDesk to sync customers.</CardDescription>
-                            </div>
-                            <Button onClick={handleSaveApi} disabled={savingApi} size="sm" className="gap-2">
-                                {savingApi ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                                Save API
-                            </Button>
                         </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="rd-api-key">API Key</Label>
-                            <Input
-                                id="rd-api-key"
-                                type="password"
-                                value={repairDeskApiKey}
-                                onChange={(e) => {
-                                    setRepairDeskApiKey(e.target.value);
-                                    setApiKeyModified(true);
-                                }}
-                                onFocus={() => {
-                                    if (hasExistingApiKey && !apiKeyModified) {
-                                        setRepairDeskApiKey('');
-                                        setApiKeyModified(true);
-                                    }
-                                }}
-                                placeholder={hasExistingApiKey ? 'Key saved (click to change)' : 'Enter your RepairDesk API key'}
-                            />
-                            <p className="text-sm text-gray-500">
-                                RepairDesk: Store Settings &rarr; Other Info &rarr; API Key.
-                            </p>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="rd-subdomain">Subdomain (optional)</Label>
-                            <div className="flex items-center gap-1">
-                                <Input
-                                    id="rd-subdomain"
-                                    type="text"
-                                    value={repairDeskSubdomain}
-                                    onChange={(e) => setRepairDeskSubdomain(e.target.value)}
-                                    placeholder="yourshop"
-                                    className="max-w-40"
-                                />
-                                <span className="text-sm text-gray-500 whitespace-nowrap">.repairdesk.co</span>
-                            </div>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={handleTestRepairDesk}
-                                disabled={rdTestStatus === 'testing' || !repairDeskApiKey}
-                            >
-                                {rdTestStatus === 'testing' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                                {rdTestStatus === 'success' && <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" />}
-                                {rdTestStatus === 'error' && <XCircle className="h-4 w-4 mr-2 text-red-600" />}
-                                Test Connection
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={handleSyncRepairDesk}
-                                disabled={syncing || !repairDeskApiKey}
-                            >
-                                {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-                                Sync Customers
-                            </Button>
-                        </div>
-                        {rdTestError && (
-                            <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{rdTestError}</p>
-                        )}
-                    </CardContent>
-                </Card>
-            </div>
+                    </AccordionContent>
+                </AccordionItem>
+            </Accordion>
         </div>
     );
 }

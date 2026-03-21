@@ -6,11 +6,12 @@ import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Phone, Send, User, Loader2, Menu, AlertCircle, RefreshCw, PhoneOff } from 'lucide-react';
+import { Phone, Send, User, Loader2, Menu, AlertCircle, RefreshCw, PhoneOff, PhoneForwarded, TestTube } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-client';
 import { logger } from '@/lib/logger';
 import { Sidebar } from '@/components/dashboard/Sidebar';
 import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeleton';
+import { SetupCard } from '@/components/dashboard/SetupCard';
 
 // Types (should ideally be generated from Supabase)
 interface Lead {
@@ -213,7 +214,11 @@ export default function Dashboard() {
     }
 
     return (
-        <div className="flex h-full bg-slate-50 overflow-hidden flex-col md:flex-row">
+        <div className="flex h-full bg-slate-50 overflow-hidden flex-col">
+            {/* Setup progress card */}
+            <SetupCard />
+
+            <div className="flex flex-1 overflow-hidden flex-col md:flex-row">
             {/* Mobile leads toggle */}
             <div className="md:hidden bg-white border-b border-slate-200 p-3">
                 <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
@@ -257,7 +262,7 @@ export default function Dashboard() {
                             disabled={loadingMore}
                         >
                             {loadingMore ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                            {loadingMore ? 'Loading...' : 'Load More Leads'}
+                            {loadingMore ? 'Loading...' : 'Load More'}
                         </Button>
                     </div>
                 )}
@@ -356,23 +361,30 @@ export default function Dashboard() {
                         </div>
                     </>
                 ) : leads.length === 0 ? (
-                    /* UX-01: Empty state for zero leads */
+                    /* Empty state for zero leads — guides activation */
                     <div className="flex-1 flex items-center justify-center p-8">
-                        <div className="max-w-sm text-center space-y-4">
+                        <div className="max-w-sm text-center space-y-5">
                             <div className="flex justify-center">
                                 <div className="rounded-full bg-blue-50 p-4">
                                     <PhoneOff className="h-10 w-10 text-blue-400" />
                                 </div>
                             </div>
                             <div className="space-y-2">
-                                <h2 className="text-xl font-bold text-slate-900">No leads yet</h2>
+                                <h2 className="text-xl font-bold text-slate-900">No missed calls captured yet</h2>
                                 <p className="text-slate-500 text-sm">
-                                    When someone calls your business and you miss the call, LeadCatcher will automatically text them and the lead will appear here.
+                                    Activate forwarding and place one test call. Your first lead will appear here automatically.
                                 </p>
                             </div>
-                            <p className="text-xs text-slate-400">
-                                Make sure call forwarding is set up on your phone. Check Settings for more options.
-                            </p>
+                            <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                                <Button onClick={() => window.location.href = '/dashboard/settings'} className="bg-blue-600 hover:bg-blue-700 gap-2">
+                                    <PhoneForwarded className="h-4 w-4" />
+                                    Activate Forwarding
+                                </Button>
+                                <Button variant="outline" onClick={() => window.location.href = '/dashboard/settings'} className="gap-2">
+                                    <TestTube className="h-4 w-4" />
+                                    Run Test Call
+                                </Button>
+                            </div>
                         </div>
                     </div>
                 ) : (
@@ -380,6 +392,7 @@ export default function Dashboard() {
                         Select a lead to view conversation
                     </div>
                 )}
+            </div>
             </div>
         </div>
     );

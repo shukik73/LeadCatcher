@@ -48,23 +48,23 @@ export function Sidebar({
     return (
         <div className="flex flex-col h-full">
             <div className="p-4 border-b border-slate-100">
-                <h2 className="font-semibold text-sm text-slate-500 uppercase tracking-wide mb-0">Leads</h2>
+                <h2 className="font-semibold text-sm text-slate-500 uppercase tracking-wide mb-0">Missed Calls</h2>
             </div>
             <div className="p-4">
                 <div className="relative">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
                     <Input
-                        placeholder="Search leads..."
+                        placeholder="Search missed calls..."
                         className="pl-9 bg-slate-50"
                         value={searchQuery}
-                        aria-label="Search leads by name, phone, or message content"
+                        aria-label="Search missed calls by name, phone, or message content"
                         onChange={(e) => onSearchChange(e.target.value)}
                     />
                 </div>
             </div>
             <div className="flex-1 overflow-y-auto" role="listbox" aria-label="Lead list">
                 {filteredLeads.length === 0 ? (
-                    <div className="p-8 text-center text-slate-400 text-sm">No leads match your search.</div>
+                    <div className="p-8 text-center text-slate-400 text-sm">No missed calls match your search.</div>
                 ) : (
                     filteredLeads.map(lead => (
                         <div
