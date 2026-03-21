@@ -38,9 +38,15 @@ export async function checkBillingStatus(businessId: string): Promise<
     return { allowed: true };
   }
 
-  const reason = status
-    ? `Subscription status is "${status}". Please update your billing to continue sending messages.`
-    : 'No active subscription. Please subscribe to send messages.';
+  // Allow SMS when no subscription exists yet (onboarding / demo).
+  // The business was just created — give them a grace period so
+  // forwarding + test calls work before they set up billing.
+  if (!status) {
+    logger.info('[BillingGuard] No subscription yet — allowing SMS for onboarding', { businessId });
+    return { allowed: true };
+  }
+
+  const reason = `Subscription status is "${status}". Please update your billing to continue sending messages.`;
 
   logger.warn('[BillingGuard] SMS blocked due to billing status', { businessId, status });
   return { allowed: false, reason };
