@@ -257,6 +257,10 @@ export default function SettingsPage() {
             if (result.success) {
                 setForwardingNumber(result.forwardingNumber || '');
                 setIsConnected(true);
+                // Also configure Twilio webhook URLs
+                try {
+                    await fetch('/api/twilio/configure-webhooks', { method: 'POST' });
+                } catch { /* non-fatal */ }
                 toast.success('Phone connected to LeadCatcher!');
             } else {
                 setConnectError(result.error || 'Failed to connect phone');
