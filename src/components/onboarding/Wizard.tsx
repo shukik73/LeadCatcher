@@ -94,6 +94,10 @@ export default function Wizard() {
             }
 
             setForwardingNumber(result.forwardingNumber || '');
+            // Also configure Twilio webhook URLs to point to this app
+            try {
+                await fetch('/api/twilio/configure-webhooks', { method: 'POST' });
+            } catch { /* non-fatal */ }
             toast.success('Phone number connected!');
             setIsConnecting(false);
             setStep(2);

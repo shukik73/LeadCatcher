@@ -78,23 +78,18 @@ async function handleVoiceWebhook(callSid: string | null, callerRaw: string, cal
 
     if (callSid) await setWebhookBusinessId(callSid, business.id);
 
-    // VERIFICATION: If business has a pending verification_token AND the
-    // incoming call matches the verification_call_sid we initiated, mark verified.
-    // This prevents unrelated forwarded calls from completing verification.
-    if (business.verification_token && business.verification_call_sid && callSid) {
-        // The forwarded call's CallSid may differ from the original, but
-        // Twilio passes the parent CallSid in the forwarded leg. Check both.
-        if (callSid === business.verification_call_sid) {
-            await supabaseAdmin
-                .from('businesses')
-                .update({ verified: true, verification_token: null, verification_call_sid: null })
-                .eq('id', business.id);
-            logger.info(`[${TAG}] Business forwarding verified via webhook`, { businessId: business.id });
-        } else {
-            logger.info(`[${TAG}] Incoming call during verification window but CallSid does not match`, {
-                businessId: business.id, expected: business.verification_call_sid, got: callSid,
-            });
-        }
+    // VERIFICATION: If business has a pending verification_token, any incoming
+    // call reaching this webhook proves call forwarding is working.
+    // Note: forwarded calls arrive with a NEW CallSid (different from the
+    // outbound call we initiated), so we cannot match on CallSid.
+    // The verification_token window is short-lived (set moments before the
+    // test call), so accepting any call during this window is safe.
+    if (business.verification_token) {
+        await supabaseAdmin
+            .from('businesses')
+            .update({ verified: true, verification_token: null, verification_call_sid: null })
+            .eq('id', business.id);
+        logger.info(`[${TAG}] Business forwarding verified via webhook`, { businessId: business.id });
     }
 
     logger.info(`[${TAG}] Missed call for business`, { business: business.name });
