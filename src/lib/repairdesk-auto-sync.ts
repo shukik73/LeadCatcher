@@ -26,7 +26,7 @@ export async function autoSyncToRepairDesk(callId: string): Promise<void> {
 
         const { data: call } = await supabase
             .from('call_analyses')
-            .select('id, customer_phone, category, urgency, callback_status, summary, outcome_notes, follow_up_notes, rd_synced_at, created_at')
+            .select('*')
             .eq('id', callId)
             .eq('business_id', business.id)
             .single();

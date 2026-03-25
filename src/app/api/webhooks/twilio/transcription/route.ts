@@ -5,6 +5,7 @@ import { checkBillingStatus } from '@/lib/billing-guard';
 import { claimWebhookEvent, markWebhookProcessed, markWebhookFailedIfProcessing, checkOptOut } from '@/lib/webhook-common';
 import { verifyCallbackSignature } from '@/lib/callback-signature';
 import { checkSmsRateLimit } from '@/lib/sms-rate-limit';
+import { scoreCall } from '@/lib/call-scoring';
 import { logger } from '@/lib/logger';
 import twilio from 'twilio';
 
@@ -60,6 +61,7 @@ async function handleTranscriptionWebhook(
     const businessId = url.searchParams.get('businessId');
     const caller = url.searchParams.get('caller'); // E.164
     const called = url.searchParams.get('called'); // E.164
+    const sourceCallId = url.searchParams.get('callSid'); // matches call_analyses.source_call_id
 
     if (!businessId || !caller || !called) {
         logger.error('Missing params in transcription callback', null, { url: request.url });
@@ -121,6 +123,101 @@ async function handleTranscriptionWebhook(
             body: `[Voicemail]: ${transcriptionText}`,
             is_ai_generated: false
         });
+    }
+
+    // 3b. Update call_analyses with transcript and AI scoring
+    try {
+        // Find the call_analyses record by source_call_id (passed from voice webhook)
+        // Falls back to phone+newest match if callSid not present (legacy calls)
+        let callAnalysisId: string | null = null;
+
+        if (sourceCallId) {
+            const { data: match } = await supabaseAdmin
+                .from('call_analyses')
+                .select('id')
+                .eq('source_call_id', sourceCallId)
+                .single();
+            callAnalysisId = match?.id || null;
+        }
+
+        if (!callAnalysisId) {
+            // Fallback: match by business + phone, most recent
+            const { data: match } = await supabaseAdmin
+                .from('call_analyses')
+                .select('id')
+                .eq('business_id', businessId)
+                .eq('customer_phone', caller)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
+            callAnalysisId = match?.id || null;
+        }
+
+        // Score the call with the actual transcript
+        const score = await scoreCall({
+            transcript: transcriptionText,
+            callStatus: 'missed',
+            customerPhone: caller,
+        });
+
+        if (callAnalysisId) {
+            // Update existing record with transcript and AI scoring
+            await supabaseAdmin
+                .from('call_analyses')
+                .update({
+                    transcript: transcriptionText,
+                    summary: score.summary,
+                    sentiment: score.sentiment,
+                    category: score.category,
+                    urgency: score.urgency,
+                    follow_up_needed: score.follow_up_needed,
+                    follow_up_notes: score.follow_up_notes,
+                    coaching_note: score.coaching_note,
+                    due_by: score.due_by,
+                    processed_at: new Date().toISOString(),
+                })
+                .eq('id', callAnalysisId);
+
+            logger.info(`[${TAG}] Updated call_analyses with transcript`, {
+                id: callAnalysisId,
+                category: score.category,
+                urgency: score.urgency,
+            });
+        } else {
+            // No existing record — create one (voice webhook may have failed)
+            const fallbackSourceId = sourceCallId || `transcription-${Date.now()}-${caller}`;
+            const { error: insertError } = await supabaseAdmin
+                .from('call_analyses')
+                .insert({
+                    business_id: businessId,
+                    source_call_id: fallbackSourceId,
+                    customer_phone: caller,
+                    call_status: 'missed',
+                    transcript: transcriptionText,
+                    summary: score.summary,
+                    sentiment: score.sentiment,
+                    category: score.category,
+                    urgency: score.urgency,
+                    follow_up_needed: score.follow_up_needed,
+                    follow_up_notes: score.follow_up_notes,
+                    callback_status: 'pending',
+                    coaching_note: score.coaching_note,
+                    due_by: score.due_by,
+                    processed_at: new Date().toISOString(),
+                });
+
+            if (insertError && insertError.code !== '23505') {
+                logger.error(`[${TAG}] Failed to create call_analyses`, insertError);
+            } else {
+                logger.info(`[${TAG}] Created new call_analyses from transcription`, {
+                    sourceCallId: fallbackSourceId,
+                    category: score.category,
+                });
+            }
+        }
+    } catch (error) {
+        // Non-blocking — don't fail the webhook
+        logger.error(`[${TAG}] Error updating call analysis`, error);
     }
 
     // 4. BILLING GUARD: Check subscription before sending SMS

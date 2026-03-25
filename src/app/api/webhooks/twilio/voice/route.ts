@@ -150,6 +150,38 @@ async function handleVoiceWebhook(callSid: string | null, callerRaw: string, cal
     });
     if (leadError) logger.error('Error upserting lead:', leadError);
 
+    // 7b. Create call_analyses record for the Call Review dashboard
+    // Uses fast defaults — AI scoring happens later when transcription arrives
+    const sourceCallId = callSid || `voice-${Date.now()}-${caller}`;
+    try {
+        const { error: analysisError } = await supabaseAdmin
+            .from('call_analyses')
+            .insert({
+                business_id: business.id,
+                source_call_id: sourceCallId,
+                customer_phone: caller,
+                call_status: 'missed',
+                summary: 'Missed call — waiting for voicemail transcription',
+                sentiment: 'neutral',
+                category: 'follow_up',
+                urgency: 'medium',
+                follow_up_needed: true,
+                follow_up_notes: 'Call the customer back to follow up on their missed call.',
+                callback_status: 'pending',
+                due_by: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+                processed_at: new Date().toISOString(),
+            });
+
+        if (analysisError && analysisError.code !== '23505') {
+            logger.error(`[${TAG}] Failed to create call_analyses record`, analysisError);
+        } else {
+            logger.info(`[${TAG}] Call analysis created`, { sourceCallId });
+        }
+    } catch (error) {
+        // Non-blocking — don't fail the webhook if analysis creation fails
+        logger.error(`[${TAG}] Error creating call analysis`, error);
+    }
+
     // 8. TwiML: Greeting + Record
     const response = new twilio.twiml.VoiceResponse();
     // Sanitize business name for TwiML (prevent injection)
@@ -165,7 +197,7 @@ async function handleVoiceWebhook(callSid: string | null, callerRaw: string, cal
         return new Response(errorResponse.toString(), { headers: { 'Content-Type': 'text/xml' } });
     }
     const sig = signCallbackParams(business.id, caller, called);
-    const callbackUrl = `${baseUrl}/api/webhooks/twilio/transcription?businessId=${business.id}&caller=${encodeURIComponent(caller)}&called=${encodeURIComponent(called)}&sig=${sig}`;
+    const callbackUrl = `${baseUrl}/api/webhooks/twilio/transcription?businessId=${business.id}&caller=${encodeURIComponent(caller)}&called=${encodeURIComponent(called)}&callSid=${encodeURIComponent(sourceCallId)}&sig=${sig}`;
 
     response.record({
         transcribe: true,
