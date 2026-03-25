@@ -63,10 +63,7 @@ export async function GET(request: Request) {
         let query = supabase
             .from('call_analyses')
             .select(
-                'id, source_call_id, customer_name, customer_phone, call_status, call_duration, ' +
-                'recording_url, summary, sentiment, category, urgency, follow_up_needed, follow_up_notes, ' +
-                'callback_status, owner, due_by, coaching_note, booked_value, last_contacted_at, ' +
-                'contact_attempts, rd_ticket_id, rd_ticket_status, created_at',
+                '*',
                 { count: 'exact' }
             )
             .eq('business_id', business.id);

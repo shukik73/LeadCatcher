@@ -38,7 +38,7 @@ export async function generateCoachingSummary(
 
     const { data: calls, error } = await supabaseAdmin
         .from('call_analyses')
-        .select('owner, category, urgency, callback_status, coaching_note, follow_up_needed, due_by, booked_value, last_contacted_at, created_at')
+        .select('*')
         .eq('business_id', businessId)
         .gte('created_at', fromDate)
         .lte('created_at', toDate);
