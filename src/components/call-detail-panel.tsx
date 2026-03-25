@@ -215,6 +215,7 @@ export function CallDetailPanel({ call, open, onClose, onUpdated }: CallDetailPa
                         rdTicketId={call.rd_ticket_id}
                         rdTicketStatus={call.rd_ticket_status}
                         rdSyncedAt={call.rd_synced_at}
+                        autoLookup={call.category === 'status_check'}
                         onSynced={onUpdated}
                     />
 
