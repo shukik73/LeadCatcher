@@ -285,17 +285,23 @@ export default function SettingsPage() {
     };
 
     const handleTestRepairDesk = async () => {
-        if (!repairDeskApiKey) {
+        if (!repairDeskApiKey && !hasExistingApiKey) {
             toast.error('Enter your RepairDesk API key first');
             return;
         }
         setRdTestStatus('testing');
         setRdTestError('');
         try {
+            const body: Record<string, unknown> = { subdomain: repairDeskSubdomain || undefined };
+            if (repairDeskApiKey) {
+                body.apiKey = repairDeskApiKey;
+            } else {
+                body.useStored = true;
+            }
             const res = await fetch('/api/repairdesk/test-connection', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ apiKey: repairDeskApiKey, subdomain: repairDeskSubdomain || undefined }),
+                body: JSON.stringify(body),
             });
             const data = await res.json();
             if (data.success) {
@@ -691,7 +697,7 @@ export default function SettingsPage() {
                                             variant="outline"
                                             size="sm"
                                             onClick={handleTestRepairDesk}
-                                            disabled={rdTestStatus === 'testing' || !repairDeskApiKey}
+                                            disabled={rdTestStatus === 'testing' || (!repairDeskApiKey && !hasExistingApiKey)}
                                         >
                                             {rdTestStatus === 'testing' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                                             {rdTestStatus === 'success' && <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" />}
@@ -702,7 +708,7 @@ export default function SettingsPage() {
                                             variant="outline"
                                             size="sm"
                                             onClick={handleSyncRepairDesk}
-                                            disabled={syncing || !repairDeskApiKey}
+                                            disabled={syncing || (!repairDeskApiKey && !hasExistingApiKey)}
                                         >
                                             {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
                                             Sync Customers

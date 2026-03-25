@@ -19,16 +19,36 @@ export async function POST(request: Request) {
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { apiKey, subdomain } = await request.json() as {
-            apiKey: string;
+        const { apiKey, subdomain, useStored } = await request.json() as {
+            apiKey?: string;
             subdomain?: string;
+            useStored?: boolean;
         };
 
-        if (!apiKey) {
+        let resolvedApiKey = apiKey;
+        let resolvedSubdomain = subdomain;
+
+        // If no apiKey provided, look up the stored one from the database
+        if (!resolvedApiKey && useStored) {
+            const { data: business } = await supabase
+                .from('businesses')
+                .select('repairdesk_api_key, repairdesk_store_url')
+                .eq('user_id', user.id)
+                .single();
+
+            if (business?.repairdesk_api_key) {
+                resolvedApiKey = business.repairdesk_api_key;
+                if (!resolvedSubdomain) {
+                    resolvedSubdomain = business.repairdesk_store_url || undefined;
+                }
+            }
+        }
+
+        if (!resolvedApiKey) {
             return Response.json({ error: 'API key is required' }, { status: 400 });
         }
 
-        const client = new RepairDeskClient(apiKey, subdomain);
+        const client = new RepairDeskClient(resolvedApiKey, resolvedSubdomain);
         const result = await client.testConnection();
 
         if (result.success) {
