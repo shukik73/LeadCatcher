@@ -221,4 +221,62 @@ export class RepairDeskClient {
             return { success: false, error: message, baseUrl: this.baseUrl };
         }
     }
+
+    // -------------------------------------------------------
+    // Write methods (for bidirectional RepairDesk integration)
+    // -------------------------------------------------------
+
+    /**
+     * Search tickets by customer phone number.
+     */
+    async searchTickets(phone: string): Promise<RepairDeskListResponse<RepairDeskTicket>> {
+        return this.request<RepairDeskListResponse<RepairDeskTicket>>(
+            `/tickets?search=${encodeURIComponent(phone)}`
+        );
+    }
+
+    /**
+     * Get full ticket details by ID.
+     */
+    async getTicketDetails(ticketId: number): Promise<RepairDeskTicket> {
+        return this.request<RepairDeskTicket>(`/tickets/${ticketId}`);
+    }
+
+    /**
+     * Add a note to an existing RepairDesk ticket.
+     */
+    async addTicketNote(ticketId: number, note: string): Promise<void> {
+        await this.request<unknown>(`/tickets/${ticketId}/notes`, {
+            method: 'POST',
+            body: JSON.stringify({ note }),
+        });
+    }
+
+    /**
+     * Create a new customer in RepairDesk.
+     */
+    async createCustomer(data: {
+        first_name: string;
+        last_name: string;
+        phone: string;
+        email?: string;
+    }): Promise<RepairDeskCustomer> {
+        return this.request<RepairDeskCustomer>('/customers', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
+    /**
+     * Update an existing customer in RepairDesk.
+     */
+    async updateCustomer(
+        customerId: number,
+        data: Partial<Pick<RepairDeskCustomer, 'first_name' | 'last_name' | 'phone' | 'email' | 'address' | 'city' | 'state' | 'zip'>>,
+    ): Promise<RepairDeskCustomer> {
+        return this.request<RepairDeskCustomer>(`/customers/${customerId}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    }
 }
