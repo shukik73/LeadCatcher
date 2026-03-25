@@ -44,7 +44,7 @@ export async function GET(request: Request) {
 
         let query = supabase
             .from('call_analyses')
-            .select('owner, callback_status, urgency, coaching_note, booked_value, last_contacted_at, created_at')
+            .select('*')
             .eq('business_id', business.id)
             .gte('created_at', fromDate)
             .lte('created_at', toDate)
