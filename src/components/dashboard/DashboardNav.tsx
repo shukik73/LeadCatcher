@@ -3,12 +3,14 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-client';
 import { Button } from '@/components/ui/button';
-import { MessageSquare, Settings, CreditCard, LogOut, Inbox, Menu, X } from 'lucide-react';
+import { MessageSquare, Settings, CreditCard, LogOut, Inbox, Menu, X, PhoneCall, ListChecks } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
     { href: '/dashboard', label: 'Inbox', icon: Inbox },
+    { href: '/dashboard/calls', label: 'Calls', icon: PhoneCall },
+    { href: '/dashboard/followups', label: 'Follow-Ups', icon: ListChecks },
     { href: '/dashboard/settings', label: 'Settings', icon: Settings },
     { href: '/dashboard/billing', label: 'Billing', icon: CreditCard },
 ];
