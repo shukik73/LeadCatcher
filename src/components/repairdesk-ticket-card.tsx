@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +24,7 @@ interface RepairDeskTicketCardProps {
     rdTicketId: string | null;
     rdTicketStatus: string | null;
     rdSyncedAt: string | null;
+    autoLookup?: boolean;
     onSynced?: () => void;
 }
 
@@ -33,12 +34,21 @@ export function RepairDeskTicketCard({
     rdTicketId,
     rdTicketStatus,
     rdSyncedAt,
+    autoLookup = false,
     onSynced,
 }: RepairDeskTicketCardProps) {
     const [tickets, setTickets] = useState<RepairDeskTicket[]>([]);
     const [loading, setLoading] = useState(false);
     const [syncing, setSyncing] = useState(false);
     const [looked, setLooked] = useState(false);
+
+    // Auto-lookup tickets for status_check calls
+    useEffect(() => {
+        if (autoLookup && customerPhone && !looked && !rdTicketId) {
+            lookupTickets();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [autoLookup, customerPhone]);
 
     const lookupTickets = async () => {
         if (!customerPhone) return;

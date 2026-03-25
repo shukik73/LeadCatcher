@@ -1,5 +1,6 @@
 import { updateCallAnalysis } from '@/lib/call-actions';
 import { validateCsrfOrigin } from '@/lib/csrf';
+import { autoSyncToRepairDesk } from '@/lib/repairdesk-auto-sync';
 import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
@@ -46,6 +47,11 @@ export async function POST(
         ...(notes ? { outcome_notes: notes } : {}),
         ...(booked_value != null ? { booked_value } : {}),
     }), 'log-outcome');
+
+    // Auto-sync to RepairDesk on booked/lost outcomes (non-blocking)
+    if (result.success && (outcome === 'booked' || outcome === 'lost')) {
+        autoSyncToRepairDesk(id).catch(() => {});
+    }
 
     return Response.json(
         result.success ? result : { error: result.error },

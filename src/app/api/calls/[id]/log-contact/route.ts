@@ -1,5 +1,6 @@
 import { updateCallAnalysis } from '@/lib/call-actions';
 import { validateCsrfOrigin } from '@/lib/csrf';
+import { autoSyncToRepairDesk } from '@/lib/repairdesk-auto-sync';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +24,11 @@ export async function POST(
         callback_status: 'called',
         acted_on: true,
     }), 'log-contact');
+
+    // Auto-sync to RepairDesk on contact attempt (non-blocking)
+    if (result.success) {
+        autoSyncToRepairDesk(id).catch(() => {});
+    }
 
     return Response.json(
         result.success ? result : { error: result.error },
