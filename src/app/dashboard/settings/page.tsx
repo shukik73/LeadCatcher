@@ -628,8 +628,20 @@ export default function SettingsPage() {
                                 <CardHeader>
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <CardTitle>RepairDesk Connection</CardTitle>
-                                            <CardDescription>Connect RepairDesk to sync customers.</CardDescription>
+                                            <CardTitle className="flex items-center gap-2">
+                                                RepairDesk Connection
+                                                {hasExistingApiKey && (
+                                                    <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                                                        <CheckCircle2 className="h-3 w-3" />
+                                                        Connected
+                                                    </span>
+                                                )}
+                                            </CardTitle>
+                                            <CardDescription>
+                                                {hasExistingApiKey
+                                                    ? 'RepairDesk is connected and syncing customers.'
+                                                    : 'Connect RepairDesk to sync customers.'}
+                                            </CardDescription>
                                         </div>
                                         <Button onClick={handleSaveApi} disabled={savingApi} size="sm" className="gap-2">
                                             {savingApi ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
