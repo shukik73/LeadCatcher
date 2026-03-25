@@ -6,6 +6,7 @@ import { checkBillingStatus } from '@/lib/billing-guard';
 import { claimWebhookEvent, markWebhookProcessed, markWebhookFailed, markWebhookFailedIfProcessing, setWebhookBusinessId, checkOptOut } from '@/lib/webhook-common';
 import { signCallbackParams } from '@/lib/callback-signature';
 import { checkSmsRateLimit } from '@/lib/sms-rate-limit';
+import { scoreCall } from '@/lib/call-scoring';
 import { logger } from '@/lib/logger';
 import twilio from 'twilio';
 
@@ -149,6 +150,54 @@ async function handleVoiceWebhook(callSid: string | null, callerRaw: string, cal
         ignoreDuplicates: true,
     });
     if (leadError) logger.error('Error upserting lead:', leadError);
+
+    // 7b. Create call_analyses record for the Call Review dashboard
+    // Run initial AI scoring without transcript (will be updated when transcription arrives)
+    try {
+        const sourceCallId = callSid || `voice-${Date.now()}-${caller}`;
+
+        // Check for duplicate before scoring
+        const { data: existingAnalysis } = await supabaseAdmin
+            .from('call_analyses')
+            .select('id')
+            .eq('source_call_id', sourceCallId)
+            .single();
+
+        if (!existingAnalysis) {
+            const score = await scoreCall({
+                callStatus: 'missed',
+                customerPhone: caller,
+            });
+
+            const { error: analysisError } = await supabaseAdmin
+                .from('call_analyses')
+                .insert({
+                    business_id: business.id,
+                    source_call_id: sourceCallId,
+                    customer_phone: caller,
+                    call_status: 'missed',
+                    summary: score.summary,
+                    sentiment: score.sentiment,
+                    category: score.category,
+                    urgency: score.urgency,
+                    follow_up_needed: score.follow_up_needed,
+                    follow_up_notes: score.follow_up_notes,
+                    callback_status: 'pending',
+                    coaching_note: score.coaching_note,
+                    due_by: score.due_by,
+                    processed_at: new Date().toISOString(),
+                });
+
+            if (analysisError && analysisError.code !== '23505') {
+                logger.error(`[${TAG}] Failed to create call_analyses record`, analysisError);
+            } else {
+                logger.info(`[${TAG}] Call analysis created`, { sourceCallId, category: score.category });
+            }
+        }
+    } catch (error) {
+        // Non-blocking — don't fail the webhook if analysis creation fails
+        logger.error(`[${TAG}] Error creating call analysis`, error);
+    }
 
     // 8. TwiML: Greeting + Record
     const response = new twilio.twiml.VoiceResponse();

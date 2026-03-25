@@ -5,6 +5,7 @@ import { checkBillingStatus } from '@/lib/billing-guard';
 import { claimWebhookEvent, markWebhookProcessed, markWebhookFailedIfProcessing, checkOptOut } from '@/lib/webhook-common';
 import { verifyCallbackSignature } from '@/lib/callback-signature';
 import { checkSmsRateLimit } from '@/lib/sms-rate-limit';
+import { scoreCall } from '@/lib/call-scoring';
 import { logger } from '@/lib/logger';
 import twilio from 'twilio';
 
@@ -121,6 +122,56 @@ async function handleTranscriptionWebhook(
             body: `[Voicemail]: ${transcriptionText}`,
             is_ai_generated: false
         });
+    }
+
+    // 3b. Update call_analyses with transcript and re-scored AI analysis
+    try {
+        // Find the call_analyses record created by the voice webhook
+        // Match on business_id + customer_phone, most recent first
+        const { data: callAnalysis } = await supabaseAdmin
+            .from('call_analyses')
+            .select('id')
+            .eq('business_id', businessId)
+            .eq('customer_phone', caller)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+        if (callAnalysis) {
+            // Re-score with the actual transcript for better accuracy
+            const score = await scoreCall({
+                transcript: transcriptionText,
+                callStatus: 'missed',
+                customerPhone: caller,
+            });
+
+            await supabaseAdmin
+                .from('call_analyses')
+                .update({
+                    transcript: transcriptionText,
+                    summary: score.summary,
+                    sentiment: score.sentiment,
+                    category: score.category,
+                    urgency: score.urgency,
+                    follow_up_needed: score.follow_up_needed,
+                    follow_up_notes: score.follow_up_notes,
+                    coaching_note: score.coaching_note,
+                    due_by: score.due_by,
+                    processed_at: new Date().toISOString(),
+                })
+                .eq('id', callAnalysis.id);
+
+            logger.info(`[${TAG}] Updated call_analyses with transcript`, {
+                id: callAnalysis.id,
+                category: score.category,
+                urgency: score.urgency,
+            });
+        } else {
+            logger.warn(`[${TAG}] No call_analyses record found to update`, { businessId, caller });
+        }
+    } catch (error) {
+        // Non-blocking — don't fail the webhook
+        logger.error(`[${TAG}] Error updating call analysis`, error);
     }
 
     // 4. BILLING GUARD: Check subscription before sending SMS
