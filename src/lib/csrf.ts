@@ -13,21 +13,33 @@ import { logger } from '@/lib/logger';
 /**
  * Validates that the request Origin matches the app's origin.
  * Returns true if the request is safe, false if it should be blocked.
+ *
+ * Fails closed in production: blocks requests when Origin/Referer are missing
+ * or when allowed origins are not configured.
  */
 export function validateCsrfOrigin(request: Request): boolean {
     const origin = request.headers.get('Origin');
     const referer = request.headers.get('Referer');
+    const isProduction = process.env.NODE_ENV === 'production';
 
-    // If neither header is present, the request is likely from a non-browser
-    // context (curl, server-to-server). Allow it — Supabase auth will still
-    // gate access. Browsers always send Origin on POST/PUT/DELETE.
+    // If neither header is present: browsers always send Origin on
+    // POST/PUT/DELETE, so a missing header means non-browser client.
+    // In production, block these — authenticated endpoints should only
+    // be called from the browser. In development, allow for curl/testing.
     if (!origin && !referer) {
+        if (isProduction) {
+            logger.warn('[CSRF] Blocked request with no Origin or Referer header in production');
+            return false;
+        }
         return true;
     }
 
     const allowedOrigins = getAllowedOrigins();
     if (allowedOrigins.length === 0) {
-        // No origins configured — skip CSRF check rather than breaking
+        if (isProduction) {
+            logger.error('[CSRF] No allowed origins configured — blocking request in production');
+            return false;
+        }
         return true;
     }
 

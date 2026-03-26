@@ -51,7 +51,7 @@ export async function checkSmsRateLimit(
 
             if (callerError) {
                 logger.error('[SmsRateLimit] Per-caller check failed', callerError, { businessId, callerPhone });
-                return { allowed: true }; // Fail open
+                return { allowed: false, reason: 'Rate limit check failed — blocking SMS as precaution' };
             }
 
             if (callerCount !== null && callerCount >= PER_CALLER_LIMIT) {
@@ -80,7 +80,7 @@ export async function checkSmsRateLimit(
 
             if (bizError) {
                 logger.error('[SmsRateLimit] Per-business check failed', bizError, { businessId });
-                return { allowed: true }; // Fail open
+                return { allowed: false, reason: 'Rate limit check failed — blocking SMS as precaution' };
             }
 
             if (bizCount !== null && bizCount >= PER_BUSINESS_LIMIT) {
@@ -94,6 +94,6 @@ export async function checkSmsRateLimit(
         return { allowed: true };
     } catch (error) {
         logger.error('[SmsRateLimit] Unexpected error', error, { businessId });
-        return { allowed: true }; // Fail open
+        return { allowed: false, reason: 'Rate limit check failed — blocking SMS as precaution' };
     }
 }
