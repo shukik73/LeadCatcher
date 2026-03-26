@@ -6,6 +6,7 @@ import { checkBillingStatus } from '@/lib/billing-guard';
 import { claimWebhookEvent, markWebhookProcessed, markWebhookFailed, markWebhookFailedIfProcessing, setWebhookBusinessId, checkOptOut } from '@/lib/webhook-common';
 import { signCallbackParams } from '@/lib/callback-signature';
 import { checkSmsRateLimit } from '@/lib/sms-rate-limit';
+import { getWebhookBaseUrl } from '@/lib/webhook-url';
 import { logger } from '@/lib/logger';
 import twilio from 'twilio';
 
@@ -128,6 +129,26 @@ async function handleVoiceWebhook(callSid: string | null, callerRaw: string, cal
                 from: called,
                 body: message,
             });
+
+            // Log the auto-reply so dashboard shows it and rate limiter counts it
+            try {
+                // Get lead_id for this caller (may not exist yet if upsert below hasn't run)
+                const { data: lead } = await supabaseAdmin
+                    .from('leads')
+                    .select('id')
+                    .eq('business_id', business.id)
+                    .eq('caller_phone', caller)
+                    .single();
+                if (lead) {
+                    await supabaseAdmin.from('messages').insert({
+                        lead_id: lead.id,
+                        direction: 'outbound',
+                        body: message,
+                    });
+                }
+            } catch (logErr) {
+                logger.error(`[${TAG}] Failed to log auto-reply message`, logErr);
+            }
         } catch (error) {
             logger.error('Error sending immediate ack:', error);
         }
@@ -188,9 +209,9 @@ async function handleVoiceWebhook(callSid: string | null, callerRaw: string, cal
     const safeName = (business.name || 'our business').replace(/[<>&"']/g, '');
     response.say({ voice: 'alice' }, `Hello! You've reached ${safeName}. We are currently assisting other clients. Please leave your name and how we can help, and I will have a team member text you back immediately.`);
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+    const baseUrl = getWebhookBaseUrl();
     if (!baseUrl) {
-        logger.error(`[${TAG}] NEXT_PUBLIC_APP_URL missing; cannot build transcription callback URL`);
+        logger.error(`[${TAG}] Webhook base URL missing; cannot build transcription callback URL`);
         const errorResponse = new twilio.twiml.VoiceResponse();
         errorResponse.say({ voice: 'alice' }, 'We apologize, but we are experiencing technical difficulties. Please try again later.');
         errorResponse.hangup();

@@ -1,6 +1,9 @@
 import { supabaseAdmin } from '@/lib/supabase-server';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import { logger } from '@/lib/logger';
 import { scoreCall } from '@/lib/call-scoring';
+import { validateCsrfOrigin } from '@/lib/csrf';
 import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
@@ -9,7 +12,6 @@ const TAG = '[CallAnalyze]';
 
 const analyzeSchema = z.object({
     source_call_id: z.string().min(1).max(256),
-    business_id: z.string().uuid(),
     rd_lead_id: z.string().max(256).nullable().optional(),
     customer_name: z.string().max(256).nullable().optional(),
     customer_phone: z.string().max(20).nullable().optional(),
@@ -25,8 +27,37 @@ const analyzeSchema = z.object({
  *
  * Ingest a call, run AI scoring, and store the analysis.
  * Idempotent on source_call_id — safe to call multiple times.
+ * Requires authentication — business_id is derived server-side.
  */
 export async function POST(request: Request) {
+    if (!validateCsrfOrigin(request)) {
+        return new Response('Forbidden', { status: 403 });
+    }
+
+    const cookieStore = await cookies();
+    const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            cookies: {
+                getAll() { return cookieStore.getAll() },
+                setAll(cookiesToSet) { try { cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options)) } catch { } }
+            }
+        }
+    );
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return new Response('Unauthorized', { status: 401 });
+
+    // Derive business_id from authenticated user — never accept from client
+    const { data: business } = await supabaseAdmin
+        .from('businesses')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+    if (!business) return Response.json({ error: 'Business not found' }, { status: 404 });
+
     try {
         let rawBody: unknown;
         try {
@@ -66,7 +97,7 @@ export async function POST(request: Request) {
             const { count } = await supabaseAdmin
                 .from('call_analyses')
                 .select('id', { count: 'exact', head: true })
-                .eq('business_id', input.business_id)
+                .eq('business_id', business.id)
                 .eq('customer_phone', input.customer_phone);
             previousCallCount = count || 0;
         }
@@ -86,7 +117,7 @@ export async function POST(request: Request) {
         const { data: inserted, error: insertError } = await supabaseAdmin
             .from('call_analyses')
             .insert({
-                business_id: input.business_id,
+                business_id: business.id,
                 source_call_id: input.source_call_id,
                 rd_lead_id: input.rd_lead_id || null,
                 customer_name: input.customer_name || null,
