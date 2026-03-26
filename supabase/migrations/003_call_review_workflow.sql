@@ -59,6 +59,7 @@ CREATE INDEX IF NOT EXISTS idx_coaching_summaries_business
 -- -----------------------------------------------
 ALTER TABLE coaching_summaries ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own coaching summaries" ON coaching_summaries;
 CREATE POLICY "Users can view own coaching summaries"
     ON coaching_summaries FOR SELECT
     USING (business_id IN (

@@ -2,6 +2,7 @@
 -- Migration 002: Call Intelligence Layer v1
 -- Adds call_analyses + message_patterns tables for AI scoring,
 -- callback queue, and SMS learning loop.
+-- Fully idempotent — safe to re-run.
 -- =============================================================
 
 -- -----------------------------------------------
@@ -43,24 +44,24 @@ CREATE TABLE IF NOT EXISTS call_analyses (
 );
 
 -- Unique index for idempotency — same call never processed twice
-CREATE UNIQUE INDEX idx_call_analyses_source_call_id
+CREATE UNIQUE INDEX IF NOT EXISTS idx_call_analyses_source_call_id
     ON call_analyses (source_call_id);
 
 -- Fast lookups for callback queue (pending follow-ups, ordered by urgency + due_by)
-CREATE INDEX idx_call_analyses_followup_queue
+CREATE INDEX IF NOT EXISTS idx_call_analyses_followup_queue
     ON call_analyses (business_id, follow_up_needed, callback_status, urgency, due_by)
     WHERE follow_up_needed = true;
 
 -- Business lookup
-CREATE INDEX idx_call_analyses_business_id
+CREATE INDEX IF NOT EXISTS idx_call_analyses_business_id
     ON call_analyses (business_id);
 
 -- Phone lookup (for customer history)
-CREATE INDEX idx_call_analyses_customer_phone
+CREATE INDEX IF NOT EXISTS idx_call_analyses_customer_phone
     ON call_analyses (business_id, customer_phone);
 
 -- Date-based queries (daily reports)
-CREATE INDEX idx_call_analyses_created_at
+CREATE INDEX IF NOT EXISTS idx_call_analyses_created_at
     ON call_analyses (business_id, created_at);
 
 -- -----------------------------------------------
@@ -81,10 +82,10 @@ CREATE TABLE IF NOT EXISTS message_patterns (
     updated_at      timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_message_patterns_business_id
+CREATE INDEX IF NOT EXISTS idx_message_patterns_business_id
     ON message_patterns (business_id);
 
-CREATE INDEX idx_message_patterns_top
+CREATE INDEX IF NOT EXISTS idx_message_patterns_top
     ON message_patterns (business_id, conversion_rate DESC, times_used DESC);
 
 -- -----------------------------------------------
@@ -93,14 +94,15 @@ CREATE INDEX idx_message_patterns_top
 ALTER TABLE call_analyses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE message_patterns ENABLE ROW LEVEL SECURITY;
 
--- Users can read their own business's call analyses
+-- Drop-and-recreate policies to be idempotent
+DROP POLICY IF EXISTS "Users can view own call analyses" ON call_analyses;
 CREATE POLICY "Users can view own call analyses"
     ON call_analyses FOR SELECT
     USING (business_id IN (
         SELECT id FROM businesses WHERE user_id = auth.uid()
     ));
 
--- Users can update callback_status, owner, acted_on, booked_value, store_visit_at
+DROP POLICY IF EXISTS "Users can update own call analyses" ON call_analyses;
 CREATE POLICY "Users can update own call analyses"
     ON call_analyses FOR UPDATE
     USING (business_id IN (
@@ -110,6 +112,7 @@ CREATE POLICY "Users can update own call analyses"
 -- Service role handles inserts (from API routes)
 -- No INSERT policy for authenticated users — only server can create analyses
 
+DROP POLICY IF EXISTS "Users can view own message patterns" ON message_patterns;
 CREATE POLICY "Users can view own message patterns"
     ON message_patterns FOR SELECT
     USING (business_id IN (
@@ -127,11 +130,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS set_call_analyses_updated_at ON call_analyses;
 CREATE TRIGGER set_call_analyses_updated_at
     BEFORE UPDATE ON call_analyses
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS set_message_patterns_updated_at ON message_patterns;
 CREATE TRIGGER set_message_patterns_updated_at
     BEFORE UPDATE ON message_patterns
     FOR EACH ROW
