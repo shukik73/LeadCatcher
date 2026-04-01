@@ -129,26 +129,6 @@ async function handleVoiceWebhook(callSid: string | null, callerRaw: string, cal
                 from: called,
                 body: message,
             });
-
-            // Log the auto-reply so dashboard shows it and rate limiter counts it
-            try {
-                // Get lead_id for this caller (may not exist yet if upsert below hasn't run)
-                const { data: lead } = await supabaseAdmin
-                    .from('leads')
-                    .select('id')
-                    .eq('business_id', business.id)
-                    .eq('caller_phone', caller)
-                    .single();
-                if (lead) {
-                    await supabaseAdmin.from('messages').insert({
-                        lead_id: lead.id,
-                        direction: 'outbound',
-                        body: message,
-                    });
-                }
-            } catch (logErr) {
-                logger.error(`[${TAG}] Failed to log auto-reply message`, logErr);
-            }
         } catch (error) {
             logger.error('Error sending immediate ack:', error);
         }
@@ -161,15 +141,53 @@ async function handleVoiceWebhook(callSid: string | null, callerRaw: string, cal
     }
 
     // 7. Log Lead (Scoped to Business) — upsert to avoid race condition with concurrent calls
-    const { error: leadError } = await supabaseAdmin.from('leads').upsert({
+    const { data: upsertedLead } = await supabaseAdmin.from('leads').upsert({
         caller_phone: caller,
         status: 'New',
         business_id: business.id,
     }, {
         onConflict: 'business_id,caller_phone',
         ignoreDuplicates: true,
-    });
-    if (leadError) logger.error('Error upserting lead:', leadError);
+    }).select('id, follow_up_count').single();
+
+    // If upsert returned nothing (ignoreDuplicates), fetch existing
+    let leadId = upsertedLead?.id;
+    let followUpCount = upsertedLead?.follow_up_count ?? 0;
+    if (!leadId) {
+        const { data: existing } = await supabaseAdmin.from('leads')
+            .select('id, follow_up_count')
+            .eq('business_id', business.id)
+            .eq('caller_phone', caller)
+            .single();
+        leadId = existing?.id;
+        followUpCount = existing?.follow_up_count ?? 0;
+    }
+
+    // 7b. Schedule follow-up SMS in 15 minutes (only if first missed call, not already followed up)
+    if (leadId && followUpCount === 0) {
+        const followUpDue = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+        await supabaseAdmin.from('leads')
+            .update({ follow_up_due_at: followUpDue })
+            .eq('id', leadId);
+        logger.info(`[${TAG}] Follow-up scheduled`, { leadId, followUpDue });
+    }
+
+    // Log the auto-reply message (if lead existed before SMS was sent above)
+    if (leadId && billing.allowed && !optOutResult.optedOut && !optOutResult.error && rateLimit.allowed) {
+        try {
+            const template = isOpen
+                ? (business.sms_template || "Hi! We missed your call — we were helping another customer. How can we help you? Would you like us to give you a call back in a few?")
+                : (business.sms_template_closed || "Hi! Our store is currently closed. How can we help you? Would you like us to schedule an appointment for when we open?");
+            const message = template.replace(/\{\{business_name\}\}/g, business.name || 'our business');
+            await supabaseAdmin.from('messages').insert({
+                lead_id: leadId,
+                direction: 'outbound',
+                body: message,
+            });
+        } catch (logErr) {
+            logger.error(`[${TAG}] Failed to log auto-reply message`, logErr);
+        }
+    }
 
     // 8. TwiML: Greeting + Record
     const response = new twilio.twiml.VoiceResponse();
