@@ -178,12 +178,17 @@ async function handleSmsWebhook(messageSid: string | null, fromRaw: string, toRa
     }
 
     if (leadId) {
-        // 3. Log Message
+        // 3. Log Message + cancel any pending follow-up (customer replied!)
         await supabaseAdmin.from('messages').insert({
             lead_id: leadId,
             direction: 'inbound',
             body: body
         });
+
+        // Cancel follow-up — customer engaged
+        await supabaseAdmin.from('leads')
+            .update({ follow_up_due_at: null, status: 'Contacted' })
+            .eq('id', leadId);
 
         // 4. AI Analysis (Async-ish)
         try {
