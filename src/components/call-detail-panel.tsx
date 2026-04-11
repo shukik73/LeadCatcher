@@ -9,7 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { UrgencyBadge, SentimentBadge, CategoryBadge, CallbackStatusBadge } from '@/components/urgency-badge';
 import { AudioPlayer } from '@/components/audio-player';
 import { RepairDeskTicketCard } from '@/components/repairdesk-ticket-card';
-import { Phone, User, Clock, MessageSquare, CheckCircle, XCircle, PhoneCall, UserPlus, Loader2 } from 'lucide-react';
+import { Phone, User, Clock, MessageSquare, CheckCircle, XCircle, PhoneCall, UserPlus, Loader2, ClipboardCheck } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
 export interface CallAnalysis {
@@ -50,6 +51,7 @@ interface CallDetailPanelProps {
 }
 
 export function CallDetailPanel({ call, open, onClose, onUpdated }: CallDetailPanelProps) {
+    const router = useRouter();
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [noteText, setNoteText] = useState('');
     const [ownerInput, setOwnerInput] = useState('');
@@ -225,6 +227,23 @@ export function CallDetailPanel({ call, open, onClose, onUpdated }: CallDetailPa
                             <CardTitle className="text-sm">Actions</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
+                            {/* Audit this Call */}
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="w-full justify-start"
+                                onClick={() => {
+                                    const params = new URLSearchParams();
+                                    params.set('call_id', call.id);
+                                    if (call.owner) params.set('employee', call.owner);
+                                    router.push(`/dashboard/audit?${params.toString()}`);
+                                    onClose();
+                                }}
+                            >
+                                <ClipboardCheck className="h-3 w-3 mr-2" />
+                                Audit this Call
+                            </Button>
+
                             {/* Log Contact */}
                             <Button
                                 size="sm"
