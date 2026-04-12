@@ -90,7 +90,14 @@ export default function ActionsPage() {
             const data = await res.json();
 
             if (data.success) {
-                setItems(data.items);
+                // Sort client-side: high > medium > low priority
+                const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+                const sorted = [...(data.items || [])].sort((a: ActionItem, b: ActionItem) => {
+                    const pa = priorityOrder[a.priority] ?? 1;
+                    const pb = priorityOrder[b.priority] ?? 1;
+                    return pa - pb;
+                });
+                setItems(sorted);
                 setPagination(data.pagination);
             } else {
                 toast.error(data.error || 'Failed to load actions');

@@ -72,7 +72,7 @@ export async function GET(request: Request) {
 
         const offset = (page - 1) * limit;
         const { data, error, count } = await query
-            .order('priority', { ascending: true }) // high first
+            .order('status', { ascending: true })  // pending/in_progress before completed
             .order('created_at', { ascending: false })
             .range(offset, offset + limit - 1);
 
