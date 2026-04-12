@@ -85,38 +85,41 @@ export function DashboardNav() {
             )}
 
             {/* Desktop sidebar */}
-            <div className="hidden md:flex w-16 bg-white border-r border-slate-200 flex-col items-center py-4 gap-1 shrink-0">
-                <div className="bg-blue-600 text-white p-1.5 rounded mb-4">
-                    <MessageSquare size={16} fill="currentColor" />
+            <div className="hidden md:flex w-48 bg-white border-r border-slate-200 flex-col py-4 shrink-0">
+                <div className="flex items-center gap-2 px-4 mb-6">
+                    <div className="bg-blue-600 text-white p-1.5 rounded">
+                        <MessageSquare size={16} fill="currentColor" />
+                    </div>
+                    <span className="font-bold text-sm text-slate-800">LeadCatcher</span>
                 </div>
 
-                {NAV_ITEMS.map((item) => (
+                <nav className="flex-1 flex flex-col gap-0.5 px-2">
+                    {NAV_ITEMS.map((item) => (
+                        <button
+                            key={item.href}
+                            onClick={() => router.push(item.href)}
+                            className={cn(
+                                "w-full h-9 rounded-lg flex items-center gap-2.5 px-3 text-sm font-medium transition-colors",
+                                isActive(item.href)
+                                    ? "bg-blue-50 text-blue-600"
+                                    : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+                            )}
+                        >
+                            <item.icon className="h-4 w-4 shrink-0" />
+                            {item.label}
+                        </button>
+                    ))}
+                </nav>
+
+                <div className="px-2 mt-2">
                     <button
-                        key={item.href}
-                        onClick={() => router.push(item.href)}
-                        title={item.label}
-                        aria-label={item.label}
-                        className={cn(
-                            "w-10 h-10 rounded-lg flex items-center justify-center transition-colors",
-                            isActive(item.href)
-                                ? "bg-blue-50 text-blue-600"
-                                : "text-slate-400 hover:text-slate-700 hover:bg-slate-50"
-                        )}
+                        onClick={handleSignOut}
+                        className="w-full h-9 rounded-lg flex items-center gap-2.5 px-3 text-sm font-medium text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                     >
-                        <item.icon className="h-5 w-5" />
+                        <LogOut className="h-4 w-4 shrink-0" />
+                        Sign Out
                     </button>
-                ))}
-
-                <div className="flex-1" />
-
-                <button
-                    onClick={handleSignOut}
-                    title="Sign Out"
-                    aria-label="Sign Out"
-                    className="w-10 h-10 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                >
-                    <LogOut className="h-5 w-5" />
-                </button>
+                </div>
             </div>
         </>
     );

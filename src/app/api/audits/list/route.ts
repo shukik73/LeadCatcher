@@ -52,6 +52,15 @@ export async function GET(request: Request) {
             .range(offset, offset + limit - 1);
 
         if (error) {
+            if (error.code === '42P01' || error.message?.includes('does not exist')) {
+                logger.warn(`${TAG} call_audits table not found - migration may not have been run`);
+                return Response.json({
+                    success: true,
+                    audits: [],
+                    pagination: { page, limit, total: 0, totalPages: 0 },
+                    migration_needed: true,
+                });
+            }
             logger.error(`${TAG} Query failed`, error);
             return Response.json({ error: 'Failed to fetch audits' }, { status: 500 });
         }

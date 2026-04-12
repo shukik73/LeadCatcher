@@ -72,11 +72,21 @@ export async function GET(request: Request) {
 
         const offset = (page - 1) * limit;
         const { data, error, count } = await query
-            .order('priority', { ascending: true }) // high first
+            .order('status', { ascending: true })  // pending/in_progress before completed
             .order('created_at', { ascending: false })
             .range(offset, offset + limit - 1);
 
         if (error) {
+            // Handle missing table gracefully (migration not yet run)
+            if (error.code === '42P01' || error.message?.includes('does not exist')) {
+                logger.warn(`${TAG} action_items table not found - migration may not have been run`);
+                return Response.json({
+                    success: true,
+                    items: [],
+                    pagination: { page, limit, total: 0, totalPages: 0 },
+                    migration_needed: true,
+                });
+            }
             logger.error(`${TAG} Query failed`, error);
             return Response.json({ error: 'Failed to fetch action items' }, { status: 500 });
         }
