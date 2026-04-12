@@ -70,9 +70,9 @@ export default function ActionsPage() {
     const [loading, setLoading] = useState(true);
     const [pagination, setPagination] = useState({ page: 1, limit: 25, total: 0, totalPages: 0 });
     const [statusFilter, setStatusFilter] = useState('pending');
-    const [priorityFilter, setPriorityFilter] = useState('');
-    const [typeFilter, setTypeFilter] = useState('');
-    const [roleFilter, setRoleFilter] = useState('');
+    const [priorityFilter, setPriorityFilter] = useState('all');
+    const [typeFilter, setTypeFilter] = useState('all');
+    const [roleFilter, setRoleFilter] = useState('all');
     const [updatingId, setUpdatingId] = useState<string | null>(null);
 
     const fetchItems = useCallback(async (page = 1) => {
@@ -81,10 +81,10 @@ export default function ActionsPage() {
             const params = new URLSearchParams();
             params.set('page', page.toString());
             params.set('limit', '25');
-            if (statusFilter) params.set('status', statusFilter);
-            if (priorityFilter) params.set('priority', priorityFilter);
-            if (typeFilter) params.set('action_type', typeFilter);
-            if (roleFilter) params.set('assigned_role', roleFilter);
+            if (statusFilter && statusFilter !== 'all') params.set('status', statusFilter);
+            if (priorityFilter && priorityFilter !== 'all') params.set('priority', priorityFilter);
+            if (typeFilter && typeFilter !== 'all') params.set('action_type', typeFilter);
+            if (roleFilter && roleFilter !== 'all') params.set('assigned_role', roleFilter);
 
             const res = await fetch(`/api/action-items/list?${params.toString()}`);
             const data = await res.json();
@@ -179,7 +179,7 @@ export default function ActionsPage() {
                         <SelectValue placeholder="Priority" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="">All Priorities</SelectItem>
+                        <SelectItem value="all">All Priorities</SelectItem>
                         <SelectItem value="high">High</SelectItem>
                         <SelectItem value="medium">Medium</SelectItem>
                         <SelectItem value="low">Low</SelectItem>
@@ -191,7 +191,7 @@ export default function ActionsPage() {
                         <SelectValue placeholder="Type" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="">All Types</SelectItem>
+                        <SelectItem value="all">All Types</SelectItem>
                         <SelectItem value="callback">Callback</SelectItem>
                         <SelectItem value="follow_up">Follow Up</SelectItem>
                         <SelectItem value="repair_update">Repair Update</SelectItem>
@@ -205,7 +205,7 @@ export default function ActionsPage() {
                         <SelectValue placeholder="Assigned To" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="">All Roles</SelectItem>
+                        <SelectItem value="all">All Roles</SelectItem>
                         <SelectItem value="owner">Owner</SelectItem>
                         <SelectItem value="tech">Tech</SelectItem>
                         <SelectItem value="front_desk">Front Desk</SelectItem>
