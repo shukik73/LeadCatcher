@@ -59,6 +59,7 @@ export interface RepairDeskCallLog {
     direction: 'inbound' | 'outbound';
     status: 'missed' | 'answered' | 'voicemail';
     duration: number;
+    recording_url: string | null;
     notes: string;
     created_at: string;
     updated_at: string;
@@ -202,6 +203,18 @@ export class RepairDeskClient {
      */
     async getOutboundCallsTo(phone: string, since?: string): Promise<RepairDeskListResponse<RepairDeskCallLog>> {
         let endpoint = `/call-logs?direction=outbound&phone=${encodeURIComponent(phone)}`;
+        if (since) {
+            endpoint += `&since=${encodeURIComponent(since)}`;
+        }
+        return this.request<RepairDeskListResponse<RepairDeskCallLog>>(endpoint);
+    }
+
+    /**
+     * Get ALL call logs (answered + missed + voicemail) since a given timestamp.
+     * Used by the AI auto-audit cron to review all calls.
+     */
+    async getAllCalls(page = 1, since?: string): Promise<RepairDeskListResponse<RepairDeskCallLog>> {
+        let endpoint = `/call-logs?page=${page}`;
         if (since) {
             endpoint += `&since=${encodeURIComponent(since)}`;
         }
