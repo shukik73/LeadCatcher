@@ -25,6 +25,9 @@ const settingsSchema = z.object({
         z.null(),
     ]).optional(),
     carrier: z.string().min(1).max(50).nullable().optional(),
+    auto_reply_enabled: z.boolean().optional(),
+    daily_digest_enabled: z.boolean().optional(),
+    status_updates_enabled: z.boolean().optional(),
 }).strict();
 
 /**

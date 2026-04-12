@@ -61,7 +61,7 @@ async function handleSmsWebhook(messageSid: string | null, fromRaw: string, toRa
     // 2. ISOLATION: Find lead based on caller AND business number
     const { data: business } = await supabaseAdmin
         .from('businesses')
-        .select('id, owner_phone, name')
+        .select('id, owner_phone, name, auto_reply_enabled')
         .eq('forwarding_number', to)
         .single();
 
@@ -209,6 +209,41 @@ async function handleSmsWebhook(messageSid: string | null, fromRaw: string, toRa
             logger.error('AI Analysis failed', error);
         }
 
+        // 4b. AI AUTO-REPLY (if enabled)
+        if (business.auto_reply_enabled && billing.allowed) {
+            try {
+                const { generateAutoReply } = await import('@/lib/ai-auto-reply');
+                const autoReply = await generateAutoReply(body, business.name || 'our store');
+
+                if (autoReply && autoReply.should_reply && autoReply.reply) {
+                    const replyRateLimit = await checkSmsRateLimit(business.id, from);
+                    if (replyRateLimit.allowed) {
+                        const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+                        await client.messages.create({
+                            to: from,
+                            from: to,
+                            body: autoReply.reply,
+                        });
+
+                        // Log the auto-reply
+                        await supabaseAdmin.from('messages').insert({
+                            lead_id: leadId,
+                            direction: 'outbound',
+                            body: autoReply.reply,
+                            is_ai_generated: true,
+                        });
+
+                        logger.info(`[${TAG}] AI auto-reply sent`, {
+                            from, businessId: business.id,
+                            confidence: autoReply.confidence,
+                        });
+                    }
+                }
+            } catch (error) {
+                logger.error(`[${TAG}] AI auto-reply failed (non-blocking)`, error);
+            }
+        }
+
         // 5. Notify Owner (only if billing is active and rate limit OK)
         const ownerRateLimit = await checkSmsRateLimit(business.id, business.owner_phone);
         if (business.owner_phone && billing.allowed && ownerRateLimit.allowed) {
@@ -217,7 +252,7 @@ async function handleSmsWebhook(messageSid: string | null, fromRaw: string, toRa
                 await client.messages.create({
                     to: business.owner_phone,
                     from: to,
-                    body: `📩 Reply from ${from}: "${body}"`,
+                    body: `New message from ${from}: "${body}"`,
                 });
             } catch (err) {
                 logger.error('Error notifying owner of SMS:', err);
