@@ -77,6 +77,12 @@ export default function SettingsPage() {
     const [rdTestError, setRdTestError] = useState('');
     const [syncing, setSyncing] = useState(false);
 
+    // Feature toggles
+    const [autoReplyEnabled, setAutoReplyEnabled] = useState(false);
+    const [dailyDigestEnabled, setDailyDigestEnabled] = useState(true);
+    const [statusUpdatesEnabled, setStatusUpdatesEnabled] = useState(false);
+    const [savingFeatures, setSavingFeatures] = useState(false);
+
     // Per-section saving states
     const [savingTemplates, setSavingTemplates] = useState(false);
     const [savingHours, setSavingHours] = useState(false);
@@ -94,7 +100,7 @@ export default function SettingsPage() {
 
         const { data: business } = await supabase
             .from('businesses')
-            .select('id, sms_template, sms_template_closed, timezone, business_hours, repairdesk_store_url, business_phone, owner_phone, carrier, forwarding_number')
+            .select('id, sms_template, sms_template_closed, timezone, business_hours, repairdesk_store_url, business_phone, owner_phone, carrier, forwarding_number, auto_reply_enabled, daily_digest_enabled, status_updates_enabled')
             .eq('user_id', user.id)
             .single();
 
@@ -109,6 +115,9 @@ export default function SettingsPage() {
             setSmsTemplateClosed(business.sms_template_closed || MORE_CLOSED_TEMPLATES[0]);
             setTimezone(business.timezone || 'America/New_York');
             setRepairDeskSubdomain(business.repairdesk_store_url || '');
+            setAutoReplyEnabled(business.auto_reply_enabled ?? false);
+            setDailyDigestEnabled(business.daily_digest_enabled ?? true);
+            setStatusUpdatesEnabled(business.status_updates_enabled ?? false);
 
             // Check if API key exists without fetching the raw value
             const { count } = await supabase
@@ -724,6 +733,79 @@ export default function SettingsPage() {
                     </AccordionContent>
                 </AccordionItem>
             </Accordion>
+
+            {/* ===== AI FEATURES ===== */}
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle className="flex items-center gap-2">
+                                <Settings2 className="h-5 w-5" />
+                                AI Features
+                            </CardTitle>
+                            <CardDescription>Configure automated AI-powered features.</CardDescription>
+                        </div>
+                        <Button
+                            onClick={async () => {
+                                setSavingFeatures(true);
+                                try {
+                                    const res = await fetch('/api/settings', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            auto_reply_enabled: autoReplyEnabled,
+                                            daily_digest_enabled: dailyDigestEnabled,
+                                            status_updates_enabled: statusUpdatesEnabled,
+                                        }),
+                                    });
+                                    const data = await res.json();
+                                    if (data.success) toast.success('Features saved');
+                                    else toast.error(data.error || 'Failed to save');
+                                } catch { toast.error('Failed to save'); }
+                                finally { setSavingFeatures(false); }
+                            }}
+                            disabled={savingFeatures}
+                            size="sm"
+                            className="gap-2"
+                        >
+                            {savingFeatures ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                            Save
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between py-2">
+                        <div>
+                            <p className="text-sm font-medium">AI Auto-Reply</p>
+                            <p className="text-xs text-slate-500">Automatically reply to customer SMS with AI-generated responses</p>
+                        </div>
+                        <Switch
+                            checked={autoReplyEnabled}
+                            onCheckedChange={setAutoReplyEnabled}
+                        />
+                    </div>
+                    <div className="flex items-center justify-between py-2">
+                        <div>
+                            <p className="text-sm font-medium">Daily Digest</p>
+                            <p className="text-xs text-slate-500">Receive a morning briefing SMS with yesterday&apos;s summary at 7 AM</p>
+                        </div>
+                        <Switch
+                            checked={dailyDigestEnabled}
+                            onCheckedChange={setDailyDigestEnabled}
+                        />
+                    </div>
+                    <div className="flex items-center justify-between py-2">
+                        <div>
+                            <p className="text-sm font-medium">Repair Status Updates</p>
+                            <p className="text-xs text-slate-500">Auto-SMS customers when their repair ticket status changes in RepairDesk</p>
+                        </div>
+                        <Switch
+                            checked={statusUpdatesEnabled}
+                            onCheckedChange={setStatusUpdatesEnabled}
+                        />
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     );
 }
