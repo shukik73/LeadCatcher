@@ -62,7 +62,7 @@ export async function GET(request: Request) {
                     hour = now.getUTCHours();
                 }
 
-                if (hour !== 18) {
+                if (hour !== 19) {
                     results.push({ businessId: biz.id, skipped: true });
                     continue;
                 }
