@@ -10,7 +10,7 @@ import { timingSafeEqual } from 'crypto';
 
 export const dynamic = 'force-dynamic';
 
-const GRACE_PERIOD_MINUTES = 3;
+const GRACE_PERIOD_MINUTES = 15;
 
 function verifyCronSecret(header: string | null): boolean {
     const secret = process.env.CRON_SECRET;
@@ -131,7 +131,8 @@ async function pollBusiness(business: BusinessRow) {
 
                 const callerName = call.customer_name || null;
 
-                // Create lead with grace period — skip if already imported
+                // Upsert by caller phone so repeat callers with new RD call IDs
+                // update the existing lead instead of being dropped.
                 const { error } = await supabaseAdmin
                     .from('leads')
                     .upsert(
@@ -145,8 +146,7 @@ async function pollBusiness(business: BusinessRow) {
                             sms_hold_until: holdUntil,
                         },
                         {
-                            onConflict: 'business_id,source,external_id',
-                            ignoreDuplicates: true,
+                            onConflict: 'business_id,caller_phone',
                         }
                     );
 
