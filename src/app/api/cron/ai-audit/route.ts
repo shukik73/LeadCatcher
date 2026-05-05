@@ -148,6 +148,12 @@ async function processBusinessCalls(business: BusinessRow) {
     let actionItemsCreated = 0;
     let rdSynced = 0;
     let allCallsFetched = true;
+    // True only if we drained every page of the RepairDesk feed without hitting
+    // either the per-run call cap or the page cap. Used to decide whether to
+    // advance the watermark.
+    let backlogDrained = false;
+    let hitRunCap = false;
+    let hitPageCap = false;
 
     try {
         let page = 1;
@@ -157,7 +163,10 @@ async function processBusinessCalls(business: BusinessRow) {
         while (page <= MAX_PAGES && totalProcessedThisRun < MAX_CALLS_PER_RUN) {
             const callLogs = await client.getAllCalls(page, since);
 
-            if (callLogs.data.length === 0) break;
+            if (callLogs.data.length === 0) {
+                backlogDrained = true;
+                break;
+            }
 
             for (const call of callLogs.data) {
                 if (totalProcessedThisRun >= MAX_CALLS_PER_RUN) break;
@@ -327,8 +336,18 @@ async function processBusinessCalls(business: BusinessRow) {
             }
 
             const meta = callLogs.meta;
-            if (!meta || page >= meta.last_page || callLogs.data.length === 0) break;
+            if (!meta || page >= meta.last_page || callLogs.data.length === 0) {
+                backlogDrained = true;
+                break;
+            }
             page++;
+        }
+
+        // If the loop exited because we ran out of budget (not because the feed
+        // was exhausted), record that so we leave the watermark alone.
+        if (!backlogDrained) {
+            if (totalProcessedThisRun >= MAX_CALLS_PER_RUN) hitRunCap = true;
+            if (page > MAX_PAGES) hitPageCap = true;
         }
     } catch (error) {
         allCallsFetched = false;
@@ -337,12 +356,22 @@ async function processBusinessCalls(business: BusinessRow) {
         });
     }
 
-    // Advance watermark only if all calls were fetched successfully
-    if (allCallsFetched) {
+    // Advance watermark only if (a) every page was fetched without errors, AND
+    // (b) we actually drained the backlog this run. If MAX_CALLS_PER_RUN or
+    // MAX_PAGES forced an early exit, leave the watermark so the next run picks
+    // up where we left off.
+    const shouldAdvanceWatermark = allCallsFetched && backlogDrained && !hitRunCap && !hitPageCap;
+    if (shouldAdvanceWatermark) {
         await supabaseAdmin
             .from('businesses')
             .update({ ai_audit_last_poll_at: new Date().toISOString() })
             .eq('id', business.id);
+    } else if (allCallsFetched && (hitRunCap || hitPageCap)) {
+        logger.warn(`${TAG} Watermark not advanced - backlog still pending`, {
+            businessId: business.id,
+            hitRunCap: hitRunCap.toString(),
+            hitPageCap: hitPageCap.toString(),
+        });
     }
 
     logger.info(`${TAG} Business processed`, {

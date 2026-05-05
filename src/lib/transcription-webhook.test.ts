@@ -25,6 +25,10 @@ vi.mock('@/lib/billing-guard', () => ({
     checkBillingStatus: vi.fn().mockResolvedValue({ allowed: true }),
 }));
 
+vi.mock('@/lib/sms-rate-limit', () => ({
+    checkSmsRateLimit: vi.fn().mockResolvedValue({ allowed: true }),
+}));
+
 vi.mock('@/lib/callback-signature', () => ({
     verifyCallbackSignature: vi.fn().mockReturnValue(true),
 }));
