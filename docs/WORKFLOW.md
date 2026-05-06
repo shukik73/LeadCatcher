@@ -232,7 +232,7 @@ flowchart TD
 
 Missed calls that never hit Twilio (e.g. shop's main line uses RepairDesk's
 own phone). The poll cron pulls them and treats them like missed calls. The
-3-minute grace window lets the owner call back before LeadCatcher fires the
+15-minute grace window lets the owner call back before LeadCatcher fires the
 auto-reply.
 
 ```mermaid
@@ -249,7 +249,7 @@ flowchart TD
     G -->|No| G1[Skip]
     G -->|Yes| H[normalizePhoneNumber]
     H --> I["UPSERT lead ON CONFLICT business_id,caller_phone<br/>(Finding 2 fix - repeat callers update, not skip)"]
-    I --> J[holdUntil = now + 3min, status=New]
+    I --> J[holdUntil = now + 15min, status=New]
 
     F --> K[Phase 2: Atomic claim<br/>UPDATE leads SET status=Processing<br/>WHERE source=repairdesk AND status=New AND sms_hold_until < now<br/>RETURNING *]
 
