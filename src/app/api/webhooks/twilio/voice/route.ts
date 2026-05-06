@@ -6,6 +6,7 @@ import { checkBillingStatus } from '@/lib/billing-guard';
 import { claimWebhookEvent, markWebhookProcessed, markWebhookFailed, markWebhookFailedIfProcessing, setWebhookBusinessId, checkOptOut } from '@/lib/webhook-common';
 import { signCallbackParams } from '@/lib/callback-signature';
 import { checkSmsRateLimit } from '@/lib/sms-rate-limit';
+import { appendBookingLink } from '@/lib/sms-template';
 import { getWebhookBaseUrl } from '@/lib/webhook-url';
 import { logger } from '@/lib/logger';
 import twilio from 'twilio';
@@ -64,7 +65,7 @@ async function handleVoiceWebhook(callSid: string | null, callerRaw: string, cal
     // 2. ISOLATION: Look up business
     const { data: business, error: bizError } = await supabaseAdmin
         .from('businesses')
-        .select('id, owner_phone, name, business_hours, timezone, sms_template, sms_template_closed, verification_token, verification_call_sid')
+        .select('id, owner_phone, name, business_hours, timezone, sms_template, sms_template_closed, booking_url, verification_token, verification_call_sid')
         .eq('forwarding_number', called)
         .single();
 
@@ -114,23 +115,31 @@ async function handleVoiceWebhook(callSid: string | null, callerRaw: string, cal
     const rateLimit = await checkSmsRateLimit(business.id, caller);
 
     // 6. PREPARE MESSAGE (only if billing active, not opted out, rate limit OK, AND lookup succeeded)
+    // Track whether Twilio actually accepted the outbound auto-reply. We only log
+    // the outbound message and schedule the follow-up after a successful send so a
+    // failed Twilio call cannot show up as a "sent" message in history.
+    let autoReplyBody: string | null = null;
+    let autoReplySent = false;
     if (billing.allowed && !optOutResult.optedOut && !optOutResult.error && rateLimit.allowed) {
+        const defaultOpen = "Hi! We missed your call — we were helping another customer. How can we help you? Would you like us to give you a call back in a few?";
+        const defaultClosed = "Hi! Our store is currently closed. How can we help you? Would you like us to schedule an appointment for when we open?";
+
+        const template = isOpen
+            ? (business.sms_template || defaultOpen)
+            : (business.sms_template_closed || defaultClosed);
+        const baseMessage = template.replace(/\{\{business_name\}\}/g, business.name || 'our business');
+        autoReplyBody = appendBookingLink(baseMessage, business.booking_url);
+
         try {
-            const defaultOpen = "Hi! We missed your call — we were helping another customer. How can we help you? Would you like us to give you a call back in a few?";
-            const defaultClosed = "Hi! Our store is currently closed. How can we help you? Would you like us to schedule an appointment for when we open?";
-
-            const template = isOpen
-                ? (business.sms_template || defaultOpen)
-                : (business.sms_template_closed || defaultClosed);
-            const message = template.replace(/\{\{business_name\}\}/g, business.name || 'our business');
-
             await client.messages.create({
                 to: caller,
                 from: called,
-                body: message,
+                body: autoReplyBody,
             });
+            autoReplySent = true;
         } catch (error) {
-            logger.error('Error sending immediate ack:', error);
+            logger.error(`[${TAG}] Error sending immediate ack`, error, { businessId: business.id });
+            autoReplyBody = null;
         }
     } else if (!billing.allowed) {
         logger.warn(`[${TAG}] Skipping SMS - billing inactive`, { businessId: business.id });
@@ -163,8 +172,9 @@ async function handleVoiceWebhook(callSid: string | null, callerRaw: string, cal
         followUpCount = existing?.follow_up_count ?? 0;
     }
 
-    // 7b. Schedule follow-up SMS in 15 minutes (only if first missed call, not already followed up)
-    if (leadId && followUpCount === 0) {
+    // 7b. Schedule follow-up SMS in 15 minutes — only if the auto-reply was actually
+    // delivered. If Twilio rejected the send, don't queue a follow-up either.
+    if (leadId && followUpCount === 0 && autoReplySent) {
         const followUpDue = new Date(Date.now() + 15 * 60 * 1000).toISOString();
         await supabaseAdmin.from('leads')
             .update({ follow_up_due_at: followUpDue })
@@ -172,17 +182,13 @@ async function handleVoiceWebhook(callSid: string | null, callerRaw: string, cal
         logger.info(`[${TAG}] Follow-up scheduled`, { leadId, followUpDue });
     }
 
-    // Log the auto-reply message (if lead existed before SMS was sent above)
-    if (leadId && billing.allowed && !optOutResult.optedOut && !optOutResult.error && rateLimit.allowed) {
+    // Log the auto-reply message ONLY if Twilio accepted it.
+    if (leadId && autoReplySent && autoReplyBody) {
         try {
-            const template = isOpen
-                ? (business.sms_template || "Hi! We missed your call — we were helping another customer. How can we help you? Would you like us to give you a call back in a few?")
-                : (business.sms_template_closed || "Hi! Our store is currently closed. How can we help you? Would you like us to schedule an appointment for when we open?");
-            const message = template.replace(/\{\{business_name\}\}/g, business.name || 'our business');
             await supabaseAdmin.from('messages').insert({
                 lead_id: leadId,
                 direction: 'outbound',
-                body: message,
+                body: autoReplyBody,
             });
         } catch (logErr) {
             logger.error(`[${TAG}] Failed to log auto-reply message`, logErr);

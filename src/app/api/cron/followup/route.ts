@@ -30,18 +30,21 @@ export async function GET(request: Request) {
         return new Response('Unauthorized', { status: 401 });
     }
 
-    // Find leads with overdue follow-ups that haven't been followed up yet
+    // Atomically claim due follow-ups by transitioning status New -> Processing
+    // and clearing follow_up_due_at in a single UPDATE ... RETURNING. Concurrent
+    // cron invocations cannot claim the same row twice — the second one's UPDATE
+    // matches zero rows because status is no longer 'New'.
     const now = new Date().toISOString();
     const { data: dueLeads, error } = await supabaseAdmin
         .from('leads')
-        .select('id, caller_phone, business_id, follow_up_count')
+        .update({ status: 'Processing', follow_up_due_at: null })
         .eq('status', 'New')
         .lte('follow_up_due_at', now)
         .lt('follow_up_count', MAX_FOLLOW_UPS)
-        .limit(50);
+        .select('id, caller_phone, business_id, follow_up_count');
 
     if (error) {
-        logger.error(`${TAG} Failed to fetch due leads`, error);
+        logger.error(`${TAG} Failed to claim due leads`, error);
         return Response.json({ error: 'DB error' }, { status: 500 });
     }
 
@@ -49,11 +52,20 @@ export async function GET(request: Request) {
         return Response.json({ processed: 0 });
     }
 
-    logger.info(`${TAG} Processing ${dueLeads.length} follow-ups`);
+    logger.info(`${TAG} Claimed ${dueLeads.length} follow-ups`);
 
     const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
     let sent = 0;
     let skipped = 0;
+
+    // Helper: revert claim by setting status back to New so other flows are not blocked.
+    // follow_up_due_at was cleared during the atomic claim, so the row will not be
+    // re-claimed on the next cron run unless something else schedules a new follow-up.
+    const releaseLead = async (leadId: string) => {
+        await supabaseAdmin.from('leads')
+            .update({ status: 'New' })
+            .eq('id', leadId);
+    };
 
     for (const lead of dueLeads) {
         try {
@@ -65,6 +77,7 @@ export async function GET(request: Request) {
                 .single();
 
             if (!business?.forwarding_number) {
+                await releaseLead(lead.id);
                 skipped++;
                 continue;
             }
@@ -73,10 +86,7 @@ export async function GET(request: Request) {
             const billing = await checkBillingStatus(business.id);
             if (!billing.allowed) {
                 logger.info(`${TAG} Skipping follow-up - billing inactive`, { leadId: lead.id });
-                // Clear follow-up so we don't keep retrying
-                await supabaseAdmin.from('leads')
-                    .update({ follow_up_due_at: null })
-                    .eq('id', lead.id);
+                await releaseLead(lead.id);
                 skipped++;
                 continue;
             }
@@ -84,9 +94,7 @@ export async function GET(request: Request) {
             // Check opt-out
             const optOut = await checkOptOut(business.id, lead.caller_phone, TAG);
             if (optOut.optedOut || optOut.error) {
-                await supabaseAdmin.from('leads')
-                    .update({ follow_up_due_at: null })
-                    .eq('id', lead.id);
+                await releaseLead(lead.id);
                 skipped++;
                 continue;
             }
@@ -94,6 +102,7 @@ export async function GET(request: Request) {
             // Check rate limit
             const rateLimit = await checkSmsRateLimit(business.id, lead.caller_phone);
             if (!rateLimit.allowed) {
+                await releaseLead(lead.id);
                 skipped++;
                 continue;
             }
@@ -116,10 +125,10 @@ export async function GET(request: Request) {
                 is_ai_generated: true,
             });
 
-            // Mark follow-up as sent, clear the due date
+            // Mark follow-up as sent, restore status to Contacted
             await supabaseAdmin.from('leads')
                 .update({
-                    follow_up_due_at: null,
+                    status: 'Contacted',
                     follow_up_count: (lead.follow_up_count || 0) + 1,
                 })
                 .eq('id', lead.id);
@@ -129,10 +138,8 @@ export async function GET(request: Request) {
 
         } catch (err) {
             logger.error(`${TAG} Failed to send follow-up`, err, { leadId: lead.id });
-            // Clear follow-up to prevent infinite retries
-            await supabaseAdmin.from('leads')
-                .update({ follow_up_due_at: null })
-                .eq('id', lead.id);
+            // Release the claim so the lead is not stuck in Processing forever
+            await releaseLead(lead.id);
             skipped++;
         }
     }

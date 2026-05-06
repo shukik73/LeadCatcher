@@ -4,6 +4,7 @@ import { normalizePhoneNumber } from '@/lib/phone-utils';
 import { isBusinessHours, type BusinessHours } from '@/lib/business-logic';
 import { checkBillingStatus } from '@/lib/billing-guard';
 import { checkSmsRateLimit } from '@/lib/sms-rate-limit';
+import { renderMissedCallSms } from '@/lib/sms-template';
 import { logger } from '@/lib/logger';
 import twilio from 'twilio';
 import { timingSafeEqual } from 'crypto';
@@ -42,7 +43,7 @@ export async function GET(request: Request) {
         // Get all businesses with RepairDesk configured
         const { data: businesses, error: bizError } = await supabaseAdmin
             .from('businesses')
-            .select('id, repairdesk_api_key, repairdesk_store_url, repairdesk_last_poll_at, forwarding_number, name, sms_template, sms_template_closed, business_hours, timezone')
+            .select('id, repairdesk_api_key, repairdesk_store_url, repairdesk_last_poll_at, forwarding_number, name, sms_template, sms_template_closed, business_hours, timezone, booking_url')
             .not('repairdesk_api_key', 'is', null);
 
         if (bizError) {
@@ -90,6 +91,7 @@ interface BusinessRow {
     sms_template_closed: string | null;
     business_hours: BusinessHours | null;
     timezone: string | null;
+    booking_url: string | null;
 }
 
 async function pollBusiness(business: BusinessRow) {
@@ -129,26 +131,27 @@ async function pollBusiness(business: BusinessRow) {
                 const externalId = `rd-call-${call.id}`;
                 const holdUntil = new Date(Date.now() + GRACE_PERIOD_MINUTES * 60 * 1000).toISOString();
 
-                const callerName = call.customer_name || null;
+                // Upsert by (business_id, caller_phone) — leads are one row per caller.
+                // For repeat callers we update source/external_id/sms_hold_until/status
+                // so a new missed call from the same number is not silently dropped.
+                const upsertRow: Record<string, unknown> = {
+                    business_id: business.id,
+                    caller_phone: normalizedPhone,
+                    source: 'repairdesk',
+                    external_id: externalId,
+                    status: 'New',
+                    sms_hold_until: holdUntil,
+                };
+                if (call.customer_name) {
+                    upsertRow.caller_name = call.customer_name;
+                }
 
-                // Create lead with grace period — skip if already imported
                 const { error } = await supabaseAdmin
                     .from('leads')
-                    .upsert(
-                        {
-                            business_id: business.id,
-                            caller_phone: normalizedPhone,
-                            caller_name: callerName,
-                            source: 'repairdesk',
-                            external_id: externalId,
-                            status: 'New',
-                            sms_hold_until: holdUntil,
-                        },
-                        {
-                            onConflict: 'business_id,source,external_id',
-                            ignoreDuplicates: true,
-                        }
-                    );
+                    .upsert(upsertRow, {
+                        onConflict: 'business_id,caller_phone',
+                        ignoreDuplicates: false,
+                    });
 
                 if (error) {
                     logger.error('[RepairDesk Poll] Failed to upsert missed call lead', error, {
@@ -355,7 +358,7 @@ async function sendMissedCallSms(
     const template = isOpen
         ? (business.sms_template || defaultOpen)
         : (business.sms_template_closed || defaultClosed);
-    const body = template.replace(/\{\{business_name\}\}/g, business.name || 'our business');
+    const body = renderMissedCallSms(template, business);
 
     try {
         await twilioClient.messages.create({

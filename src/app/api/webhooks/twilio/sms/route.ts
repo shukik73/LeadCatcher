@@ -4,6 +4,8 @@ import { normalizePhoneNumber } from '@/lib/phone-utils';
 import { checkBillingStatus } from '@/lib/billing-guard';
 import { claimWebhookEvent, markWebhookProcessed, markWebhookFailed, markWebhookFailedIfProcessing, setWebhookBusinessId } from '@/lib/webhook-common';
 import { checkSmsRateLimit } from '@/lib/sms-rate-limit';
+import { qualifyLead, buildOwnerSummary, MAX_QUALIFICATION_QUESTIONS, type QualificationData } from '@/lib/lead-qualification';
+import { maybeSendHotLeadAlert } from '@/lib/hot-lead-alert';
 import { logger } from '@/lib/logger';
 import twilio from 'twilio';
 
@@ -61,7 +63,7 @@ async function handleSmsWebhook(messageSid: string | null, fromRaw: string, toRa
     // 2. ISOLATION: Find lead based on caller AND business number
     const { data: business } = await supabaseAdmin
         .from('businesses')
-        .select('id, owner_phone, name, auto_reply_enabled')
+        .select('id, owner_phone, name, auto_reply_enabled, forwarding_number')
         .eq('forwarding_number', to)
         .single();
 
@@ -162,20 +164,28 @@ async function handleSmsWebhook(messageSid: string | null, fromRaw: string, toRa
             onConflict: 'business_id,caller_phone',
             ignoreDuplicates: true,
         })
-        .select('id')
+        .select('id, caller_name, qualification_status, qualification_data, qualification_step')
         .single();
 
     // If upsert returned nothing (ignoreDuplicates), fetch the existing lead
-    let leadId: string | null = upsertedLead?.id ?? null;
-    if (!leadId) {
+    type LeadCtx = {
+        id: string;
+        caller_name: string | null;
+        qualification_status: string | null;
+        qualification_data: QualificationData | null;
+        qualification_step: number | null;
+    };
+    let leadCtx: LeadCtx | null = (upsertedLead as LeadCtx) ?? null;
+    if (!leadCtx) {
         const { data: existingLead } = await supabaseAdmin
             .from('leads')
-            .select('id')
+            .select('id, caller_name, qualification_status, qualification_data, qualification_step')
             .eq('caller_phone', from)
             .eq('business_id', business.id)
             .single();
-        leadId = existingLead?.id ?? null;
+        leadCtx = (existingLead as LeadCtx) ?? null;
     }
+    const leadId: string | null = leadCtx?.id ?? null;
 
     if (leadId) {
         // 3. Log Message + cancel any pending follow-up (customer replied!)
@@ -209,8 +219,105 @@ async function handleSmsWebhook(messageSid: string | null, fromRaw: string, toRa
             logger.error('AI Analysis failed', error);
         }
 
+        // 4a. AI LEAD QUALIFICATION
+        // Asks at most 2-3 short questions to learn device/issue/urgency, then
+        // forwards a structured summary to the owner. Skipped when:
+        //   - billing inactive, customer opted out (already handled above)
+        //   - rate limit blocks the qualification reply
+        //   - lead is already qualified
+        const currentStatus = leadCtx?.qualification_status ?? 'none';
+        const currentStep = leadCtx?.qualification_step ?? 0;
+        const currentData: QualificationData = leadCtx?.qualification_data ?? {};
+        let qualificationHandled = false;
+        let qualificationUrgency: string | null = currentData.urgency ?? null;
+        let lastSummary = '';
+
+        if (billing.allowed && currentStatus !== 'qualified') {
+            const qualRateLimit = await checkSmsRateLimit(business.id, from);
+            if (qualRateLimit.allowed) {
+                try {
+                    const decision = await qualifyLead({
+                        customerMessage: body,
+                        existing: currentData,
+                        step: currentStep,
+                    });
+                    qualificationUrgency = decision.extracted.urgency ?? qualificationUrgency;
+
+                    // Persist qualification progress regardless of question/summary outcome.
+                    await supabaseAdmin.from('leads')
+                        .update({
+                            qualification_status: decision.qualified ? 'qualified' : 'in_progress',
+                            qualification_data: decision.extracted,
+                            qualification_step: Math.min(currentStep + 1, MAX_QUALIFICATION_QUESTIONS),
+                        })
+                        .eq('id', leadId);
+
+                    if (!decision.qualified && decision.next_question) {
+                        try {
+                            const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+                            await client.messages.create({
+                                to: from,
+                                from: to,
+                                body: decision.next_question,
+                            });
+                            await supabaseAdmin.from('messages').insert({
+                                lead_id: leadId,
+                                direction: 'outbound',
+                                body: decision.next_question,
+                                is_ai_generated: true,
+                            });
+                            qualificationHandled = true;
+                        } catch (err) {
+                            logger.error(`[${TAG}] Failed to send qualification question`, err);
+                        }
+                    } else if (decision.qualified) {
+                        const summary = buildOwnerSummary({
+                            customerPhone: from,
+                            customerName: leadCtx?.caller_name,
+                            data: decision.extracted,
+                        });
+                        lastSummary = summary;
+
+                        const ownerRateLimit = await checkSmsRateLimit(business.id, business.owner_phone);
+                        if (business.owner_phone && ownerRateLimit.allowed) {
+                            try {
+                                const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+                                await client.messages.create({
+                                    to: business.owner_phone,
+                                    from: to,
+                                    body: summary,
+                                });
+                                await supabaseAdmin.from('leads')
+                                    .update({ qualification_summary_sent_at: new Date().toISOString() })
+                                    .eq('id', leadId);
+                                qualificationHandled = true;
+                            } catch (err) {
+                                logger.error(`[${TAG}] Failed to forward qualification summary`, err);
+                            }
+                        }
+                    }
+                } catch (error) {
+                    logger.error(`[${TAG}] Qualification failed (non-blocking)`, error);
+                }
+            } else {
+                logger.warn(`[${TAG}] Qualification skipped - rate limited`, { businessId: business.id });
+            }
+        }
+
+        // 4a.1. HOT LEAD ALERT — fire owner SMS when urgency is high.
+        if (qualificationUrgency === 'high') {
+            await maybeSendHotLeadAlert({
+                leadId,
+                businessId: business.id,
+                ownerPhone: business.owner_phone,
+                forwardingNumber: business.forwarding_number,
+                summary: lastSummary || `New high-urgency lead from ${from}: "${body.slice(0, 140)}"`,
+                urgency: qualificationUrgency,
+            });
+        }
+
         // 4b. AI AUTO-REPLY (if enabled)
-        if (business.auto_reply_enabled && billing.allowed) {
+        if (!qualificationHandled && business.auto_reply_enabled && billing.allowed) {
             try {
                 const { generateAutoReply } = await import('@/lib/ai-auto-reply');
                 const autoReply = await generateAutoReply(body, business.name || 'our store');
@@ -244,9 +351,12 @@ async function handleSmsWebhook(messageSid: string | null, fromRaw: string, toRa
             }
         }
 
-        // 5. Notify Owner (only if billing is active and rate limit OK)
+        // 5. Notify Owner (only if billing is active and rate limit OK).
+        // Skipped when the qualification flow already forwarded a structured
+        // summary so the owner doesn't get the same lead twice.
+        const summaryAlreadyForwarded = lastSummary !== '';
         const ownerRateLimit = await checkSmsRateLimit(business.id, business.owner_phone);
-        if (business.owner_phone && billing.allowed && ownerRateLimit.allowed) {
+        if (!summaryAlreadyForwarded && business.owner_phone && billing.allowed && ownerRateLimit.allowed) {
             const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
             try {
                 await client.messages.create({

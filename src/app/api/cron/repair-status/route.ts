@@ -3,6 +3,7 @@ import { RepairDeskClient } from '@/lib/repairdesk';
 import { normalizePhoneNumber } from '@/lib/phone-utils';
 import { checkBillingStatus } from '@/lib/billing-guard';
 import { checkSmsRateLimit } from '@/lib/sms-rate-limit';
+import { sendReviewRequest } from '@/lib/review-request';
 import { logger } from '@/lib/logger';
 import { timingSafeEqual } from 'crypto';
 import twilio from 'twilio';
@@ -19,6 +20,9 @@ const STATUS_MESSAGES: Record<string, string> = {
     'Waiting for Parts': "Update from {{business_name}}: We're waiting for parts for your repair. We'll notify you once they arrive.",
     'Parts Arrived': "Good news from {{business_name}}! The parts for your repair have arrived. We'll start working on it right away.",
 };
+
+// Statuses that mean the repair is finished and we should request a Google review.
+const REVIEW_TRIGGER_STATUSES = new Set(['Completed', 'Paid', 'Picked Up']);
 
 function verifyCronSecret(header: string | null): boolean {
     const secret = process.env.CRON_SECRET;
@@ -42,7 +46,7 @@ export async function GET(request: Request) {
     try {
         const { data: businesses } = await supabaseAdmin
             .from('businesses')
-            .select('id, name, repairdesk_api_key, repairdesk_store_url, forwarding_number, status_updates_enabled, business_hours, timezone')
+            .select('id, name, repairdesk_api_key, repairdesk_store_url, forwarding_number, status_updates_enabled, business_hours, timezone, google_review_link')
             .eq('status_updates_enabled', true)
             .not('repairdesk_api_key', 'is', null);
 
@@ -75,6 +79,7 @@ async function processBusinessTickets(
         id: string; name: string; repairdesk_api_key: string;
         repairdesk_store_url: string | null; forwarding_number: string;
         business_hours: unknown; timezone: string | null;
+        google_review_link: string | null;
     },
     twilioClient: ReturnType<typeof twilio>,
 ) {
@@ -86,6 +91,7 @@ async function processBusinessTickets(
     const billing = await checkBillingStatus(biz.id);
     let statusChanges = 0;
     let smsSent = 0;
+    let reviewRequests = 0;
 
     // Fetch recent tickets (first 3 pages)
     for (let page = 1; page <= 3; page++) {
@@ -123,6 +129,23 @@ async function processBusinessTickets(
                             current_status: ticket.status,
                         })
                         .eq('id', existing.id);
+
+                    // If the ticket just transitioned to a completed/paid state,
+                    // fire a one-shot review request (deduped on ticket id).
+                    if (REVIEW_TRIGGER_STATUSES.has(ticket.status)) {
+                        const sent = await sendReviewRequest({
+                            businessId: biz.id,
+                            businessName: biz.name,
+                            forwardingNumber: biz.forwarding_number,
+                            googleReviewLink: biz.google_review_link,
+                            customerPhone: normalizedPhone,
+                            customerName: ticket.customer
+                                ? `${ticket.customer.first_name || ''} ${ticket.customer.last_name || ''}`.trim()
+                                : null,
+                            ticketId: ticket.id,
+                        });
+                        if (sent) reviewRequests++;
+                    }
 
                     // Send SMS if we have a message template for this status
                     const template = STATUS_MESSAGES[ticket.status];
@@ -192,5 +215,5 @@ async function processBusinessTickets(
         if (!meta || page >= meta.last_page) break;
     }
 
-    return { statusChanges, smsSent };
+    return { statusChanges, smsSent, reviewRequests };
 }
