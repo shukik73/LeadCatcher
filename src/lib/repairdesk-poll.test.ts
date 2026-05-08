@@ -130,7 +130,7 @@ describe('RepairDesk Poll - Grace Period Callback Detection', () => {
 
     it('should pass created_at (not sms_hold_until) when checking for callbacks', async () => {
         const leadCreatedAt = '2024-01-15T10:00:00Z';
-        const leadHoldUntil = '2024-01-15T10:03:00Z'; // 3 min grace
+        const leadHoldUntil = '2024-01-15T10:03:00Z'; // expired hold (any past timestamp works)
 
         const business = {
             id: 'biz-1',

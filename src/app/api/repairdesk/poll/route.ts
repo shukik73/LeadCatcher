@@ -11,7 +11,7 @@ import { timingSafeEqual } from 'crypto';
 
 export const dynamic = 'force-dynamic';
 
-const GRACE_PERIOD_MINUTES = 3;
+const GRACE_PERIOD_MINUTES = 15;
 
 function verifyCronSecret(header: string | null): boolean {
     const secret = process.env.CRON_SECRET;
