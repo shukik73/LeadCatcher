@@ -32,52 +32,129 @@ interface AutoLinkResult {
     error?: string;
 }
 
+type TwilioClient = ReturnType<typeof twilio>;
+
 /**
- * Automatically links the platform's Twilio phone number (from TWILIO_PHONE_NUMBER env var)
- * to the current user's business. The user only provides their business phone —
- * the Twilio number is assigned in the background.
+ * Shown when a business tries to link a forwarding number that another business
+ * already owns. In single-tenant ('shared') mode this is expected on the second
+ * signup; the partial unique index `businesses_forwarding_number_unique` guarantees
+ * one business per number, and this message tells the operator what's actually wrong
+ * instead of leaking a raw Postgres 23505.
+ */
+const NUMBER_ALREADY_LINKED_ERROR =
+    'This phone number is already linked to another business. LeadCatcher is currently ' +
+    'running in single-tenant mode, so each business needs its own dedicated Twilio ' +
+    'number. Contact support to provision a dedicated number.';
+
+type NumberStrategy = 'shared' | 'per-tenant';
+
+interface AcquiredNumber {
+    phoneNumber: string;
+    sid: string;
+}
+
+type AcquireNumberResult =
+    | { success: true; number: AcquiredNumber }
+    | { success: false; error: string };
+
+/**
+ * Selects how a business gets its telephony number. Defaults to 'shared'
+ * (single-tenant). Set TWILIO_NUMBER_STRATEGY=per-tenant to go multi-tenant
+ * once provisionDedicatedNumber() is implemented.
+ */
+function getNumberStrategy(): NumberStrategy {
+    return process.env.TWILIO_NUMBER_STRATEGY === 'per-tenant' ? 'per-tenant' : 'shared';
+}
+
+/**
+ * Resolves the Twilio number a business should use.
+ *
+ * - 'shared' (default): single-tenant. Every business links the one platform number
+ *   in TWILIO_PHONE_NUMBER. Only one business can own it (enforced by
+ *   businesses_forwarding_number_unique), so the second signup is rejected upstream
+ *   with NUMBER_ALREADY_LINKED_ERROR rather than a raw constraint error.
+ * - 'per-tenant': MULTI-TENANT HOOK. Assign a dedicated number per business via
+ *   provisionDedicatedNumber(). The rest of the flow already keys off the per-business
+ *   `forwarding_number` (link step + both webhook lookups), so no other code changes.
+ */
+async function acquireNumberForBusiness(client: TwilioClient): Promise<AcquireNumberResult> {
+    if (getNumberStrategy() === 'per-tenant') {
+        return provisionDedicatedNumber();
+    }
+
+    const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
+    if (!twilioPhoneNumber) {
+        logger.error('[acquireNumberForBusiness] TWILIO_PHONE_NUMBER env var not set');
+        return { success: false, error: 'Twilio phone number not configured. Please contact support.' };
+    }
+
+    // Verify the number exists in the Twilio account
+    const numbers = await client.incomingPhoneNumbers.list({
+        phoneNumber: twilioPhoneNumber,
+        limit: 1,
+    });
+
+    if (numbers.length === 0) {
+        logger.error('[acquireNumberForBusiness] TWILIO_PHONE_NUMBER not found in account', { twilioPhoneNumber });
+        return { success: false, error: 'Twilio number not found in account. Please contact support.' };
+    }
+
+    return { success: true, number: { phoneNumber: numbers[0].phoneNumber, sid: numbers[0].sid } };
+}
+
+/**
+ * MULTI-TENANT HOOK — provision a dedicated Twilio number for a single business.
+ *
+ * When you're ready to pay ~$1/mo per tenant (+ first-purchase fee), give this the
+ * Twilio client (pass `client` from acquireNumberForBusiness) and implement it (and
+ * set TWILIO_NUMBER_STRATEGY=per-tenant):
+ *
+ *   const available = await client.availablePhoneNumbers('US').local.list({ limit: 1 });
+ *   if (available.length === 0) return { success: false, error: 'No numbers available right now.' };
+ *   const purchased = await client.incomingPhoneNumbers.create({ phoneNumber: available[0].phoneNumber });
+ *   return { success: true, number: { phoneNumber: purchased.phoneNumber, sid: purchased.sid } };
+ *
+ * Until then it fails loudly so flipping the env var without finishing the work
+ * doesn't silently misbehave.
+ */
+async function provisionDedicatedNumber(): Promise<AcquireNumberResult> {
+    logger.error('[provisionDedicatedNumber] per-tenant provisioning is not implemented yet');
+    return { success: false, error: 'Per-tenant number provisioning is not enabled yet. Please contact support.' };
+}
+
+/**
+ * Automatically links a Twilio phone number to the current user's business. The user
+ * only provides their business phone — the Twilio number is assigned in the background
+ * according to TWILIO_NUMBER_STRATEGY (shared single-tenant number by default).
  */
 export async function autoLinkTwilioNumber(): Promise<AutoLinkResult> {
     const accountSid = process.env.TWILIO_ACCOUNT_SID;
     const authToken = process.env.TWILIO_AUTH_TOKEN;
-    const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 
     if (!accountSid || !authToken) {
         logger.error('[autoLinkTwilioNumber] Missing Twilio credentials');
         return { success: false, error: 'Server configuration error. Please contact support.' };
     }
 
-    if (!twilioPhoneNumber) {
-        logger.error('[autoLinkTwilioNumber] TWILIO_PHONE_NUMBER env var not set');
-        return { success: false, error: 'Twilio phone number not configured. Please contact support.' };
-    }
-
     try {
-        // Verify the number exists in the Twilio account
         const client = twilio(accountSid, authToken);
-        const numbers = await client.incomingPhoneNumbers.list({
-            phoneNumber: twilioPhoneNumber,
-            limit: 1
-        });
 
-        if (numbers.length === 0) {
-            logger.error('[autoLinkTwilioNumber] TWILIO_PHONE_NUMBER not found in account', { twilioPhoneNumber });
-            return { success: false, error: 'Twilio number not found in account. Please contact support.' };
+        const acquired = await acquireNumberForBusiness(client);
+        if (!acquired.success) {
+            return { success: false, error: acquired.error };
         }
-
-        const foundNumber = numbers[0];
 
         // Link to the user's business
         const linkResult = await linkTwilioNumberToBusiness(
-            foundNumber.phoneNumber,
-            foundNumber.sid
+            acquired.number.phoneNumber,
+            acquired.number.sid
         );
 
         if (!linkResult.success) {
             return { success: false, error: linkResult.error || 'Failed to link number' };
         }
 
-        return { success: true, forwardingNumber: foundNumber.phoneNumber };
+        return { success: true, forwardingNumber: acquired.number.phoneNumber };
 
     } catch (error) {
         logger.error('[autoLinkTwilioNumber] Error', error);
@@ -207,6 +284,27 @@ export async function linkTwilioNumberToBusiness(
             return { success: false, error: 'Business not found. Complete onboarding first.' };
         }
 
+        // Multi-tenant guard: a forwarding number may belong to exactly one business
+        // (enforced by businesses_forwarding_number_unique). Check across tenants with
+        // the admin client (RLS would hide other businesses' rows) so we can return a
+        // clear message before hitting the unique constraint. Re-linking the same number
+        // to the same business stays allowed via the .neq('id', …) filter.
+        const { data: existingOwner } = await supabaseAdmin
+            .from('businesses')
+            .select('id')
+            .eq('forwarding_number', phoneNumber)
+            .neq('id', business.id)
+            .maybeSingle();
+
+        if (existingOwner) {
+            logger.warn('[linkTwilioNumberToBusiness] Number already owned by another business', {
+                phoneNumber,
+                existingBusinessId: existingOwner.id,
+                currentBusinessId: business.id,
+            });
+            return { success: false, error: NUMBER_ALREADY_LINKED_ERROR };
+        }
+
         // Use supabaseAdmin to update protected telephony fields (bypasses trigger)
         const { error: updateError } = await supabaseAdmin
             .from('businesses')
@@ -218,6 +316,11 @@ export async function linkTwilioNumberToBusiness(
 
         if (updateError) {
             logger.error('[linkTwilioNumberToBusiness] DB error', updateError);
+            // Safety net for the race between the pre-check above and this update:
+            // Postgres 23505 = unique_violation on businesses_forwarding_number_unique.
+            if ((updateError as { code?: string }).code === '23505') {
+                return { success: false, error: NUMBER_ALREADY_LINKED_ERROR };
+            }
             return { success: false, error: 'Failed to save phone number to your account' };
         }
 

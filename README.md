@@ -114,6 +114,32 @@ Copy `.env.example` to `.env.local` and fill in the values:
 | `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis token |
 | `OPENAI_API_KEY` | OpenAI key for AI voicemail analysis |
 | `OPENAI_MODEL` | Model to use (default: `gpt-4o`) |
+| `TWILIO_NUMBER_STRATEGY` | `shared` (default) or `per-tenant` — see Tenancy below |
+
+---
+
+## Tenancy (single-tenant vs multi-tenant)
+
+LeadCatcher ships in **single-tenant mode** by default (`TWILIO_NUMBER_STRATEGY=shared`,
+or unset). In this mode every business is linked to the one platform number in
+`TWILIO_PHONE_NUMBER`. A forwarding number can belong to exactly one business
+(enforced by the `businesses_forwarding_number_unique` index), so **only one business
+can be onboarded per deployment**. A second business attempting to onboard receives a
+clear error explaining that each business needs its own dedicated number — rather than
+a generic save failure.
+
+To run **multi-tenant**, each business needs its own dedicated Twilio number
+(~$1/mo per number + a first-purchase fee). The code is structured so this is a
+drop-in change:
+
+1. Implement `provisionDedicatedNumber()` in `src/app/actions/twilio.ts` (a worked
+   example is in the function's doc comment — it purchases a number via
+   `client.incomingPhoneNumbers.create(...)`).
+2. Set `TWILIO_NUMBER_STRATEGY=per-tenant`.
+
+Nothing else changes: the link step and both inbound webhooks already route on each
+business's own `forwarding_number`, and the unique index already enforces
+one-number-per-business.
 
 ---
 
