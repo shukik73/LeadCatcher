@@ -81,6 +81,8 @@ export default function SettingsPage() {
     const [autoReplyEnabled, setAutoReplyEnabled] = useState(false);
     const [dailyDigestEnabled, setDailyDigestEnabled] = useState(true);
     const [statusUpdatesEnabled, setStatusUpdatesEnabled] = useState(false);
+    const [bookingUrl, setBookingUrl] = useState('');
+    const [googleReviewLink, setGoogleReviewLink] = useState('');
     const [savingFeatures, setSavingFeatures] = useState(false);
 
     // Per-section saving states
@@ -100,7 +102,7 @@ export default function SettingsPage() {
 
         const { data: business } = await supabase
             .from('businesses')
-            .select('id, sms_template, sms_template_closed, timezone, business_hours, repairdesk_store_url, business_phone, owner_phone, carrier, forwarding_number, auto_reply_enabled, daily_digest_enabled, status_updates_enabled')
+            .select('id, sms_template, sms_template_closed, timezone, business_hours, repairdesk_store_url, business_phone, owner_phone, carrier, forwarding_number, auto_reply_enabled, daily_digest_enabled, status_updates_enabled, booking_url, google_review_link')
             .eq('user_id', user.id)
             .single();
 
@@ -118,6 +120,8 @@ export default function SettingsPage() {
             setAutoReplyEnabled(business.auto_reply_enabled ?? false);
             setDailyDigestEnabled(business.daily_digest_enabled ?? true);
             setStatusUpdatesEnabled(business.status_updates_enabled ?? false);
+            setBookingUrl(business.booking_url || '');
+            setGoogleReviewLink(business.google_review_link || '');
 
             // Check if API key exists without fetching the raw value
             const { count } = await supabase
@@ -756,6 +760,8 @@ export default function SettingsPage() {
                                             auto_reply_enabled: autoReplyEnabled,
                                             daily_digest_enabled: dailyDigestEnabled,
                                             status_updates_enabled: statusUpdatesEnabled,
+                                            booking_url: bookingUrl || null,
+                                            google_review_link: googleReviewLink || null,
                                         }),
                                     });
                                     const data = await res.json();
@@ -803,6 +809,33 @@ export default function SettingsPage() {
                             checked={statusUpdatesEnabled}
                             onCheckedChange={setStatusUpdatesEnabled}
                         />
+                    </div>
+
+                    <div className="border-t pt-4 space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="booking_url">Booking / Scheduling Link</Label>
+                            <Input
+                                id="booking_url"
+                                value={bookingUrl}
+                                onChange={(e) => setBookingUrl(e.target.value)}
+                                placeholder="https://calendly.com/your-store or your booking page URL"
+                            />
+                            <p className="text-xs text-slate-500">
+                                Used in missed-call SMS via {'{{booking_link}}'} template variable
+                            </p>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="google_review_link">Google Review Link</Label>
+                            <Input
+                                id="google_review_link"
+                                value={googleReviewLink}
+                                onChange={(e) => setGoogleReviewLink(e.target.value)}
+                                placeholder="https://g.page/r/your-store/review"
+                            />
+                            <p className="text-xs text-slate-500">
+                                Sent to customers after their repair is completed in RepairDesk
+                            </p>
+                        </div>
                     </div>
                 </CardContent>
             </Card>
