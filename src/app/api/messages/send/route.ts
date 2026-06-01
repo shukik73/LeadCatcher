@@ -7,13 +7,15 @@ import { logger } from '@/lib/logger';
 import twilio from 'twilio';
 import { z } from 'zod';
 
+export const dynamic = 'force-dynamic';
+
 // Initialize Twilio Client
 const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
 const sendMessageSchema = z.object({
     leadId: z.string().uuid('Invalid lead ID format'),
     body: z.string().min(1, 'Message body is required').max(1600, 'Message too long (max 1600 characters)'),
-});
+}).strict();
 
 export async function POST(request: Request) {
     // CSRF protection: validate Origin header

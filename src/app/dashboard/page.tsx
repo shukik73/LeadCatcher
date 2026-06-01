@@ -73,7 +73,7 @@ export default function Dashboard() {
         async function fetchLeads() {
             const { data, error } = await supabase
                 .from('leads')
-                .select(`*, messages (*)`)
+                .select(`*, messages (id, direction, body, is_ai_generated, created_at)`)
                 .order('created_at', { ascending: false })
                 .range(0, PAGE_SIZE - 1);
 
@@ -104,7 +104,7 @@ export default function Dashboard() {
         setLoadingMore(true);
         const { data, error } = await supabase
             .from('leads')
-            .select(`*, messages (*)`)
+            .select(`*, messages (id, direction, body, is_ai_generated, created_at)`)
             .order('created_at', { ascending: false })
             .range(leads.length, leads.length + PAGE_SIZE - 1);
 

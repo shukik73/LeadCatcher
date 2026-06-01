@@ -169,13 +169,19 @@ async function handleSmsWebhook(eventId: string | null, fromRaw: string, toRaw: 
         return new Response('OK', { status: 200 });
     }
 
-    // 2.7. TCPA COMPLIANCE: Check if user is opted out
-    const { data: optOut } = await supabaseAdmin
+    // 2.7. TCPA COMPLIANCE: Check if user is opted out (FAIL CLOSED)
+    const { data: optOut, error: optOutError } = await supabaseAdmin
         .from('opt_outs')
         .select('id')
         .eq('business_id', business.id)
         .eq('phone_number', from)
         .maybeSingle();
+
+    if (optOutError) {
+        logger.error(`[${TAG}] Opt-out lookup failed, suppressing outbound SMS (fail closed)`, optOutError, { from, businessId: business.id });
+        if (eventId) await markWebhookProcessed(eventId);
+        return new Response('OK', { status: 200 });
+    }
 
     if (optOut) {
         logger.info(`[${TAG}] Message from opted-out user ignored`, { from, businessId: business.id });

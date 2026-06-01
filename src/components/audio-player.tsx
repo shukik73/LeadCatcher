@@ -40,7 +40,7 @@ export function AudioPlayer({ src }: AudioPlayerProps) {
                 onLoadedMetadata={() => setDuration(audioRef.current?.duration || 0)}
                 onEnded={() => setPlaying(false)}
             />
-            <Button variant="ghost" size="icon" onClick={toggle} className="h-8 w-8">
+            <Button variant="ghost" size="icon" onClick={toggle} className="h-8 w-8" aria-label={playing ? 'Pause recording' : 'Play recording'}>
                 {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
             </Button>
             <Volume2 className="h-4 w-4 text-slate-400" />
