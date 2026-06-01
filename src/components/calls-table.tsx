@@ -39,6 +39,7 @@ export function CallsTable({
                             <th className="px-3 py-2 w-8">
                                 <input
                                     type="checkbox"
+                                    aria-label="Select all calls"
                                     className="rounded"
                                     checked={calls.length > 0 && calls.every(c => selectedIds.has(c.id))}
                                     onChange={(e) => {
@@ -65,14 +66,19 @@ export function CallsTable({
                         {calls.map((call) => (
                             <tr
                                 key={call.id}
+                                tabIndex={0}
+                                role="button"
+                                aria-label={`View call from ${call.customer_name || call.customer_phone || 'unknown'}`}
                                 className={`border-b hover:bg-slate-50 cursor-pointer transition-colors ${
                                     isOverdue(call) ? 'bg-red-50/50' : ''
                                 }`}
                                 onClick={() => onSelectCall(call)}
+                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectCall(call); } }}
                             >
                                 <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                                     <input
                                         type="checkbox"
+                                        aria-label={`Select call from ${call.customer_name || call.customer_phone || 'unknown'}`}
                                         className="rounded"
                                         checked={selectedIds.has(call.id)}
                                         onChange={() => onToggleSelect(call.id)}

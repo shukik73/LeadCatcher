@@ -8,10 +8,7 @@ const TAG = '[Analytics]';
 /**
  * GET /api/analytics/funnel?period=7|30|90
  *
- * Returns lead conversion funnel data:
- * - Missed calls → SMS sent → Customer replied → Booked → Revenue
- * - Conversion rates at each stage
- * - Breakdown by day of week and hour
+ * Returns lead conversion funnel data.
  */
 export async function GET(request: Request) {
     try {
@@ -37,23 +34,20 @@ export async function GET(request: Request) {
         const days = Math.min(90, Math.max(1, period));
         const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
-        // Fetch all data in parallel
+        // All queries in parallel — no nested awaits
         const [
             totalLeadsResult,
             contactedResult,
             bookedResult,
             callsResult,
-            messagesResult,
             revenueResult,
         ] = await Promise.all([
-            // Total leads in period
             supabase
                 .from('leads')
-                .select('id, status, source, created_at, converted_at, conversion_value', { count: 'exact' })
+                .select('id, status, conversion_value', { count: 'exact' })
                 .eq('business_id', business.id)
                 .gte('created_at', since),
 
-            // Contacted (replied)
             supabase
                 .from('leads')
                 .select('id', { count: 'exact', head: true })
@@ -61,7 +55,6 @@ export async function GET(request: Request) {
                 .in('status', ['Contacted', 'Booked', 'Closed'])
                 .gte('created_at', since),
 
-            // Booked
             supabase
                 .from('leads')
                 .select('id', { count: 'exact', head: true })
@@ -69,26 +62,12 @@ export async function GET(request: Request) {
                 .in('status', ['Booked', 'Closed'])
                 .gte('created_at', since),
 
-            // Calls
             supabase
                 .from('call_analyses')
-                .select('id, call_status, callback_status, booked_value, owner, created_at', { count: 'exact' })
+                .select('id, call_status, callback_status, booked_value, owner', { count: 'exact' })
                 .eq('business_id', business.id)
                 .gte('created_at', since),
 
-            // Outbound messages
-            supabase
-                .from('messages')
-                .select('id', { count: 'exact', head: true })
-                .eq('direction', 'outbound')
-                .in('lead_id', (await supabase
-                    .from('leads')
-                    .select('id')
-                    .eq('business_id', business.id)
-                    .gte('created_at', since)
-                ).data?.map(l => l.id) || []),
-
-            // Revenue from booked calls
             supabase
                 .from('call_analyses')
                 .select('booked_value')
@@ -97,36 +76,46 @@ export async function GET(request: Request) {
                 .gte('created_at', since),
         ]);
 
+        // Count outbound messages via a separate query (no nested await / IN list)
+        const leadIds = (totalLeadsResult.data || []).map(l => l.id);
+        let smsSent = 0;
+        if (leadIds.length > 0) {
+            // Batch in chunks of 100 to avoid oversized IN clauses
+            for (let i = 0; i < leadIds.length; i += 100) {
+                const chunk = leadIds.slice(i, i + 100);
+                const { count } = await supabase
+                    .from('messages')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('direction', 'outbound')
+                    .in('lead_id', chunk);
+                smsSent += count || 0;
+            }
+        }
+
         const totalLeads = totalLeadsResult.count || 0;
         const contacted = contactedResult.count || 0;
         const booked = bookedResult.count || 0;
         const totalCalls = callsResult.count || 0;
-        const smsSent = messagesResult.count || 0;
 
-        // Calculate revenue
         const revenue = (revenueResult.data || [])
             .reduce((sum, r) => sum + (r.booked_value || 0), 0);
 
-        // Calculate lead conversions with value
         const leadRevenue = (totalLeadsResult.data || [])
             .filter(l => l.conversion_value != null)
             .reduce((sum, l) => sum + (l.conversion_value || 0), 0);
 
         const totalRevenue = revenue + leadRevenue;
 
-        // Calls breakdown
         const calls = callsResult.data || [];
         const missedCalls = calls.filter(c => c.call_status === 'missed').length;
         const answeredCalls = calls.filter(c => c.call_status === 'answered').length;
         const bookedCalls = calls.filter(c => c.callback_status === 'booked').length;
         const lostCalls = calls.filter(c => c.callback_status === 'lost').length;
 
-        // Conversion rates
         const missedToContactRate = missedCalls > 0 ? Math.round((contacted / missedCalls) * 100) : 0;
         const contactToBookRate = contacted > 0 ? Math.round((booked / contacted) * 100) : 0;
         const overallConversion = totalLeads > 0 ? Math.round((booked / totalLeads) * 100) : 0;
 
-        // Owner/employee leaderboard
         const ownerMap: Record<string, { calls: number; booked: number; revenue: number }> = {};
         for (const call of calls) {
             const owner = call.owner || 'Unassigned';
@@ -150,8 +139,8 @@ export async function GET(request: Request) {
                 answered_calls: answeredCalls,
                 sms_sent: smsSent,
                 total_leads: totalLeads,
-                contacted: contacted,
-                booked: booked,
+                contacted,
+                booked,
                 lost: lostCalls,
                 revenue: totalRevenue,
             },

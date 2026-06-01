@@ -72,8 +72,12 @@ export function FollowUpQueue({ followups, onUpdated, onSelectCall }: FollowUpQu
                 return (
                     <Card
                         key={fu.id}
+                        tabIndex={0}
+                        role="button"
+                        aria-label={`View follow-up for ${fu.customer_name || fu.customer_phone || 'unknown'}`}
                         className={`cursor-pointer transition-colors hover:border-blue-200 ${isOverdue ? 'border-red-200 bg-red-50/30' : ''}`}
                         onClick={() => onSelectCall(fu.id)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectCall(fu.id); } }}
                     >
                         <CardContent className="py-3">
                             <div className="flex items-start justify-between gap-3">
