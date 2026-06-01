@@ -4,6 +4,8 @@ import { stripe, PLANS, TRIAL_DAYS, type PlanId } from '@/lib/stripe';
 import { validateCsrfOrigin } from '@/lib/csrf';
 import { logger } from '@/lib/logger';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
     // CSRF protection: validate Origin header
     if (!validateCsrfOrigin(request)) {

@@ -152,15 +152,17 @@ async function processBusinessTickets(
                     if (template && billing.allowed && biz.forwarding_number) {
                         const rateLimit = await checkSmsRateLimit(biz.id, normalizedPhone);
                         if (rateLimit.allowed) {
-                            // Check opt-out
-                            const { data: optOut } = await supabaseAdmin
+                            // Check opt-out (FAIL CLOSED)
+                            const { data: optOut, error: optOutErr } = await supabaseAdmin
                                 .from('opt_outs')
                                 .select('id')
                                 .eq('business_id', biz.id)
                                 .eq('phone_number', normalizedPhone)
                                 .maybeSingle();
 
-                            if (!optOut) {
+                            if (optOutErr) {
+                                logger.error(`${TAG} Opt-out check failed, skipping SMS (fail closed)`, optOutErr);
+                            } else if (!optOut) {
                                 const body = template
                                     .replace(/\{\{business_name\}\}/g, biz.name)
                                     .replace(/\{\{close_time\}\}/g, 'closing time');
