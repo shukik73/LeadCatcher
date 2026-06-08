@@ -7,11 +7,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { UrgencyBadge, CallbackStatusBadge } from '@/components/urgency-badge';
 import {
     Flame, RefreshCw, Loader2, Phone, User, Clock, PhoneCall,
-    CheckCircle, XCircle, PhoneOff, StickyNote, AlertTriangle, Ticket,
+    CheckCircle, XCircle, PhoneOff, StickyNote, AlertTriangle, Ticket, ListTodo, Ban,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface HotLead {
+    type: 'call' | 'action';
     id: string;
     customerName: string | null;
     customerPhone: string | null;
@@ -24,8 +25,14 @@ interface HotLead {
     coachingNote: string | null;
     sourceCallId: string | null;
     rdTicketId: string | null;
+    actionType: string | null;
     createdAt: string;
     updatedAt: string;
+}
+
+function humanize(value: string | null): string | null {
+    if (!value) return null;
+    return value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 interface HotLeadsSummary {
@@ -95,6 +102,29 @@ export default function HotLeadsPage() {
             });
             const data = await res.json();
             if (res.ok && (data.success || data.id)) {
+                toast.success(`${label} — done`);
+                fetchLeads();
+            } else {
+                toast.error(data.error || `${label} failed`);
+            }
+        } catch {
+            toast.error(`${label} failed`);
+        } finally {
+            setLoadingAction(null);
+        }
+    };
+
+    const actionItemUpdate = async (itemId: string, status: 'completed' | 'cancelled', label: string) => {
+        const key = `${itemId}-${label}`;
+        setLoadingAction(key);
+        try {
+            const res = await fetch('/api/action-items/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: itemId, status }),
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
                 toast.success(`${label} — done`);
                 fetchLeads();
             } else {
@@ -227,11 +257,22 @@ export default function HotLeadsPage() {
                                             </div>
 
                                             <div className="flex flex-wrap gap-1.5 mb-2">
+                                                {lead.type === 'action' && (
+                                                    <span className="text-xs text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded inline-flex items-center gap-1">
+                                                        <ListTodo className="h-2.5 w-2.5" />
+                                                        Task
+                                                    </span>
+                                                )}
                                                 <UrgencyBadge urgency={lead.urgency} />
                                                 <CallbackStatusBadge status={lead.callbackStatus} />
                                                 {lead.callStatus && (
                                                     <span className="text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded capitalize">
                                                         {lead.callStatus}
+                                                    </span>
+                                                )}
+                                                {lead.actionType && (
+                                                    <span className="text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                                                        {humanize(lead.actionType)}
                                                     </span>
                                                 )}
                                                 {lead.rdTicketId && (
@@ -273,62 +314,89 @@ export default function HotLeadsPage() {
 
                                         {/* Quick actions */}
                                         <div className="flex flex-wrap sm:flex-col gap-1 shrink-0">
-                                            <Button
-                                                size="sm" variant="outline" className="h-7 text-xs"
-                                                disabled={busy}
-                                                onClick={() => quickAction(lead.id, 'mark-called', 'Marked called')}
-                                            >
-                                                {loadingAction === `${lead.id}-Marked called`
-                                                    ? <Loader2 className="h-3 w-3 animate-spin" />
-                                                    : <PhoneCall className="h-3 w-3 mr-1" />}
-                                                Called
-                                            </Button>
-                                            <Button
-                                                size="sm" variant="default" className="h-7 text-xs"
-                                                disabled={busy}
-                                                onClick={() => quickAction(lead.id, 'mark-booked', 'Marked booked')}
-                                            >
-                                                {loadingAction === `${lead.id}-Marked booked`
-                                                    ? <Loader2 className="h-3 w-3 animate-spin" />
-                                                    : <CheckCircle className="h-3 w-3 mr-1" />}
-                                                Booked
-                                            </Button>
-                                            <Button
-                                                size="sm" variant="outline" className="h-7 text-xs"
-                                                disabled={busy}
-                                                onClick={() => quickAction(lead.id, 'log-contact', 'Contact logged')}
-                                            >
-                                                {loadingAction === `${lead.id}-Contact logged`
-                                                    ? <Loader2 className="h-3 w-3 animate-spin" />
-                                                    : <PhoneOff className="h-3 w-3 mr-1" />}
-                                                No Answer
-                                            </Button>
-                                            <Button
-                                                size="sm" variant="destructive" className="h-7 text-xs"
-                                                disabled={busy}
-                                                onClick={() => quickAction(lead.id, 'mark-lost', 'Marked lost')}
-                                            >
-                                                {loadingAction === `${lead.id}-Marked lost`
-                                                    ? <Loader2 className="h-3 w-3 animate-spin" />
-                                                    : <XCircle className="h-3 w-3 mr-1" />}
-                                                Lost
-                                            </Button>
-                                            <Button
-                                                size="sm" variant="ghost" className="h-7 text-xs"
-                                                disabled={busy}
-                                                onClick={() => {
-                                                    setNoteOpenFor(noteOpenFor === lead.id ? null : lead.id);
-                                                    setNoteText('');
-                                                }}
-                                            >
-                                                <StickyNote className="h-3 w-3 mr-1" />
-                                                Note
-                                            </Button>
+                                            {lead.type === 'call' ? (
+                                                <>
+                                                    <Button
+                                                        size="sm" variant="outline" className="h-7 text-xs"
+                                                        disabled={busy}
+                                                        onClick={() => quickAction(lead.id, 'mark-called', 'Marked called')}
+                                                    >
+                                                        {loadingAction === `${lead.id}-Marked called`
+                                                            ? <Loader2 className="h-3 w-3 animate-spin" />
+                                                            : <PhoneCall className="h-3 w-3 mr-1" />}
+                                                        Called
+                                                    </Button>
+                                                    <Button
+                                                        size="sm" variant="default" className="h-7 text-xs"
+                                                        disabled={busy}
+                                                        onClick={() => quickAction(lead.id, 'mark-booked', 'Marked booked')}
+                                                    >
+                                                        {loadingAction === `${lead.id}-Marked booked`
+                                                            ? <Loader2 className="h-3 w-3 animate-spin" />
+                                                            : <CheckCircle className="h-3 w-3 mr-1" />}
+                                                        Booked
+                                                    </Button>
+                                                    <Button
+                                                        size="sm" variant="outline" className="h-7 text-xs"
+                                                        disabled={busy}
+                                                        onClick={() => quickAction(lead.id, 'log-contact', 'Contact logged')}
+                                                    >
+                                                        {loadingAction === `${lead.id}-Contact logged`
+                                                            ? <Loader2 className="h-3 w-3 animate-spin" />
+                                                            : <PhoneOff className="h-3 w-3 mr-1" />}
+                                                        No Answer
+                                                    </Button>
+                                                    <Button
+                                                        size="sm" variant="destructive" className="h-7 text-xs"
+                                                        disabled={busy}
+                                                        onClick={() => quickAction(lead.id, 'mark-lost', 'Marked lost')}
+                                                    >
+                                                        {loadingAction === `${lead.id}-Marked lost`
+                                                            ? <Loader2 className="h-3 w-3 animate-spin" />
+                                                            : <XCircle className="h-3 w-3 mr-1" />}
+                                                        Lost
+                                                    </Button>
+                                                    <Button
+                                                        size="sm" variant="ghost" className="h-7 text-xs"
+                                                        disabled={busy}
+                                                        onClick={() => {
+                                                            setNoteOpenFor(noteOpenFor === lead.id ? null : lead.id);
+                                                            setNoteText('');
+                                                        }}
+                                                    >
+                                                        <StickyNote className="h-3 w-3 mr-1" />
+                                                        Note
+                                                    </Button>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Button
+                                                        size="sm" variant="default" className="h-7 text-xs"
+                                                        disabled={busy}
+                                                        onClick={() => actionItemUpdate(lead.id, 'completed', 'Completed')}
+                                                    >
+                                                        {loadingAction === `${lead.id}-Completed`
+                                                            ? <Loader2 className="h-3 w-3 animate-spin" />
+                                                            : <CheckCircle className="h-3 w-3 mr-1" />}
+                                                        Complete
+                                                    </Button>
+                                                    <Button
+                                                        size="sm" variant="outline" className="h-7 text-xs"
+                                                        disabled={busy}
+                                                        onClick={() => actionItemUpdate(lead.id, 'cancelled', 'Dismissed')}
+                                                    >
+                                                        {loadingAction === `${lead.id}-Dismissed`
+                                                            ? <Loader2 className="h-3 w-3 animate-spin" />
+                                                            : <Ban className="h-3 w-3 mr-1" />}
+                                                        Dismiss
+                                                    </Button>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
 
-                                    {/* Inline add-note */}
-                                    {noteOpenFor === lead.id && (
+                                    {/* Inline add-note (call leads only) */}
+                                    {lead.type === 'call' && noteOpenFor === lead.id && (
                                         <div className="pt-2 border-t border-slate-100 space-y-2">
                                             <Textarea
                                                 value={noteText}
