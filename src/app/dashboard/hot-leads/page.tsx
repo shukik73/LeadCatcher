@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 
 interface HotLead {
     id: string;
+    sourceType?: 'call_analysis' | 'action_item';
     customerName: string | null;
     customerPhone: string | null;
     urgency: string | null;
@@ -227,6 +228,11 @@ export default function HotLeadsPage() {
                                             </div>
 
                                             <div className="flex flex-wrap gap-1.5 mb-2">
+                                                {lead.sourceType === 'action_item' && (
+                                                    <span className="text-xs text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
+                                                        Action item
+                                                    </span>
+                                                )}
                                                 <UrgencyBadge urgency={lead.urgency} />
                                                 <CallbackStatusBadge status={lead.callbackStatus} />
                                                 {lead.callStatus && (
@@ -272,7 +278,12 @@ export default function HotLeadsPage() {
                                         </div>
 
                                         {/* Quick actions */}
-                                        <div className="flex flex-wrap sm:flex-col gap-1 shrink-0">
+                                        {lead.sourceType === 'action_item' ? (
+                                            <div className="text-xs text-slate-500 bg-amber-50 border border-amber-100 rounded-md px-3 py-2 shrink-0 max-w-[180px]">
+                                                Open task surfaced from action_items. Use call buttons only on call-analysis leads.
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-wrap sm:flex-col gap-1 shrink-0">
                                             <Button
                                                 size="sm" variant="outline" className="h-7 text-xs"
                                                 disabled={busy}
@@ -324,7 +335,8 @@ export default function HotLeadsPage() {
                                                 <StickyNote className="h-3 w-3 mr-1" />
                                                 Note
                                             </Button>
-                                        </div>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Inline add-note */}

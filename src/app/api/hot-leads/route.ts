@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { buildHotLeadQueue, type HotLeadActionItemRow, type HotLeadCallRow } from '@/lib/hot-lead-queue';
 import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -7,25 +8,7 @@ const TAG = '[HotLeads]';
 
 // Callback statuses that still need owner action (i.e. not yet booked/lost).
 const ACTIONABLE_STATUSES = ['pending', 'no_answer', 'called'] as const;
-
-const urgencyOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
-
-interface CallRow {
-    id: string;
-    source_call_id: string | null;
-    customer_name: string | null;
-    customer_phone: string | null;
-    urgency: string | null;
-    call_status: string | null;
-    callback_status: string | null;
-    due_by: string | null;
-    summary: string | null;
-    follow_up_notes: string | null;
-    coaching_note: string | null;
-    rd_ticket_id: string | null;
-    created_at: string;
-    updated_at: string;
-}
+const OPEN_ACTION_ITEM_STATUSES = ['pending', 'in_progress'] as const;
 
 /**
  * GET /api/hot-leads
@@ -74,21 +57,18 @@ export async function GET() {
             return Response.json({ error: 'Failed to fetch hot leads' }, { status: 500 });
         }
 
-        const rows = (data || []) as CallRow[];
+        const { data: actionItems, error: actionItemsError } = await supabase
+            .from('action_items')
+            .select('id, title, description, action_type, priority, status, customer_name, customer_phone, call_analysis_id, rd_ticket_id, created_at, updated_at')
+            .eq('business_id', business.id)
+            .in('status', OPEN_ACTION_ITEM_STATUSES as unknown as string[])
+            .order('created_at', { ascending: false })
+            .limit(100);
 
-        // Sort in JS: urgency DESC (high first), then earliest due_by first.
-        // Rows without a due_by sort after those that have one.
-        const sorted = [...rows].sort((a, b) => {
-            const urgDiff = (urgencyOrder[a.urgency ?? ''] ?? 3) - (urgencyOrder[b.urgency ?? ''] ?? 3);
-            if (urgDiff !== 0) return urgDiff;
-            const aDue = a.due_by ? new Date(a.due_by).getTime() : Number.POSITIVE_INFINITY;
-            const bDue = b.due_by ? new Date(b.due_by).getTime() : Number.POSITIVE_INFINITY;
-            return aDue - bDue;
-        });
-
-        const now = Date.now();
-        const dueNow = sorted.filter((r) => r.due_by && new Date(r.due_by).getTime() <= now).length;
-        const highUrgency = sorted.filter((r) => r.urgency === 'high').length;
+        if (actionItemsError) {
+            logger.error(`${TAG} Action item query failed`, actionItemsError);
+            return Response.json({ error: 'Failed to fetch hot leads' }, { status: 500 });
+        }
 
         // Booked today — derived from existing data (call_analyses resolved as
         // booked and updated since the start of the local day). Null if it can't
@@ -108,32 +88,13 @@ export async function GET() {
             bookedToday = null;
         }
 
-        const leads = sorted.map((r) => ({
-            id: r.id,
-            customerName: r.customer_name,
-            customerPhone: r.customer_phone,
-            urgency: r.urgency,
-            callStatus: r.call_status,
-            callbackStatus: r.callback_status,
-            dueBy: r.due_by,
-            summary: r.summary,
-            followUpNotes: r.follow_up_notes,
-            coachingNote: r.coaching_note,
-            sourceCallId: r.source_call_id,
-            rdTicketId: r.rd_ticket_id,
-            createdAt: r.created_at,
-            updatedAt: r.updated_at,
-        }));
-
         return Response.json({
             success: true,
-            summary: {
-                total: leads.length,
-                dueNow,
-                highUrgency,
+            ...buildHotLeadQueue({
+                calls: (data || []) as HotLeadCallRow[],
+                actionItems: (actionItems || []) as HotLeadActionItemRow[],
                 bookedToday,
-            },
-            leads,
+            }),
         });
     } catch (error) {
         logger.error(`${TAG} Unexpected error`, error);
