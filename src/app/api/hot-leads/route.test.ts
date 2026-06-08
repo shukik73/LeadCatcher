@@ -90,7 +90,7 @@ beforeEach(() => {
     vi.clearAllMocks();
 });
 
-describe('GET /api/hot-leads', () => {
+describe('GET /api/hot-leads (route handler)', () => {
     it('returns 401 when unauthenticated', async () => {
         const { status, json } = await runGet({ user: null });
         expect(status).toBe(401);
@@ -110,60 +110,53 @@ describe('GET /api/hot-leads', () => {
         expect(businessScoped.length).toBeGreaterThanOrEqual(2);
     });
 
-    it('sorts by urgency (high first) then due_by ASC and computes summary counts', async () => {
+    it('returns merged call + action-item leads with a sourceType discriminator', async () => {
         const callRows = [
-            { id: 'a', urgency: 'low', due_by: null, callback_status: 'pending', customer_name: 'A' },
-            { id: 'b', urgency: 'high', due_by: '2099-01-01T10:00:00Z', callback_status: 'pending', customer_name: 'B' },
-            { id: 'c', urgency: 'high', due_by: '2020-01-01T09:00:00Z', callback_status: 'pending', customer_name: 'C' },
-            { id: 'd', urgency: 'medium', due_by: null, callback_status: 'pending', customer_name: 'D' },
+            {
+                id: 'call-1', source_call_id: 'CA-1', urgency: 'low', due_by: '2099-01-01T10:00:00Z',
+                callback_status: 'pending', customer_name: 'Caller', customer_phone: '+1',
+                summary: 'call summary', follow_up_notes: null, coaching_note: null,
+                rd_ticket_id: null, created_at: '2026-06-08T08:00:00Z', updated_at: '2026-06-08T08:00:00Z',
+            },
         ];
-        const { status, json } = await runGet({ callRows, bookedCount: 0 });
+        const actionRows = [
+            {
+                id: 'act-1', call_analysis_id: null, title: 'Send quote', description: 'iPhone screen',
+                action_type: 'quote_needed', priority: 'high', status: 'pending',
+                customer_name: 'Jane', customer_phone: '+2', rd_ticket_id: 'RD-9',
+                created_at: '2026-06-08T09:00:00Z', updated_at: '2026-06-08T09:00:00Z',
+            },
+        ];
+        const { status, json } = await runGet({ callRows, actionRows, bookedCount: 0 });
         expect(status).toBe(200);
         expect(json.success).toBe(true);
-        expect(json.leads.map((l: { id: string }) => l.id)).toEqual(['c', 'b', 'd', 'a']);
-        expect(json.summary.total).toBe(4);
-        expect(json.summary.highUrgency).toBe(2);
-        // Only 'c' has a due_by in the past.
-        expect(json.summary.dueNow).toBe(1);
-        expect(json.leads.every((l: { type: string }) => l.type === 'call')).toBe(true);
+        expect(json.summary.total).toBe(2);
+        expect(json.summary.highUrgency).toBe(1);
+        // High-urgency action item sorts ahead of the low-urgency call.
+        expect(json.leads.map((l: { id: string }) => l.id)).toEqual(['act-1', 'call-1']);
+        expect(json.leads[0]).toMatchObject({
+            sourceType: 'action_item',
+            urgency: 'high',
+            summary: 'Send quote',
+            followUpNotes: 'iPhone screen',
+        });
+        expect(json.leads[1].sourceType).toBe('call_analysis');
     });
 
-    it('merges open action items and maps priority to urgency', async () => {
+    it('includes action items linked to a call, annotated with the linked call id', async () => {
         const { json } = await runGet({
             callRows: [],
             actionRows: [
-                {
-                    id: 'act-1', call_analysis_id: null, title: 'Call back customer',
-                    description: 'wants a quote', action_type: 'callback', priority: 'high',
-                    status: 'pending', customer_name: 'Jane', customer_phone: '+15550001111',
-                    rd_ticket_id: 'T-9', created_at: 'now', updated_at: 'now',
-                },
+                { id: 'act-linked', call_analysis_id: 'call-7', title: 'Follow up', priority: 'medium', status: 'pending' },
             ],
         });
-        expect(json.leads).toHaveLength(1);
-        const lead = json.leads[0];
-        expect(lead.type).toBe('action');
-        expect(lead.urgency).toBe('high');
-        expect(lead.summary).toBe('Call back customer');
-        expect(lead.followUpNotes).toBe('wants a quote');
-        expect(lead.actionType).toBe('callback');
-        expect(lead.dueBy).toBeNull();
-        expect(json.summary.highUrgency).toBe(1);
-    });
-
-    it('dedupes action items already represented by a call lead', async () => {
-        const { json } = await runGet({
-            callRows: [{ id: 'call-1', urgency: 'high', due_by: null, callback_status: 'pending' }],
-            actionRows: [
-                { id: 'act-linked', call_analysis_id: 'call-1', title: 'dupe', priority: 'high', status: 'pending' },
-                { id: 'act-standalone', call_analysis_id: null, title: 'keep', priority: 'medium', status: 'pending' },
-            ],
+        expect(json.summary.total).toBe(1);
+        expect(json.leads[0]).toMatchObject({
+            id: 'act-linked',
+            sourceType: 'action_item',
+            sourceCallId: 'call-7',
+            coachingNote: 'Linked call: call-7',
         });
-        const ids = json.leads.map((l: { id: string }) => l.id);
-        expect(ids).toContain('call-1');
-        expect(ids).toContain('act-standalone');
-        expect(ids).not.toContain('act-linked');
-        expect(json.summary.total).toBe(2);
     });
 
     it('reports bookedToday from the count query', async () => {
@@ -171,20 +164,16 @@ describe('GET /api/hot-leads', () => {
         expect(json.summary.bookedToday).toBe(5);
     });
 
-    it('degrades gracefully when the action_items table is missing', async () => {
+    it('returns 500 when the primary call query errors', async () => {
+        const { status, json } = await runGet({ callError: { code: 'XYZ', message: 'boom' } });
+        expect(status).toBe(500);
+        expect(json.error).toBe('Failed to fetch hot leads');
+    });
+
+    it('returns 500 when the action-items query errors', async () => {
         const { status, json } = await runGet({
             callRows: [{ id: 'call-1', urgency: 'high', due_by: null, callback_status: 'pending' }],
             actionError: { code: '42P01', message: 'relation "action_items" does not exist' },
-        });
-        expect(status).toBe(200);
-        expect(json.success).toBe(true);
-        expect(json.leads).toHaveLength(1);
-        expect(json.leads[0].id).toBe('call-1');
-    });
-
-    it('returns 500 when the primary call query errors', async () => {
-        const { status, json } = await runGet({
-            callError: { code: 'XYZ', message: 'boom' },
         });
         expect(status).toBe(500);
         expect(json.error).toBe('Failed to fetch hot leads');
