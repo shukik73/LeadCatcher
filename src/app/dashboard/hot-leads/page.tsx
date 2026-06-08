@@ -296,9 +296,9 @@ export default function HotLeadsPage() {
                                             <Button
                                                 size="sm" variant="outline" className="h-7 text-xs"
                                                 disabled={busy}
-                                                onClick={() => quickAction(lead.id, 'log-contact', 'Contact logged')}
+                                                onClick={() => quickAction(lead.id, 'log-outcome', 'No answer logged', { outcome: 'no_answer' })}
                                             >
-                                                {loadingAction === `${lead.id}-Contact logged`
+                                                {loadingAction === `${lead.id}-No answer logged`
                                                     ? <Loader2 className="h-3 w-3 animate-spin" />
                                                     : <PhoneOff className="h-3 w-3 mr-1" />}
                                                 No Answer
