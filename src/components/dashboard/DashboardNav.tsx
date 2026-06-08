@@ -3,12 +3,13 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-client';
 import { Button } from '@/components/ui/button';
-import { MessageSquare, Settings, CreditCard, LogOut, Inbox, Menu, X, PhoneCall, ListChecks, GraduationCap, ClipboardCheck, ListTodo, BarChart3, User } from 'lucide-react';
+import { MessageSquare, Settings, CreditCard, LogOut, Inbox, Menu, X, PhoneCall, ListChecks, GraduationCap, ClipboardCheck, ListTodo, BarChart3, User, Flame } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
     { href: '/dashboard', label: 'Inbox', icon: Inbox },
+    { href: '/dashboard/hot-leads', label: 'Hot Leads', icon: Flame },
     { href: '/dashboard/calls', label: 'Calls', icon: PhoneCall },
     { href: '/dashboard/followups', label: 'Follow-Ups', icon: ListChecks },
     { href: '/dashboard/coaching', label: 'Coaching', icon: GraduationCap },
