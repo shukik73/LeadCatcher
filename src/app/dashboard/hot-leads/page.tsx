@@ -4,10 +4,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { UrgencyBadge, CallbackStatusBadge } from '@/components/urgency-badge';
 import {
     Flame, RefreshCw, Loader2, Phone, User, Clock, PhoneCall,
-    CheckCircle, XCircle, PhoneOff, StickyNote, AlertTriangle, Ticket,
+    CheckCircle, XCircle, PhoneOff, StickyNote, AlertTriangle, Ticket, DollarSign,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -56,6 +57,8 @@ export default function HotLeadsPage() {
     const [noteOpenFor, setNoteOpenFor] = useState<string | null>(null);
     const [noteText, setNoteText] = useState('');
     const [savingNote, setSavingNote] = useState(false);
+    const [bookingOpenFor, setBookingOpenFor] = useState<string | null>(null);
+    const [bookingValue, setBookingValue] = useState('');
 
     const fetchLeads = useCallback(async () => {
         setLoading(true);
@@ -106,6 +109,23 @@ export default function HotLeadsPage() {
         } finally {
             setLoadingAction(null);
         }
+    };
+
+    const confirmBooked = (leadId: string) => {
+        const raw = bookingValue.trim();
+        const parsed = raw === '' ? undefined : Number(raw);
+        if (parsed != null && (!Number.isFinite(parsed) || parsed < 0)) {
+            toast.error('Enter a valid job value');
+            return;
+        }
+        setBookingOpenFor(null);
+        setBookingValue('');
+        quickAction(
+            leadId,
+            'mark-booked',
+            'Marked booked',
+            parsed != null ? { booked_value: parsed } : undefined,
+        );
     };
 
     const saveNote = async (leadId: string) => {
@@ -297,7 +317,11 @@ export default function HotLeadsPage() {
                                             <Button
                                                 size="sm" variant="default" className="h-7 text-xs"
                                                 disabled={busy}
-                                                onClick={() => quickAction(lead.id, 'mark-booked', 'Marked booked')}
+                                                onClick={() => {
+                                                    setBookingOpenFor(bookingOpenFor === lead.id ? null : lead.id);
+                                                    setBookingValue('');
+                                                    setNoteOpenFor(null);
+                                                }}
                                             >
                                                 {loadingAction === `${lead.id}-Marked booked`
                                                     ? <Loader2 className="h-3 w-3 animate-spin" />
@@ -338,6 +362,42 @@ export default function HotLeadsPage() {
                                             </div>
                                         )}
                                     </div>
+
+                                    {/* Inline booked-value capture — feeds recovered revenue */}
+                                    {bookingOpenFor === lead.id && (
+                                        <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center gap-2">
+                                            <div className="relative flex-1">
+                                                <DollarSign className="h-3.5 w-3.5 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2" />
+                                                <Input
+                                                    type="number" min="0" step="1" inputMode="decimal"
+                                                    placeholder="Job value (optional)"
+                                                    className="h-7 text-xs pl-7"
+                                                    value={bookingValue}
+                                                    autoFocus
+                                                    onChange={(e) => setBookingValue(e.target.value)}
+                                                    onKeyDown={(e) => { if (e.key === 'Enter') confirmBooked(lead.id); }}
+                                                />
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    size="sm" className="h-7 text-xs"
+                                                    disabled={busy}
+                                                    onClick={() => confirmBooked(lead.id)}
+                                                >
+                                                    {loadingAction === `${lead.id}-Marked booked`
+                                                        ? <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                                        : <CheckCircle className="h-3 w-3 mr-1" />}
+                                                    Confirm booked
+                                                </Button>
+                                                <Button
+                                                    size="sm" variant="ghost" className="h-7 text-xs"
+                                                    onClick={() => { setBookingOpenFor(null); setBookingValue(''); }}
+                                                >
+                                                    Cancel
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* Inline add-note */}
                                     {noteOpenFor === lead.id && (

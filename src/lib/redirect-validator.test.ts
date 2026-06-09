@@ -27,22 +27,22 @@ describe('getSafeRedirectPath', () => {
     });
 
     describe('null/empty input', () => {
-        it('returns /dashboard for null', () => {
-            expect(getSafeRedirectPath(null)).toBe('/dashboard');
+        it('returns the default landing for null', () => {
+            expect(getSafeRedirectPath(null)).toBe('/dashboard/today');
         });
 
-        it('returns /dashboard for empty string (no leading slash)', () => {
-            expect(getSafeRedirectPath('')).toBe('/dashboard');
+        it('returns the default landing for empty string (no leading slash)', () => {
+            expect(getSafeRedirectPath('')).toBe('/dashboard/today');
         });
     });
 
     describe('blocks open redirect attacks', () => {
         it('blocks absolute URLs to external sites', () => {
-            expect(getSafeRedirectPath('https://evil.com')).toBe('/dashboard');
+            expect(getSafeRedirectPath('https://evil.com')).toBe('/dashboard/today');
         });
 
         it('blocks protocol-relative URLs (//evil.com)', () => {
-            expect(getSafeRedirectPath('//evil.com')).toBe('/dashboard');
+            expect(getSafeRedirectPath('//evil.com')).toBe('/dashboard/today');
             expect(vi.mocked(logger.warn)).toHaveBeenCalledWith(
                 expect.stringContaining('protocol-relative'),
                 expect.any(Object)
@@ -50,37 +50,37 @@ describe('getSafeRedirectPath', () => {
         });
 
         it('blocks URLs with http in path', () => {
-            expect(getSafeRedirectPath('/redirect?url=http://evil.com')).toBe('/dashboard');
+            expect(getSafeRedirectPath('/redirect?url=http://evil.com')).toBe('/dashboard/today');
         });
 
         it('blocks paths with colon (protocol indicators)', () => {
-            expect(getSafeRedirectPath('javascript:alert(1)')).toBe('/dashboard');
+            expect(getSafeRedirectPath('javascript:alert(1)')).toBe('/dashboard/today');
         });
 
         it('blocks data: URI scheme', () => {
-            expect(getSafeRedirectPath('data:text/html,<script>alert(1)</script>')).toBe('/dashboard');
+            expect(getSafeRedirectPath('data:text/html,<script>alert(1)</script>')).toBe('/dashboard/today');
         });
 
         it('blocks paths without leading slash', () => {
-            expect(getSafeRedirectPath('evil.com/steal')).toBe('/dashboard');
+            expect(getSafeRedirectPath('evil.com/steal')).toBe('/dashboard/today');
         });
     });
 
     describe('blocks encoded bypass attempts', () => {
         it('blocks encoded forward slash %2f', () => {
-            expect(getSafeRedirectPath('/..%2f..%2fetc/passwd')).toBe('/dashboard');
+            expect(getSafeRedirectPath('/..%2f..%2fetc/passwd')).toBe('/dashboard/today');
         });
 
         it('blocks encoded forward slash %2F (uppercase)', () => {
-            expect(getSafeRedirectPath('/..%2F..%2Fetc/passwd')).toBe('/dashboard');
+            expect(getSafeRedirectPath('/..%2F..%2Fetc/passwd')).toBe('/dashboard/today');
         });
 
         it('blocks encoded backslash %5c', () => {
-            expect(getSafeRedirectPath('/..%5c..%5cetc/passwd')).toBe('/dashboard');
+            expect(getSafeRedirectPath('/..%5c..%5cetc/passwd')).toBe('/dashboard/today');
         });
 
         it('blocks encoded backslash %5C (uppercase)', () => {
-            expect(getSafeRedirectPath('/..%5C..%5Cetc/passwd')).toBe('/dashboard');
+            expect(getSafeRedirectPath('/..%5C..%5Cetc/passwd')).toBe('/dashboard/today');
         });
     });
 

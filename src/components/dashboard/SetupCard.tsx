@@ -80,8 +80,8 @@ export function SetupCard() {
         : 'testCallDone';
 
     const handleContinue = () => {
-        if (nextStep === 'phoneConnected' || nextStep === 'autoReplyEnabled') {
-            router.push('/dashboard/settings');
+        if (nextStep === 'testCallDone') {
+            router.push('/dashboard/settings#test-call');
         } else {
             router.push('/dashboard/settings');
         }

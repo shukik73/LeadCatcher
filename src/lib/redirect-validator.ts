@@ -5,7 +5,7 @@ import { logger } from '@/lib/logger';
  * Only allows relative paths that start with / and don't contain protocol indicators.
  */
 export function getSafeRedirectPath(path: string | null): string {
-    const defaultPath = '/dashboard';
+    const defaultPath = '/dashboard/today';
 
     if (!path) {
         return defaultPath;

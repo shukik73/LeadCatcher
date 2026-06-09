@@ -43,7 +43,7 @@ export async function POST(request: Request) {
 
     if (!business) return new Response('Business not found', { status: 404 });
     if (!business.forwarding_number) {
-        return new Response(JSON.stringify({ success: false, error: 'No Twilio number linked. Complete step 3 first.' }), {
+        return new Response(JSON.stringify({ success: false, error: 'No phone number is linked yet. Connect your phone in the Phone Connection section above, then run the test call.' }), {
             status: 400, headers: { 'Content-Type': 'application/json' }
         });
     }
@@ -87,7 +87,25 @@ export async function POST(request: Request) {
 
     } catch (error) {
         logger.error('Verification Call Failed', error);
-        return new Response(JSON.stringify({ success: false, error: 'Failed to place call' }), {
+        // Surface Twilio's actual failure so owners can self-serve the fix instead
+        // of seeing a generic "Failed to place call". Common codes:
+        //   21210/21219 — 'To' number isn't a Verified Caller ID (Twilio trial accounts)
+        //   21211       — invalid 'To' phone number
+        //   21601/21614 — number isn't reachable / not a valid mobile
+        //   21205/11200/21601 — webhook URL couldn't be fetched by Twilio
+        const twErr = error as { code?: number; message?: string };
+        const friendly =
+            twErr.code === 21210 || twErr.code === 21219
+                ? 'Your business phone is not a verified caller ID on this account. Verify it in the Twilio Console (or upgrade off the trial), then try again.'
+                : twErr.code === 21211
+                ? 'Your business phone number looks invalid. Check it in the Phone Connection section above and try again.'
+                : twErr.code === 21601 || twErr.code === 21614
+                ? 'We could not place a call to your business phone — the number may be unreachable or not a valid phone line. Double-check it and try again.'
+                : twErr.code === 11200 || twErr.code === 21205
+                ? `Our server could not be reached to set up the call (${twErr.code}). This is usually a configuration issue on our end — please contact support.`
+                : `The call could not be placed${twErr.code ? ` (error ${twErr.code})` : ''}. Please try again, or contact support if it keeps failing.`;
+
+        return new Response(JSON.stringify({ success: false, error: friendly }), {
             status: 500, headers: { 'Content-Type': 'application/json' }
         });
     }

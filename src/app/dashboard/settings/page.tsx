@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { Loader2, CheckCircle2, XCircle, RefreshCw, Save, Phone, AlertCircle, Pencil, Settings2 } from 'lucide-react';
 import { autoLinkTwilioNumber } from '@/app/actions/twilio';
 import { ForwardingStatus } from '@/components/dashboard/ForwardingStatus';
+import { TestCallCard } from '@/components/dashboard/TestCallCard';
 
 interface BusinessHours {
     [key: string]: {
@@ -469,6 +470,9 @@ export default function SettingsPage() {
                     )}
                 </CardContent>
             </Card>
+
+            {/* Test Call Forwarding — target of dashboard "Run Test Call" CTAs */}
+            <TestCallCard isConnected={isConnected} />
 
             {/* Auto-Reply Message (Simplified Template) */}
             <Card>
