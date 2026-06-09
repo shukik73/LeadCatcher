@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -144,9 +144,11 @@ export default function TodayPage() {
     const [bookingValue, setBookingValue] = useState('');
     const [now] = useState(() => new Date());
 
-    const load = useCallback(async () => {
-        setLoading(true);
-        setError(null);
+    const load = useCallback(async (silent = false) => {
+        if (!silent) {
+            setLoading(true);
+            setError(null);
+        }
         try {
             const [recoveryRes, hotRes] = await Promise.all([
                 fetch(`/api/analytics/recovery?period=${PERIOD_DAYS}`),
@@ -168,17 +170,37 @@ export default function TodayPage() {
                 setSummary(hot.summary || null);
             }
             if ((!recoveryRes.ok || !recovery.success) && (!hotRes.ok || !hot.success)) {
-                setError(recovery.error || hot.error || 'Failed to load your dashboard');
+                // On a silent refresh, keep the last good data rather than flashing an error.
+                if (!silent) setError(recovery.error || hot.error || 'Failed to load your dashboard');
             }
         } catch {
-            setError('Failed to load your dashboard');
+            if (!silent) setError('Failed to load your dashboard');
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     }, []);
 
     useEffect(() => {
         load();
+    }, [load]);
+
+    // Live refresh — keep Today current as a leave-it-open wall-board.
+    // Silent (no spinner), and paused while the owner is mid-booking so a
+    // background refresh never wipes an open job-value form.
+    const bookingIdRef = useRef<string | null>(null);
+    bookingIdRef.current = bookingId;
+    useEffect(() => {
+        const refreshIfIdle = () => {
+            if (bookingIdRef.current === null && document.visibilityState === 'visible') {
+                load(true);
+            }
+        };
+        const id = setInterval(refreshIfIdle, 60000);
+        document.addEventListener('visibilitychange', refreshIfIdle);
+        return () => {
+            clearInterval(id);
+            document.removeEventListener('visibilitychange', refreshIfIdle);
+        };
     }, [load]);
 
     const markBooked = async (leadId: string, value?: number) => {
@@ -249,16 +271,22 @@ export default function TodayPage() {
                         )}
                     </p>
                 </div>
-                <Button variant="outline" size="sm" onClick={load} disabled={loading}>
-                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                </Button>
+                <div className="flex items-center gap-2 shrink-0">
+                    <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-slate-400" title="This screen updates automatically every minute">
+                        <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                        Live
+                    </span>
+                    <Button variant="outline" size="sm" onClick={() => load()} disabled={loading}>
+                        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    </Button>
+                </div>
             </div>
 
             {error && (
                 <div className="text-center py-12 text-slate-500">
                     <AlertTriangle className="h-8 w-8 mx-auto mb-2 text-red-400" />
                     <p className="text-sm">{error}</p>
-                    <Button variant="outline" size="sm" className="mt-3" onClick={load}>
+                    <Button variant="outline" size="sm" className="mt-3" onClick={() => load()}>
                         <RefreshCw className="h-4 w-4 mr-1" /> Retry
                     </Button>
                 </div>
