@@ -43,7 +43,7 @@ export default function Pricing() {
             <div className="container px-4 mx-auto">
                 <div className="text-center max-w-3xl mx-auto mb-16">
                     <h2 className="text-3xl md:text-5xl font-bold mb-4 text-slate-900">Simple, transparent pricing.</h2>
-                    <p className="text-xl text-slate-500">Start with a 14-day free trial. No credit card required.</p>
+                    <p className="text-xl text-slate-500">Start with a 14-day free trial. No charge for 14 days &mdash; cancel anytime.</p>
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
