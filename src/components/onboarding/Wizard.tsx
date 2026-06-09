@@ -375,7 +375,7 @@ export default function Wizard() {
                                         </Button>
                                     </>
                                 ) : (
-                                    <Button className="w-full bg-green-600 hover:bg-green-700" onClick={() => router.push('/dashboard')}>Go to Dashboard</Button>
+                                    <Button className="w-full bg-green-600 hover:bg-green-700" onClick={() => router.push('/dashboard/today')}>Go to Dashboard</Button>
                                 )}
                             </CardFooter>
                         </Card>

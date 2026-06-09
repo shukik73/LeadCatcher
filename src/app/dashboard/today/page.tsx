@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { UrgencyBadge, CallbackStatusBadge } from '@/components/urgency-badge';
 import {
     Sun, RefreshCw, Loader2, Phone, PhoneCall, User, Clock,
@@ -89,6 +90,8 @@ export default function TodayPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [actioningId, setActioningId] = useState<string | null>(null);
+    const [bookingId, setBookingId] = useState<string | null>(null);
+    const [bookingValue, setBookingValue] = useState('');
     const [now] = useState(() => new Date());
 
     const load = useCallback(async () => {
@@ -128,14 +131,28 @@ export default function TodayPage() {
         load();
     }, [load]);
 
-    const markBooked = async (leadId: string) => {
+    const markBooked = async (leadId: string, value?: number) => {
         setActioningId(leadId);
         try {
-            const res = await fetch(`/api/calls/${leadId}/mark-booked`, { method: 'POST' });
+            const res = await fetch(`/api/calls/${leadId}/mark-booked`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(value != null ? { booked_value: value } : {}),
+            });
             const data = await res.json();
             if (res.ok && (data.success || data.id)) {
-                toast.success('Marked booked 🎉');
+                toast.success(
+                    value != null ? `Booked — ${formatMoney(value)} recovered 🎉` : 'Marked booked 🎉',
+                );
                 setCallbacks((prev) => prev.filter((l) => l.id !== leadId));
+                setBookingId(null);
+                setBookingValue('');
+                // Reflect the win in the KPI row immediately.
+                setStats((prev) => prev && ({
+                    ...prev,
+                    booked_leads: prev.booked_leads + 1,
+                    estimated_recovered_revenue: prev.estimated_recovered_revenue + (value ?? 0),
+                }));
             } else {
                 toast.error(data.error || 'Could not update');
             }
@@ -144,6 +161,16 @@ export default function TodayPage() {
         } finally {
             setActioningId(null);
         }
+    };
+
+    const confirmBooking = (leadId: string) => {
+        const raw = bookingValue.trim();
+        const parsed = raw === '' ? undefined : Number(raw);
+        if (parsed != null && (!Number.isFinite(parsed) || parsed < 0)) {
+            toast.error('Enter a valid job value');
+            return;
+        }
+        markBooked(leadId, parsed);
     };
 
     const dueNow = summary?.dueNow ?? 0;
@@ -265,7 +292,7 @@ export default function TodayPage() {
                                             key={lead.id}
                                             className={isOverdue ? 'border-red-200 bg-red-50/30' : undefined}
                                         >
-                                            <CardContent className="py-3">
+                                            <CardContent className="py-3 space-y-2">
                                                 <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -302,7 +329,10 @@ export default function TodayPage() {
                                                         <Button
                                                             size="sm" className="h-8 text-xs bg-green-600 hover:bg-green-700"
                                                             disabled={busy}
-                                                            onClick={() => markBooked(lead.id)}
+                                                            onClick={() => {
+                                                                setBookingId(bookingId === lead.id ? null : lead.id);
+                                                                setBookingValue('');
+                                                            }}
                                                         >
                                                             {busy
                                                                 ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -310,6 +340,40 @@ export default function TodayPage() {
                                                         </Button>
                                                     </div>
                                                 </div>
+
+                                                {/* Inline booked-value capture — makes recovered revenue exact */}
+                                                {bookingId === lead.id && (
+                                                    <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center gap-2">
+                                                        <div className="relative flex-1">
+                                                            <DollarSign className="h-3.5 w-3.5 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2" />
+                                                            <Input
+                                                                type="number" min="0" step="1" inputMode="decimal"
+                                                                placeholder="Job value (optional)"
+                                                                className="h-8 text-xs pl-7"
+                                                                value={bookingValue}
+                                                                autoFocus
+                                                                onChange={(e) => setBookingValue(e.target.value)}
+                                                                onKeyDown={(e) => { if (e.key === 'Enter') confirmBooking(lead.id); }}
+                                                            />
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <Button
+                                                                size="sm" className="h-8 text-xs bg-green-600 hover:bg-green-700"
+                                                                disabled={busy}
+                                                                onClick={() => confirmBooking(lead.id)}
+                                                            >
+                                                                {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Confirm booked'}
+                                                            </Button>
+                                                            <Button
+                                                                size="sm" variant="ghost" className="h-8 text-xs"
+                                                                disabled={busy}
+                                                                onClick={() => { setBookingId(null); setBookingValue(''); }}
+                                                            >
+                                                                Cancel
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </CardContent>
                                         </Card>
                                     );
