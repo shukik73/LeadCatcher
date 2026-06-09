@@ -6,6 +6,7 @@ import { claimWebhookEvent, markWebhookProcessed, markWebhookFailedIfProcessing,
 import { verifyCallbackSignature } from '@/lib/callback-signature';
 import { checkSmsRateLimit } from '@/lib/sms-rate-limit';
 import { scoreCall } from '@/lib/call-scoring';
+import { maybeSendHotLeadAlert } from '@/lib/hot-lead-alert';
 import { logger } from '@/lib/logger';
 import twilio from 'twilio';
 
@@ -125,6 +126,11 @@ async function handleTranscriptionWebhook(
         });
     }
 
+    // Hoisted out of the scoring block so the owner-notification step (7) can
+    // decide between the prioritized hot-lead alert and the standard summary.
+    let scoreUrgency: string | null = null;
+    let scoreSummary: string | null = null;
+
     // 3b. Update call_analyses with transcript and AI scoring
     try {
         // Find the call_analyses record by source_call_id (passed from voice webhook)
@@ -159,6 +165,8 @@ async function handleTranscriptionWebhook(
             callStatus: 'missed',
             customerPhone: caller,
         });
+        scoreUrgency = score.urgency;
+        scoreSummary = score.summary;
 
         if (callAnalysisId) {
             // Update existing record with transcript and AI scoring
@@ -261,10 +269,31 @@ async function handleTranscriptionWebhook(
         logger.info(`[${TAG}] Skipping auto-reply - user opted out or lookup failed`, { caller, businessId });
     }
 
-    // 7. Notify Owner with Summary (only if billing active)
+    // 7. Notify owner (only if billing active). A high-urgency voicemail fires
+    //    the prioritized HOT LEAD alert (one-shot, deduped with the SMS path via
+    //    leads.hot_alert_sent_at). Everything else gets the standard summary.
+    //    When the hot alert is sent (or already sent) we skip the generic notice
+    //    so the owner isn't texted twice for the same voicemail.
     if (billing.allowed) {
-        const { data: business } = await supabaseAdmin.from('businesses').select('owner_phone').eq('id', businessId).single();
-        if (business?.owner_phone) {
+        const { data: business } = await supabaseAdmin
+            .from('businesses')
+            .select('owner_phone, forwarding_number')
+            .eq('id', businessId)
+            .single();
+
+        let hotAlertSent = false;
+        if (lead && scoreUrgency === 'high') {
+            hotAlertSent = await maybeSendHotLeadAlert({
+                leadId: lead.id,
+                businessId,
+                ownerPhone: business?.owner_phone,
+                forwardingNumber: business?.forwarding_number,
+                summary: `Voicemail from ${caller}: ${scoreSummary || analysis.summary}`,
+                urgency: scoreUrgency,
+            });
+        }
+
+        if (!hotAlertSent && business?.owner_phone) {
             const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
             try {
                 await client.messages.create({

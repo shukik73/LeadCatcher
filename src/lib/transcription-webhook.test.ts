@@ -33,6 +33,18 @@ vi.mock('@/lib/callback-signature', () => ({
     verifyCallbackSignature: vi.fn().mockReturnValue(true),
 }));
 
+// scoreCall is controllable per-test; defaults to the medium-urgency fallback so
+// existing tests keep exercising the standard owner-summary path.
+const mockScoreCall = vi.fn();
+vi.mock('@/lib/call-scoring', () => ({
+    scoreCall: (...args: unknown[]) => mockScoreCall(...args),
+}));
+
+const mockMaybeSendHotLeadAlert = vi.fn();
+vi.mock('@/lib/hot-lead-alert', () => ({
+    maybeSendHotLeadAlert: (...args: unknown[]) => mockMaybeSendHotLeadAlert(...args),
+}));
+
 vi.mock('@/lib/logger', () => ({
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -72,6 +84,8 @@ function mockSupabaseChain(returnValue: { data: unknown; error: unknown }) {
     return {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
+        order: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
         single: vi.fn().mockResolvedValue(returnValue),
         maybeSingle: vi.fn().mockResolvedValue(returnValue),
         insert: vi.fn().mockResolvedValue({ error: null }),
@@ -89,6 +103,18 @@ describe('Transcription Webhook Route', () => {
         process.env.TWILIO_ACCOUNT_SID = 'test-sid';
         process.env.TWILIO_AUTH_TOKEN = 'test-token';
         mockMessagesCreate.mockResolvedValue({});
+        // Default: medium urgency → standard owner summary path.
+        mockScoreCall.mockResolvedValue({
+            category: 'follow_up',
+            urgency: 'medium',
+            sentiment: 'neutral',
+            summary: 'Customer left a voicemail',
+            follow_up_needed: true,
+            follow_up_notes: 'Call them back.',
+            coaching_note: '',
+            due_by: new Date().toISOString(),
+        });
+        mockMaybeSendHotLeadAlert.mockResolvedValue(false);
     });
 
     it('returns 403 if Twilio signature is invalid', async () => {
@@ -241,6 +267,51 @@ describe('Transcription Webhook Route', () => {
                 body: expect.stringContaining('Voicemail'),
             })
         );
+    });
+
+    it('fires the hot-lead alert (not the generic summary) on high urgency', async () => {
+        vi.mocked(validateTwilioRequest).mockResolvedValue(true);
+        mockScoreCall.mockResolvedValue({
+            category: 'repair_quote',
+            urgency: 'high',
+            sentiment: 'frustrated',
+            summary: 'Urgent: car broke down, needs tow today',
+            follow_up_needed: true,
+            follow_up_notes: 'Call immediately.',
+            coaching_note: '',
+            due_by: new Date().toISOString(),
+        });
+        mockMaybeSendHotLeadAlert.mockResolvedValue(true); // alert sent
+
+        mockSupabaseFrom.mockImplementation((table: string) => {
+            if (table === 'leads') {
+                const chain = mockSupabaseChain({ data: { id: 'lead-1' }, error: null });
+                chain.update = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
+                return chain;
+            }
+            if (table === 'opt_outs') return mockSupabaseChain({ data: null, error: null });
+            if (table === 'businesses') return mockSupabaseChain({ data: { owner_phone: '+15550001111', forwarding_number: '+15559876543' }, error: null });
+            return mockSupabaseChain({ data: null, error: null });
+        });
+
+        const req = createFormDataRequest(
+            { TranscriptionText: 'My car broke down I need help now', TranscriptionStatus: 'completed' },
+            { businessId: VALID_BIZ_ID, caller: '+15551234567', called: '+15559876543' }
+        );
+        await POST(req);
+
+        // Hot-lead alert called with the lead + high urgency.
+        expect(mockMaybeSendHotLeadAlert).toHaveBeenCalledWith(
+            expect.objectContaining({ leadId: 'lead-1', urgency: 'high', ownerPhone: '+15550001111' })
+        );
+        // Generic owner voicemail summary should NOT be sent (avoids double-texting).
+        const ownerSummaryCalls = mockMessagesCreate.mock.calls.filter(
+            (call: unknown[]) => {
+                const arg = call[0] as { to: string; body: string };
+                return arg.to === '+15550001111' && arg.body.includes('New Voicemail');
+            }
+        );
+        expect(ownerSummaryCalls).toHaveLength(0);
     });
 
     describe('param format validation', () => {
