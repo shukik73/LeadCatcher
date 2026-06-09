@@ -82,6 +82,56 @@ function StatCard({
     );
 }
 
+function RecoveryFunnel({ stats }: { stats: RecoveryStats | null }) {
+    if (!stats || stats.missed_calls === 0) return null;
+
+    const stages = [
+        { label: 'Missed calls', value: stats.missed_calls, color: 'bg-slate-400' },
+        { label: 'Auto-texted', value: stats.sms_sent, color: 'bg-blue-400' },
+        { label: 'Replied', value: stats.customer_replies, color: 'bg-indigo-500' },
+        { label: 'Booked', value: stats.booked_leads, color: 'bg-green-500' },
+    ];
+    const max = Math.max(stats.missed_calls, 1);
+
+    return (
+        <Card>
+            <CardContent className="py-4 space-y-3">
+                <p className="text-xs font-medium text-slate-500">
+                    Recovery funnel · last {PERIOD_DAYS} days
+                </p>
+                <div className="space-y-2">
+                    {stages.map((s, i) => {
+                        const pct = Math.round((s.value / max) * 100);
+                        const prev = i > 0 ? stages[i - 1].value : null;
+                        const conv = prev && prev > 0 ? Math.round((s.value / prev) * 100) : null;
+                        return (
+                            <div key={s.label} className="flex items-center gap-3">
+                                <span className="w-24 shrink-0 text-xs text-slate-600">{s.label}</span>
+                                <div className="h-6 flex-1 overflow-hidden rounded bg-slate-100">
+                                    <div
+                                        className={`flex h-full items-center justify-end rounded px-2 ${s.color}`}
+                                        style={{ width: `${s.value > 0 ? Math.max(pct, 8) : 0}%` }}
+                                    >
+                                        {s.value > 0 && (
+                                            <span className="text-[11px] font-semibold text-white">{s.value}</span>
+                                        )}
+                                    </div>
+                                </div>
+                                <span className="w-12 shrink-0 text-right text-[11px] text-slate-400">
+                                    {conv != null ? `${conv}%` : ''}
+                                </span>
+                            </div>
+                        );
+                    })}
+                </div>
+                <p className="text-[11px] text-slate-400">
+                    Percentages show stage-to-stage conversion. Aim to lift the drop from replied to booked.
+                </p>
+            </CardContent>
+        </Card>
+    );
+}
+
 export default function TodayPage() {
     const router = useRouter();
     const [stats, setStats] = useState<RecoveryStats | null>(null);
@@ -249,6 +299,9 @@ export default function TodayPage() {
                             />
                         </div>
                     </div>
+
+                    {/* Recovery funnel — where leads leak between stages */}
+                    <RecoveryFunnel stats={stats} />
 
                     {/* Needs attention now — the callback queue */}
                     <div>
