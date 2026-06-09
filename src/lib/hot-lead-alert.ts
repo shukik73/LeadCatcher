@@ -59,10 +59,19 @@ export async function maybeSendHotLeadAlert(opts: {
 
     const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
     try {
+        // Make the alert actionable: deep-link the owner straight to the callback
+        // queue. Keep the whole SMS within 320 chars by trimming the summary, not
+        // the link.
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_BASE_URL || '';
+        const link = baseUrl ? `\nOpen: ${baseUrl}/dashboard/hot-leads` : '';
+        const prefix = '[HOT LEAD] ';
+        const room = Math.max(0, 320 - prefix.length - link.length);
+        const body = `${prefix}${summary.slice(0, room)}${link}`;
+
         await client.messages.create({
             to: ownerPhone,
             from: forwardingNumber,
-            body: `[HOT LEAD] ${summary}`.slice(0, 320),
+            body,
         });
         logger.info(`${TAG} Hot lead alert sent`, { leadId, businessId });
         return true;
