@@ -380,7 +380,7 @@ export default function Dashboard() {
                                     <PhoneForwarded className="h-4 w-4" />
                                     Activate Forwarding
                                 </Button>
-                                <Button variant="outline" onClick={() => window.location.href = '/dashboard/settings'} className="gap-2">
+                                <Button variant="outline" onClick={() => window.location.href = '/dashboard/settings#test-call'} className="gap-2">
                                     <TestTube className="h-4 w-4" />
                                     Run Test Call
                                 </Button>
