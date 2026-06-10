@@ -81,4 +81,19 @@ describe('maybeSendHotLeadAlert', () => {
         expect(sent).toBe(false);
         expect(mockMessagesCreate).not.toHaveBeenCalled();
     });
+
+    it('includes a deep link to the hot-leads queue when a base URL is set', async () => {
+        const prev = process.env.NEXT_PUBLIC_APP_URL;
+        process.env.NEXT_PUBLIC_APP_URL = 'https://app.example.com';
+        try {
+            const sent = await maybeSendHotLeadAlert(base);
+            expect(sent).toBe(true);
+            const body = mockMessagesCreate.mock.calls[0][0].body as string;
+            expect(body).toContain('https://app.example.com/dashboard/hot-leads');
+            expect(body.length).toBeLessThanOrEqual(320);
+        } finally {
+            if (prev === undefined) delete process.env.NEXT_PUBLIC_APP_URL;
+            else process.env.NEXT_PUBLIC_APP_URL = prev;
+        }
+    });
 });
