@@ -27,10 +27,15 @@ if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) 
         token: process.env.UPSTASH_REDIS_REST_TOKEN,
     });
 
-    // Standard user API routes: 10 requests / 10s
+    // Standard user API routes: 40 requests / 10s.
+    // The dashboard is chatty by design: every queue action fires a POST plus a
+    // full list refetch, and Today auto-refreshes — an owner actively working
+    // the Hot Leads queue burns ~6 requests per click. 10/10s throttled normal
+    // single-user usage into 429s (seen in prod 2026-06-11); 40/10s still stops
+    // scripted abuse while never rate-limiting one human clicking buttons.
     userRatelimit = new Ratelimit({
         redis: redis,
-        limiter: Ratelimit.slidingWindow(10, '10 s'),
+        limiter: Ratelimit.slidingWindow(40, '10 s'),
         analytics: true,
         prefix: 'rl:user',
     });
