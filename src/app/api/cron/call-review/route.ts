@@ -38,7 +38,7 @@ export async function GET(request: Request) {
     try {
         const { data: businesses } = await supabaseAdmin
             .from('businesses')
-            .select('id, name, repairdesk_api_key, repairdesk_store_url, ai_audit_last_poll_at')
+            .select('id, name, repairdesk_api_key, repairdesk_store_url, ai_audit_last_poll_at, timezone')
             .not('repairdesk_api_key', 'is', null);
 
         if (!businesses || businesses.length === 0) {
@@ -67,10 +67,12 @@ export async function GET(request: Request) {
 async function reviewBusinessCalls(biz: {
     id: string; name: string; repairdesk_api_key: string;
     repairdesk_store_url: string | null; ai_audit_last_poll_at: string | null;
+    timezone: string | null;
 }) {
     const client = new RepairDeskClient(
         biz.repairdesk_api_key,
         biz.repairdesk_store_url || undefined,
+        biz.timezone || undefined, // leads feed timestamps are store-local
     );
 
     const since = biz.ai_audit_last_poll_at || undefined;
