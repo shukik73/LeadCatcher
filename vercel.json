@@ -31,6 +31,10 @@
     {
       "path": "/api/cron/repair-status",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/followup-drafts",
+      "schedule": "5 * * * *"
     }
   ]
 }
