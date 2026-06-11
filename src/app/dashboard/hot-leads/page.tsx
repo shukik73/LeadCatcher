@@ -60,17 +60,30 @@ export default function HotLeadsPage() {
     const [bookingOpenFor, setBookingOpenFor] = useState<string | null>(null);
     const [bookingValue, setBookingValue] = useState('');
 
-    const fetchLeads = useCallback(async () => {
+    const fetchLeads = useCallback(async (attempt = 0) => {
         setLoading(true);
         setError(null);
         try {
             const res = await fetch('/api/hot-leads');
-            const data = await res.json();
-            if (res.ok && data.success) {
+
+            // Rate limited (middleware returns plain text, not JSON): the data
+            // is fine, we're just refreshing too fast. Retry once, keep the
+            // current list on screen instead of replacing it with an error.
+            if (res.status === 429) {
+                if (attempt < 1) {
+                    setTimeout(() => fetchLeads(attempt + 1), 2500);
+                    return;
+                }
+                setError('Refreshing too fast — give it a few seconds and retry.');
+                return;
+            }
+
+            const data = await res.json().catch(() => null);
+            if (res.ok && data?.success) {
                 setLeads(data.leads || []);
                 setSummary(data.summary || null);
             } else {
-                setError(data.error || 'Failed to load hot leads');
+                setError(data?.error || 'Failed to load hot leads');
             }
         } catch {
             setError('Failed to load hot leads');
@@ -163,7 +176,7 @@ export default function HotLeadsPage() {
                     Missed calls and callbacks that can still turn into revenue.
                 </p>
             </div>
-            <Button variant="outline" size="sm" onClick={fetchLeads} disabled={loading}>
+            <Button variant="outline" size="sm" onClick={() => fetchLeads()} disabled={loading}>
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             </Button>
         </div>
@@ -205,7 +218,7 @@ export default function HotLeadsPage() {
                 <div className="text-center py-16 text-slate-500">
                     <AlertTriangle className="h-8 w-8 mx-auto mb-2 text-red-400" />
                     <p className="text-sm">{error}</p>
-                    <Button variant="outline" size="sm" className="mt-3" onClick={fetchLeads}>
+                    <Button variant="outline" size="sm" className="mt-3" onClick={() => fetchLeads()}>
                         <RefreshCw className="h-4 w-4 mr-1" /> Retry
                     </Button>
                 </div>
