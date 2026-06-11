@@ -65,6 +65,98 @@ export interface RepairDeskCallLog {
     updated_at: string;
 }
 
+// --- Leads feed (/appointment) — the REAL RepairDesk call data ---
+// RepairDesk has no /call-logs endpoint: it answers 200 with an embedded error
+// object, so every call-log method silently returned nothing. The phone-call
+// data actually lives in the leads feed, exposed under the singular
+// `/appointment` endpoint as data.LeadsData (live-verified 2026-06-11 against
+// a production store: 25/page, newest-first, pagination.next_page_exist).
+
+export interface RepairDeskLeadCustomer {
+    id: string;
+    fullName: string;
+    mobile: string;
+    phone?: string;
+    email?: string;
+}
+
+export interface RepairDeskLeadSummary {
+    id: string;
+    order_id: string;
+    status: string;
+    /** 'Answered' | 'Missed Call' | 'OutBound' */
+    call_status: string;
+    recording_url: string | null;
+    /** "YYYY/MM/DD HH:mm", store-local time */
+    created_date: string;
+    customer: RepairDeskLeadCustomer | null;
+}
+
+export interface RepairDeskLead {
+    summary: RepairDeskLeadSummary;
+}
+
+interface RepairDeskLeadsEnvelope {
+    success?: boolean;
+    message?: string;
+    data?: {
+        LeadsData?: RepairDeskLead[];
+        pagination?: { page: number; next_page_exist: number; total_pages: number };
+        // present instead of LeadsData when the API wraps an error in a 200
+        message?: string;
+    };
+}
+
+/** When a business has no poll watermark yet, only look this far back —
+ *  the leads feed holds the store's full history (30k+ rows). */
+const DEFAULT_LEADS_LOOKBACK_MS = 2 * 60 * 60 * 1000;
+
+/** Newest-first feed + early stop means we rarely read past page 1-2;
+ *  this cap is a backstop against clock skew or a bad `since`. */
+const MAX_LEAD_PAGES = 40;
+
+/** "YYYY/MM/DD HH:mm" (store-local) → epoch ms. Parsed in server time; on a
+ *  UTC host an ET timestamp reads a few hours newer than reality, which only
+ *  widens the `since` window — downstream dedup absorbs the overlap. */
+function parseRdLeadDate(s: string | null | undefined): number {
+    const m = String(s || '').match(/(\d{4})\/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})/);
+    if (!m) return 0;
+    return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]).getTime();
+}
+
+/** Last 10 digits, for phone comparison across formatting variants. */
+function phoneDigits(p: string | null | undefined): string {
+    return String(p || '').replace(/\D/g, '').slice(-10);
+}
+
+function leadToCallLog(lead: RepairDeskLead): RepairDeskCallLog | null {
+    const s = lead?.summary;
+    if (!s) return null;
+    const createdAt = new Date(parseRdLeadDate(s.created_date)).toISOString();
+    return {
+        id: parseInt(s.id, 10) || 0,
+        customer_id: parseInt(s.customer?.id || '0', 10) || 0,
+        customer_name: s.customer?.fullName || '',
+        phone: s.customer?.mobile || s.customer?.phone || '',
+        direction: s.call_status === 'OutBound' ? 'outbound' : 'inbound',
+        status: s.call_status === 'Missed Call' ? 'missed' : 'answered',
+        duration: 0, // not exposed by the leads feed
+        recording_url: s.recording_url || null,
+        notes: '',
+        created_at: createdAt,
+        updated_at: createdAt,
+    };
+}
+
+/** All call-log results fit in one synthesized page (the adapter already
+ *  paginated the upstream feed), so callers' page loops exit after page 1. */
+function singlePage<T>(rows: T[], page: number): RepairDeskListResponse<T> {
+    return {
+        data: page === 1 ? rows : [],
+        meta: { current_page: page, last_page: 1, per_page: rows.length || 1, total: rows.length },
+    };
+}
+
 export interface RepairDeskError {
     message: string;
     status: number;
@@ -175,26 +267,65 @@ export class RepairDeskClient {
     }
 
     /**
-     * Get call logs, optionally filtered by page and date range.
+     * Fetch one page of the leads feed (`/appointment`).
+     * RepairDesk wraps errors in HTTP 200 responses, so a missing LeadsData
+     * array is treated as an error (the embedded message is surfaced).
      */
-    async getCallLogs(page = 1, since?: string): Promise<RepairDeskListResponse<RepairDeskCallLog>> {
-        let endpoint = `/call-logs?page=${page}`;
-        if (since) {
-            endpoint += `&since=${encodeURIComponent(since)}`;
+    async getLeads(page = 1): Promise<{ leads: RepairDeskLead[]; nextPageExists: boolean }> {
+        const body = await this.request<RepairDeskLeadsEnvelope>(`/appointment?page=${page}`);
+        const leads = body?.data?.LeadsData;
+        if (!Array.isArray(leads)) {
+            const msg = body?.data?.message || body?.message || 'unexpected /appointment response shape';
+            throw new Error(`RepairDesk /appointment error: ${msg}`);
         }
-        return this.request<RepairDeskListResponse<RepairDeskCallLog>>(endpoint);
+        return { leads, nextPageExists: Boolean(body?.data?.pagination?.next_page_exist) };
     }
 
     /**
-     * Get missed calls since a given timestamp.
-     * Filters call logs for inbound calls with status 'missed'.
+     * All lead calls since `since` (ISO timestamp), mapped to RepairDeskCallLog.
+     * Newest-first feed: stops paginating once a page is entirely older than
+     * `since`. With no/invalid `since`, looks back DEFAULT_LEADS_LOOKBACK_MS
+     * instead of scanning the store's entire lead history.
+     */
+    private async getLeadCallLogsSince(since?: string): Promise<RepairDeskCallLog[]> {
+        const parsedSince = since ? Date.parse(since) : NaN;
+        const sinceMs = Number.isFinite(parsedSince)
+            ? parsedSince
+            : Date.now() - DEFAULT_LEADS_LOOKBACK_MS;
+
+        const out: RepairDeskCallLog[] = [];
+        for (let page = 1; page <= MAX_LEAD_PAGES; page++) {
+            const { leads, nextPageExists } = await this.getLeads(page);
+            if (leads.length === 0) break;
+
+            let oldestOnPage = Infinity;
+            for (const lead of leads) {
+                const log = leadToCallLog(lead);
+                if (!log) continue;
+                const createdMs = Date.parse(log.created_at);
+                oldestOnPage = Math.min(oldestOnPage, createdMs);
+                if (createdMs >= sinceMs) out.push(log);
+            }
+
+            if (oldestOnPage < sinceMs || !nextPageExists) break;
+        }
+        return out;
+    }
+
+    /**
+     * Get call logs since a given timestamp.
+     * Sourced from the leads feed — see getLeads().
+     */
+    async getCallLogs(page = 1, since?: string): Promise<RepairDeskListResponse<RepairDeskCallLog>> {
+        return this.getAllCalls(page, since);
+    }
+
+    /**
+     * Get missed inbound calls since a given timestamp.
      */
     async getMissedCalls(page = 1, since?: string): Promise<RepairDeskListResponse<RepairDeskCallLog>> {
-        let endpoint = `/call-logs?page=${page}&status=missed&direction=inbound`;
-        if (since) {
-            endpoint += `&since=${encodeURIComponent(since)}`;
-        }
-        return this.request<RepairDeskListResponse<RepairDeskCallLog>>(endpoint);
+        const logs = await this.getLeadCallLogsSince(since);
+        return singlePage(logs.filter((l) => l.status === 'missed' && l.direction === 'inbound'), page);
     }
 
     /**
@@ -202,23 +333,20 @@ export class RepairDeskClient {
      * Used to detect if the user returned a missed call.
      */
     async getOutboundCallsTo(phone: string, since?: string): Promise<RepairDeskListResponse<RepairDeskCallLog>> {
-        let endpoint = `/call-logs?direction=outbound&phone=${encodeURIComponent(phone)}`;
-        if (since) {
-            endpoint += `&since=${encodeURIComponent(since)}`;
-        }
-        return this.request<RepairDeskListResponse<RepairDeskCallLog>>(endpoint);
+        const target = phoneDigits(phone);
+        const logs = await this.getLeadCallLogsSince(since);
+        return singlePage(
+            logs.filter((l) => l.direction === 'outbound' && target && phoneDigits(l.phone) === target),
+            1,
+        );
     }
 
     /**
-     * Get ALL call logs (answered + missed + voicemail) since a given timestamp.
+     * Get ALL calls (answered + missed + outbound) since a given timestamp.
      * Used by the AI auto-audit cron to review all calls.
      */
     async getAllCalls(page = 1, since?: string): Promise<RepairDeskListResponse<RepairDeskCallLog>> {
-        let endpoint = `/call-logs?page=${page}`;
-        if (since) {
-            endpoint += `&since=${encodeURIComponent(since)}`;
-        }
-        return this.request<RepairDeskListResponse<RepairDeskCallLog>>(endpoint);
+        return singlePage(await this.getLeadCallLogsSince(since), page);
     }
 
     /**
