@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
+import { FollowUpDrafts } from '@/components/followup-drafts';
 import { FollowUpQueue } from '@/components/followup-queue';
 import { CallDetailPanel, type CallAnalysis } from '@/components/call-detail-panel';
 import { Button } from '@/components/ui/button';
@@ -73,6 +74,7 @@ export default function FollowUpsPage() {
 
     return (
         <div className="p-4 md:p-6 space-y-4 max-w-3xl">
+            <FollowUpDrafts />
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-xl font-bold text-slate-800">Follow-Up Queue</h1>
