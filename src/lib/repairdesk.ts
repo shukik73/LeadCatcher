@@ -115,13 +115,41 @@ const DEFAULT_LEADS_LOOKBACK_MS = 2 * 60 * 60 * 1000;
  *  this cap is a backstop against clock skew or a bad `since`. */
 const MAX_LEAD_PAGES = 40;
 
-/** "YYYY/MM/DD HH:mm" (store-local) → epoch ms. Parsed in server time; on a
- *  UTC host an ET timestamp reads a few hours newer than reality, which only
- *  widens the `since` window — downstream dedup absorbs the overlap. */
-function parseRdLeadDate(s: string | null | undefined): number {
+/** Offset (ms) of `timeZone` from UTC at the instant `utcMs`. */
+function tzOffsetMs(timeZone: string, utcMs: number): number {
+    const parts = Object.fromEntries(
+        new Intl.DateTimeFormat('en-US', {
+            timeZone,
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false,
+        }).formatToParts(new Date(utcMs)).map((p) => [p.type, p.value]),
+    );
+    const hour = parts.hour === '24' ? 0 : Number(parts.hour);
+    const asUtc = Date.UTC(
+        Number(parts.year), Number(parts.month) - 1, Number(parts.day),
+        hour, Number(parts.minute), Number(parts.second),
+    );
+    return asUtc - utcMs;
+}
+
+/** "YYYY/MM/DD HH:mm" wall-clock time in `timeZone` → epoch ms.
+ *  The feed reports store-local time with no offset; parsing it in server
+ *  time is wrong in both directions (a UTC host reads an ET timestamp as 4-5h
+ *  in the past, silently filtering every call out of the `since` window).
+ *  Two-pass offset refinement handles DST transitions. */
+function parseRdLeadDate(s: string | null | undefined, timeZone: string): number {
     const m = String(s || '').match(/(\d{4})\/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})/);
     if (!m) return 0;
-    return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]).getTime();
+    const wallUtc = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+    try {
+        let guess = wallUtc - tzOffsetMs(timeZone, wallUtc);
+        guess = wallUtc - tzOffsetMs(timeZone, guess);
+        return guess;
+    } catch {
+        // Unknown/invalid IANA zone — fall back to server-local parsing
+        return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]).getTime();
+    }
 }
 
 /** Last 10 digits, for phone comparison across formatting variants. */
@@ -129,10 +157,10 @@ function phoneDigits(p: string | null | undefined): string {
     return String(p || '').replace(/\D/g, '').slice(-10);
 }
 
-function leadToCallLog(lead: RepairDeskLead): RepairDeskCallLog | null {
+function leadToCallLog(lead: RepairDeskLead, timeZone: string): RepairDeskCallLog | null {
     const s = lead?.summary;
     if (!s) return null;
-    const createdAt = new Date(parseRdLeadDate(s.created_date)).toISOString();
+    const createdAt = new Date(parseRdLeadDate(s.created_date, timeZone)).toISOString();
     return {
         id: parseInt(s.id, 10) || 0,
         customer_id: parseInt(s.customer?.id || '0', 10) || 0,
@@ -170,9 +198,12 @@ const SUBDOMAIN_RE = /^[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]$/;
 export class RepairDeskClient {
     private apiKey: string;
     private baseUrl: string;
+    /** IANA zone the store's wall-clock timestamps are written in. */
+    private timezone: string;
 
-    constructor(apiKey: string, subdomain?: string) {
+    constructor(apiKey: string, subdomain?: string, timezone?: string) {
         this.apiKey = apiKey;
+        this.timezone = timezone || 'America/New_York';
 
         // Default to "api" subdomain if none provided (same as ReviewGuard)
         const cleanSubdomain = (subdomain || 'api').trim();
@@ -300,7 +331,7 @@ export class RepairDeskClient {
 
             let oldestOnPage = Infinity;
             for (const lead of leads) {
-                const log = leadToCallLog(lead);
+                const log = leadToCallLog(lead, this.timezone);
                 if (!log) continue;
                 const createdMs = Date.parse(log.created_at);
                 oldestOnPage = Math.min(oldestOnPage, createdMs);

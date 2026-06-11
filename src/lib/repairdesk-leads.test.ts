@@ -9,9 +9,21 @@ import { RepairDeskClient } from './repairdesk';
  * leads feed at /appointment (data.LeadsData).
  */
 
+// Format an instant as the store's wall-clock time, the way RepairDesk does.
+// The client under test defaults to America/New_York, so tests are correct
+// regardless of the machine/CI timezone (the original bug: parsing store-local
+// times in server time made every call look hours old on a UTC host).
+const STORE_TZ = 'America/New_York';
 function fmtRdDate(d: Date): string {
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    const parts = Object.fromEntries(
+        new Intl.DateTimeFormat('en-US', {
+            timeZone: STORE_TZ,
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', hour12: false,
+        }).formatToParts(d).map((p) => [p.type, p.value]),
+    );
+    const hour = parts.hour === '24' ? '00' : parts.hour;
+    return `${parts.year}/${parts.month}/${parts.day} ${hour}:${parts.minute}`;
 }
 
 interface LeadOpts {
@@ -156,6 +168,21 @@ describe('RepairDeskClient leads feed adapter', () => {
         const res = await client.getOutboundCallsTo('13054944078', minutesAgo(60).toISOString());
 
         expect(res.data.map((c) => c.id)).toEqual([401]);
+    });
+
+    it('parses store-local timestamps to the correct instant regardless of server timezone', async () => {
+        // A call 10 minutes ago, expressed as ET wall-clock text (as the feed
+        // does). On a UTC server, naive parsing would read this as ~4-5h old
+        // and filter it out of a 2h window. It must survive the default lookback.
+        mockFetchOnce([
+            leadsEnvelope([lead({ id: '601', callStatus: 'Missed Call', createdAt: minutesAgo(10) })]),
+        ]);
+
+        const res = await client.getMissedCalls(1); // default lookback, no since
+
+        expect(res.data.map((c) => c.id)).toEqual([601]);
+        const parsed = Date.parse(res.data[0].created_at);
+        expect(Math.abs(parsed - minutesAgo(10).getTime())).toBeLessThan(61_000);
     });
 
     it('maps recording_url and parses created_date', async () => {

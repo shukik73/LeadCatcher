@@ -97,7 +97,8 @@ interface BusinessRow {
 async function pollBusiness(business: BusinessRow) {
     const client = new RepairDeskClient(
         business.repairdesk_api_key,
-        business.repairdesk_store_url || undefined
+        business.repairdesk_store_url || undefined,
+        business.timezone || undefined // leads feed timestamps are store-local
     );
 
     let newMissedCalls = 0;

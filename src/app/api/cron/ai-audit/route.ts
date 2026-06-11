@@ -141,6 +141,7 @@ async function processBusinessCalls(business: BusinessRow) {
     const client = new RepairDeskClient(
         business.repairdesk_api_key,
         business.repairdesk_store_url || undefined,
+        business.timezone || undefined, // leads feed timestamps are store-local
     );
 
     const since = business.ai_audit_last_poll_at || undefined;
