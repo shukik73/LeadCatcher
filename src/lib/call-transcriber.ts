@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { fetch as undiciFetch, Agent } from 'undici';
 import { logger } from '@/lib/logger';
 
 const openai = process.env.OPENAI_API_KEY
@@ -6,6 +7,26 @@ const openai = process.env.OPENAI_API_KEY
     : null;
 
 const TAG = '[Transcriber]';
+
+// RingoPBX (RepairDesk's telephony vendor) serves an incomplete TLS chain —
+// every strict client rejects it ("unable to verify the first certificate"),
+// which silently killed transcription for all RepairDesk recordings. TLS
+// verification is disabled for THIS HOST ONLY; recording URLs are
+// unauthenticated blobs, so the residual MITM risk is accepted over losing
+// transcripts entirely. The internal triage tool ships the same workaround.
+// NOTE: undici's fetch must be paired with undici's Agent — Node's built-in
+// fetch rejects a foreign dispatcher ("invalid onRequestStart method").
+const RINGOPBX_HOST = 'storage01.ringopbx.com';
+const ringopbxAgent = new Agent({ connect: { rejectUnauthorized: false } });
+
+function fetchRecording(url: string, timeoutMs: number) {
+    let host = '';
+    try { host = new URL(url).hostname; } catch { /* fall through to plain fetch */ }
+    if (host === RINGOPBX_HOST) {
+        return undiciFetch(url, { dispatcher: ringopbxAgent, signal: AbortSignal.timeout(timeoutMs) });
+    }
+    return fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+}
 
 /**
  * Fetches an audio recording from a URL and transcribes it using OpenAI Whisper.
@@ -27,9 +48,7 @@ export async function transcribeRecording(recordingUrl: string): Promise<string 
         // Fetch the audio file
         logger.info(`${TAG} Fetching recording`, { url: recordingUrl.substring(0, 80) });
 
-        const response = await fetch(recordingUrl, {
-            signal: AbortSignal.timeout(30_000), // 30s timeout
-        });
+        const response = await fetchRecording(recordingUrl, 30_000);
 
         if (!response.ok) {
             logger.error(`${TAG} Failed to fetch recording`, null, {
