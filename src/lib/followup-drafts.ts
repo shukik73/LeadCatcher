@@ -43,36 +43,51 @@ export interface DraftResult {
     shouldSend: boolean;
 }
 
+// Categories worth chasing when the job didn't convert. An answered call where
+// someone asked for a quote and never came in is the single best follow-up
+// candidate — exactly what we want, even though it isn't a "missed call".
+const FOLLOWUP_CATEGORIES = ['repair_quote', 'parts_inquiry', 'status_check', 'follow_up'];
+// callback_status values that mean "resolved" — never chase these.
+const RESOLVED_STATUSES = ['booked', 'lost'];
+
 /**
- * Calls that showed intent (quote, follow-up needed) but produced no ticket
- * and no store visit, old enough to chase and young enough to still be warm,
- * with no draft created before (unique index on call_analysis_id backstops this).
+ * Calls worth a follow-up: showed buying intent (a quote/parts/status category
+ * OR follow_up_needed) and didn't convert — no ticket, no store visit, not
+ * booked/lost — old enough to chase and young enough to still be warm, with no
+ * draft created before (unique index on call_analysis_id backstops this).
+ *
+ * `minAgeHours = 0` skips the cool-off grace (used by the on-demand
+ * "find follow-ups now" path so the owner sees results immediately).
  */
-export async function findFollowUpCandidates(businessId: string): Promise<FollowUpCandidate[]> {
+export async function findFollowUpCandidates(businessId: string, minAgeHours = MIN_AGE_HOURS): Promise<FollowUpCandidate[]> {
     const now = Date.now();
-    const newest = new Date(now - MIN_AGE_HOURS * 3600_000).toISOString();
+    const newest = new Date(now - minAgeHours * 3600_000).toISOString();
     const oldest = new Date(now - MAX_AGE_HOURS * 3600_000).toISOString();
 
     const { data, error } = await supabaseAdmin
         .from('call_analyses')
-        .select('id, customer_name, customer_phone, summary, category, created_at')
+        .select('id, customer_name, customer_phone, summary, category, created_at, follow_up_needed')
         .eq('business_id', businessId)
-        .eq('follow_up_needed', true)
-        .in('callback_status', ['pending', 'no_answer'])
         .is('ticket_created_at', null)
         .is('store_visit_at', null)
         .not('customer_phone', 'is', null)
+        .not('callback_status', 'in', `(${RESOLVED_STATUSES.join(',')})`)
         .gte('created_at', oldest)
         .lte('created_at', newest)
         .order('created_at', { ascending: false })
-        .limit(MAX_DRAFTS_PER_RUN * 3); // headroom; dedupe below cuts it down
+        .limit(MAX_DRAFTS_PER_RUN * 4); // headroom; intent + dedupe filters cut it down
 
     if (error) {
         logger.error(`${TAG} Candidate query failed`, error, { businessId });
         return [];
     }
     const candidates = (data || []).filter(
-        (c) => c.customer_phone && c.category !== 'spam' && c.category !== 'wrong_number',
+        (c) =>
+            c.customer_phone &&
+            c.category !== 'spam' &&
+            c.category !== 'wrong_number' &&
+            // buying intent: a follow-up-worthy category, or the auditor flagged it
+            (FOLLOWUP_CATEGORIES.includes(c.category || '') || c.follow_up_needed === true),
     ) as FollowUpCandidate[];
 
     if (candidates.length === 0) return [];

@@ -85,6 +85,19 @@ describe('findFollowUpCandidates', () => {
         const out = await findFollowUpCandidates('biz-1');
         expect(out).toEqual([]);
     });
+
+    it('includes answered quote calls (intent by category) and follow_up_needed calls; drops no-intent calls', async () => {
+        candidatesResult.mockResolvedValue({
+            data: [
+                row('quote', { category: 'repair_quote', follow_up_needed: false }),     // intent by category
+                row('flagged', { category: 'other', follow_up_needed: true }),            // intent by flag
+                row('noise', { category: 'other', follow_up_needed: false }),             // no intent → dropped
+            ],
+            error: null,
+        });
+        const out = await findFollowUpCandidates('biz-1');
+        expect(out.map((c) => c.id).sort()).toEqual(['flagged', 'quote']);
+    });
 });
 
 describe('draftFollowUpSms (template fallback, no OpenAI key)', () => {

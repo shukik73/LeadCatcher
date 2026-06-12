@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Send, SkipForward, Pencil, Sparkles, Loader2 } from 'lucide-react';
+import { Send, SkipForward, Pencil, Sparkles, Loader2, Wand2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface FollowUpDraft {
@@ -28,6 +28,7 @@ export function FollowUpDrafts() {
     const [acting, setActing] = useState<string | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editText, setEditText] = useState('');
+    const [generating, setGenerating] = useState(false);
 
     const fetchDrafts = useCallback(async () => {
         try {
@@ -44,6 +45,28 @@ export function FollowUpDrafts() {
     useEffect(() => {
         fetchDrafts();
     }, [fetchDrafts]);
+
+    const generate = async () => {
+        setGenerating(true);
+        try {
+            const res = await fetch('/api/followups/generate', { method: 'POST' });
+            const data = await res.json().catch(() => null);
+            if (res.ok && data?.success) {
+                toast.success(
+                    data.created > 0
+                        ? `${data.created} follow-up draft${data.created === 1 ? '' : 's'} ready`
+                        : 'No new follow-ups to draft right now',
+                );
+                await fetchDrafts();
+            } else {
+                toast.error(data?.error || 'Could not generate drafts');
+            }
+        } catch {
+            toast.error('Could not generate drafts');
+        } finally {
+            setGenerating(false);
+        }
+    };
 
     const act = async (id: string, action: 'approve' | 'skip', sms?: string) => {
         setActing(id);
@@ -68,16 +91,44 @@ export function FollowUpDrafts() {
         }
     };
 
-    if (loading || drafts.length === 0) return null;
+    if (loading) return null;
+
+    const GenerateButton = (
+        <Button size="sm" variant="outline" onClick={generate} disabled={generating}>
+            {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
+            <span className="ml-1">Find follow-ups now</span>
+        </Button>
+    );
+
+    // Empty state still shows the on-demand trigger so the owner can pull
+    // drafts between the 9am/1pm/6pm digests.
+    if (drafts.length === 0) {
+        return (
+            <Card className="border-slate-200">
+                <CardContent className="p-4 flex items-center justify-between gap-3">
+                    <div>
+                        <h2 className="font-semibold text-slate-800 text-sm">No follow-up drafts right now</h2>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                            Chase customers who asked about a repair or sale but never came in.
+                        </p>
+                    </div>
+                    {GenerateButton}
+                </CardContent>
+            </Card>
+        );
+    }
 
     return (
         <Card className="border-amber-200 bg-amber-50/50">
             <CardContent className="p-4 space-y-3">
-                <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-amber-600" />
-                    <h2 className="font-semibold text-slate-800">
-                        Drafted follow-ups — your approval needed ({drafts.length})
-                    </h2>
+                <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-amber-600" />
+                        <h2 className="font-semibold text-slate-800">
+                            Drafted follow-ups — your approval needed ({drafts.length})
+                        </h2>
+                    </div>
+                    {GenerateButton}
                 </div>
                 <p className="text-xs text-slate-500 -mt-2">
                     Customers who talked about a repair or sale but never came in. Review each text — nothing sends without you.
