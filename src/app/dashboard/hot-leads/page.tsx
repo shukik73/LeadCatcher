@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { UrgencyBadge, CallbackStatusBadge } from '@/components/urgency-badge';
+import { FollowUpDrafts } from '@/components/followup-drafts';
 import {
     Flame, RefreshCw, Loader2, Phone, User, Clock, PhoneCall,
     CheckCircle, XCircle, PhoneOff, StickyNote, AlertTriangle, Ticket, DollarSign,
@@ -170,10 +171,10 @@ export default function HotLeadsPage() {
             <div>
                 <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                     <Flame className="h-5 w-5 text-orange-500" />
-                    Hot Lead Recovery
+                    Queue
                 </h1>
                 <p className="text-sm text-slate-500 mt-0.5">
-                    Missed calls and callbacks that can still turn into revenue.
+                    Everything that needs you: callbacks, follow-up approvals, open leads.
                 </p>
             </div>
             <Button variant="outline" size="sm" onClick={() => fetchLeads()} disabled={loading}>
@@ -185,6 +186,9 @@ export default function HotLeadsPage() {
     return (
         <div className="p-4 md:p-6 space-y-4 max-w-4xl">
             {Header}
+
+            {/* AI follow-up drafts awaiting approval — part of the same queue */}
+            <FollowUpDrafts />
 
             {/* Summary cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
