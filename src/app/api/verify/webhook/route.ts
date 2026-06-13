@@ -19,7 +19,7 @@ export async function POST(request: Request) {
 
     const response = new twilio.twiml.VoiceResponse();
     response.say(
-        { voice: 'alice' },
+        { voice: 'Polly.Joanna-Neural' },
         'This is a verification call from LeadCatcher. Your phone is working correctly. You may hang up now.'
     );
     response.pause({ length: 2 });

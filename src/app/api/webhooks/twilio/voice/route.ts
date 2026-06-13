@@ -15,6 +15,12 @@ export const dynamic = 'force-dynamic';
 
 const TAG = 'Voice Webhook';
 
+// Natural-sounding TTS voice. 'alice' is Twilio's legacy robotic voice;
+// Amazon Polly Neural voices sound human and cost the same order of pennies.
+// Joanna-Neural = warm US English. (Upgrade path: Polly.Joanna-Generative
+// for the most human quality, if enabled on the Twilio account.)
+const NATURAL_VOICE = 'Polly.Joanna-Neural' as const;
+
 export async function POST(request: Request) {
     // 1. SECURITY
     const isValid = await validateTwilioRequest(request);
@@ -73,7 +79,7 @@ async function handleVoiceWebhook(callSid: string | null, callerRaw: string, cal
         logger.error(`[${TAG}] No business found`, bizError, { called });
         if (callSid) await markWebhookFailed(callSid);
         const response = new twilio.twiml.VoiceResponse();
-        response.say("We're sorry, this number is not configured correctly. Goodbye.");
+        response.say({ voice: NATURAL_VOICE }, "We're sorry, this number is not configured correctly. Goodbye.");
         response.hangup();
         return new Response(response.toString(), { headers: { 'Content-Type': 'text/xml' } });
     }
@@ -231,13 +237,13 @@ async function handleVoiceWebhook(callSid: string | null, callerRaw: string, cal
     const response = new twilio.twiml.VoiceResponse();
     // Sanitize business name for TwiML (prevent injection)
     const safeName = (business.name || 'our business').replace(/[<>&"']/g, '');
-    response.say({ voice: 'alice' }, `Hello! You've reached ${safeName}. We are currently assisting other clients. Please leave your name and how we can help, and I will have a team member text you back immediately.`);
+    response.say({ voice: NATURAL_VOICE }, `Hello! You've reached ${safeName}. We are currently assisting other clients. Please leave your name and how we can help, and I will have a team member text you back immediately.`);
 
     const baseUrl = getWebhookBaseUrl();
     if (!baseUrl) {
         logger.error(`[${TAG}] Webhook base URL missing; cannot build transcription callback URL`);
         const errorResponse = new twilio.twiml.VoiceResponse();
-        errorResponse.say({ voice: 'alice' }, 'We apologize, but we are experiencing technical difficulties. Please try again later.');
+        errorResponse.say({ voice: NATURAL_VOICE }, 'We apologize, but we are experiencing technical difficulties. Please try again later.');
         errorResponse.hangup();
         return new Response(errorResponse.toString(), { headers: { 'Content-Type': 'text/xml' } });
     }
