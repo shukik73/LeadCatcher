@@ -15,11 +15,13 @@ export const dynamic = 'force-dynamic';
 
 const TAG = 'Voice Webhook';
 
-// Natural-sounding TTS voice. 'alice' is Twilio's legacy robotic voice;
-// Amazon Polly Neural voices sound human and cost the same order of pennies.
-// Joanna-Neural = warm US English. (Upgrade path: Polly.Joanna-Generative
-// for the most human quality, if enabled on the Twilio account.)
-const NATURAL_VOICE = 'Polly.Joanna-Neural' as const;
+// Natural-sounding TTS voice. 'alice' is Twilio's legacy robotic voice.
+// Polly Generative is Amazon's most human-sounding tier (~$0.013/100 chars
+// vs Neural's $0.0032 — pennies per call at our volume). Alternatives to try
+// by swapping this one value: Polly.Matthew-Generative (US male),
+// Polly.Danielle-Generative, Polly.Ruth-Generative. Fall back to *-Neural
+// if Generative is ever disabled on the Twilio account.
+const NATURAL_VOICE = 'Polly.Joanna-Generative' as const;
 
 export async function POST(request: Request) {
     // 1. SECURITY
@@ -237,7 +239,7 @@ async function handleVoiceWebhook(callSid: string | null, callerRaw: string, cal
     const response = new twilio.twiml.VoiceResponse();
     // Sanitize business name for TwiML (prevent injection)
     const safeName = (business.name || 'our business').replace(/[<>&"']/g, '');
-    response.say({ voice: NATURAL_VOICE }, `Hello! You've reached ${safeName}. We are currently assisting other clients. Please leave your name and how we can help, and I will have a team member text you back immediately.`);
+    response.say({ voice: NATURAL_VOICE }, `Hi, thanks for calling ${safeName}! We're helping another customer right now and didn't want to miss you. Leave your name and what you need after the beep, and we'll text you right back.`);
 
     const baseUrl = getWebhookBaseUrl();
     if (!baseUrl) {
