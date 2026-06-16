@@ -19,13 +19,20 @@ export async function checkBillingStatus(businessId: string): Promise<
 > {
   const { data: business, error } = await supabaseAdmin
     .from('businesses')
-    .select('stripe_status, stripe_trial_ends_at, created_at')
+    .select('billing_exempt, stripe_status, stripe_trial_ends_at, created_at')
     .eq('id', businessId)
     .single();
 
   if (error || !business) {
     logger.error('[BillingGuard] Failed to fetch business — failing closed', error, { businessId });
     return { allowed: false, reason: 'Unable to verify billing status. Please try again later.' };
+  }
+
+  // Internal / comped accounts (e.g. our own shop dogfooding the product) bypass
+  // the subscription gate. Kept separate from stripe_status so they never count
+  // as paying customers in revenue metrics.
+  if (business.billing_exempt) {
+    return { allowed: true };
   }
 
   const status = business.stripe_status;
