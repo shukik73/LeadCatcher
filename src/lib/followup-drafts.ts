@@ -22,10 +22,15 @@ Rules:
 - Reference the SPECIFIC device or request from the call summary (e.g. "your iPhone 15 screen", "the Apple monitor you wanted to sell").
 - Invite them to come in today or tomorrow. No pressure language.
 - Never invent prices, never promise outcomes, no URLs, no emojis.
-- If the summary shows the matter is already resolved, spam, or a vendor/telemarketer, set should_send to false.
+- If the summary shows the matter is already resolved (device ready/picked up, already came in), spam, or a vendor/telemarketer, set should_send to false.
+
+Confidence — how sure you are this is a genuine unconverted sales lead worth an automatic text:
+- "high": clear device + repair/quote intent, clearly did NOT convert (e.g. asked the price of an iPhone 15 screen and didn't commit).
+- "medium": real but fuzzy — a generic "missed your call" with no device, or intent you're unsure about.
+- "low": probably resolved, thin, or you're guessing.
 
 Return JSON only:
-{"sms": "...", "should_send": true/false, "reason": "one short line: why this lead is worth chasing (shown to the owner)"}`;
+{"sms": "...", "should_send": true/false, "confidence": "high|medium|low", "reason": "one short line: why this lead is worth chasing (shown to the owner)"}`;
 
 export interface FollowUpCandidate {
     id: string;
@@ -36,11 +41,15 @@ export interface FollowUpCandidate {
     created_at: string;
 }
 
+export type DraftConfidence = 'high' | 'medium' | 'low';
+
 export interface DraftResult {
     sms: string;
     reason: string;
     aiGenerated: boolean;
     shouldSend: boolean;
+    /** Only 'high' is eligible for auto-send; everything else waits for approval. */
+    confidence: DraftConfidence;
 }
 
 // Categories worth chasing when the job didn't convert. An answered call where
@@ -134,11 +143,14 @@ export async function draftFollowUpSms(
             });
             const parsed = JSON.parse(response.choices[0].message.content || '{}');
             if (typeof parsed.sms === 'string' && parsed.sms.trim()) {
+                const confidence: DraftConfidence =
+                    parsed.confidence === 'high' || parsed.confidence === 'medium' ? parsed.confidence : 'low';
                 return {
                     sms: parsed.sms.replace(/https?:\/\/\S+/gi, '').trim().slice(0, 320),
                     reason: typeof parsed.reason === 'string' ? parsed.reason.slice(0, 200) : 'Showed intent, never came in',
                     aiGenerated: true,
                     shouldSend: parsed.should_send !== false,
+                    confidence,
                 };
             }
         } catch (error) {
@@ -148,13 +160,16 @@ export async function draftFollowUpSms(
         }
     }
 
-    // Template fallback — generic but safe
+    // Template fallback — generic but safe. Always 'low' confidence so a
+    // template (no specific device, no real summary) never auto-sends; it can
+    // still appear in the approval queue.
     const greeting = greetName ? `Hi ${greetName}, ` : 'Hi, ';
     return {
         sms: `${greeting}it's ${businessName} — following up on your call with us. We're ready when you are; come by today or tomorrow and we'll take care of you!`,
         reason: 'Showed intent on a call, no ticket or visit since',
         aiGenerated: false,
         shouldSend: true,
+        confidence: 'low',
     };
 }
 

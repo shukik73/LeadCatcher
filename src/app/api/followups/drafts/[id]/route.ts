@@ -1,10 +1,8 @@
 import { createSupabaseServerClient, supabaseAdmin } from '@/lib/supabase-server';
 import { validateCsrfOrigin } from '@/lib/csrf';
-import { checkBillingStatus } from '@/lib/billing-guard';
-import { checkSmsRateLimit } from '@/lib/sms-rate-limit';
+import { sendFollowUpSms } from '@/lib/followup-send';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
-import twilio from 'twilio';
 
 export const dynamic = 'force-dynamic';
 
@@ -84,76 +82,34 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             return Response.json({ success: true, status: 'skipped' });
         }
 
-        // --- approve: send, with every guard the rest of the app uses ---
-        const revert = async () => {
-            await supabaseAdmin
-                .from('pending_followups')
-                .update({ status: 'pending', sent_at: null })
-                .eq('id', id);
-        };
-
+        // --- approve: send via the shared guard stack (billing, opt-out, rate limit) ---
         if (!business.forwarding_number) {
-            await revert();
+            await supabaseAdmin.from('pending_followups').update({ status: 'pending', sent_at: null }).eq('id', id);
             return Response.json({ error: 'No business phone number configured' }, { status: 400 });
         }
 
-        const billing = await checkBillingStatus(business.id);
-        if (!billing.allowed) {
-            await revert();
-            return Response.json({ error: 'Billing inactive' }, { status: 402 });
+        const result = await sendFollowUpSms({
+            businessId: business.id,
+            forwardingNumber: business.forwarding_number,
+            customerPhone: claimed.customer_phone,
+            body: claimed.draft_sms,
+        });
+
+        if (!result.sent) {
+            if (result.optedOut) {
+                // Never send; mark skipped so it leaves the queue.
+                await supabaseAdmin.from('pending_followups').update({ status: 'skipped' }).eq('id', id);
+                return Response.json({ error: 'Customer has opted out of SMS' }, { status: 409 });
+            }
+            // Transient failure — revert to pending so the owner can retry.
+            await supabaseAdmin.from('pending_followups').update({ status: 'pending', sent_at: null }).eq('id', id);
+            return Response.json({ error: result.reason || 'SMS send failed' }, { status: 502 });
         }
 
-        // TCPA: fail closed on opt-out lookup errors
-        const { data: optOut, error: optOutError } = await supabaseAdmin
-            .from('opt_outs')
-            .select('id')
-            .eq('business_id', business.id)
-            .eq('phone_number', claimed.customer_phone)
-            .maybeSingle();
-        if (optOutError) {
-            await revert();
-            return Response.json({ error: 'Opt-out check failed, not sent' }, { status: 500 });
-        }
-        if (optOut) {
-            // Customer opted out — never send; mark skipped so it leaves the queue
-            await supabaseAdmin.from('pending_followups').update({ status: 'skipped' }).eq('id', id);
-            return Response.json({ error: 'Customer has opted out of SMS' }, { status: 409 });
-        }
-
-        const rateLimit = await checkSmsRateLimit(business.id, claimed.customer_phone);
-        if (!rateLimit.allowed) {
-            await revert();
-            return Response.json({ error: `Rate limited: ${rateLimit.reason || 'too many messages'}` }, { status: 429 });
-        }
-
-        try {
-            const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-            await client.messages.create({
-                to: claimed.customer_phone,
-                from: business.forwarding_number,
-                body: claimed.draft_sms,
-            });
-        } catch (sendError) {
-            logger.error(`${TAG} Twilio send failed`, sendError, { draftId: id });
-            await revert();
-            return Response.json({ error: 'SMS send failed' }, { status: 502 });
-        }
-
-        // Log to the conversation history when a lead exists for this phone
-        const { data: lead } = await supabaseAdmin
-            .from('leads')
-            .select('id')
-            .eq('business_id', business.id)
-            .eq('caller_phone', claimed.customer_phone)
-            .maybeSingle();
-        if (lead) {
-            await supabaseAdmin.from('messages').insert({
-                lead_id: lead.id,
-                direction: 'outbound',
-                body: claimed.draft_sms,
-                is_ai_generated: true,
-            });
-        }
+        await supabaseAdmin
+            .from('pending_followups')
+            .update({ sent_via: 'manual' })
+            .eq('id', id);
 
         logger.info(`${TAG} Follow-up sent`, { draftId: id, businessId: business.id });
         return Response.json({ success: true, status: 'sent' });

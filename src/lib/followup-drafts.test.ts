@@ -101,10 +101,12 @@ describe('findFollowUpCandidates', () => {
 });
 
 describe('draftFollowUpSms (template fallback, no OpenAI key)', () => {
-    it('produces a personalized, sendable template draft', async () => {
+    it('produces a personalized, sendable template draft (never auto-sendable)', async () => {
         const draft = await draftFollowUpSms(row('a') as never, 'Techy Miramar');
         expect(draft.shouldSend).toBe(true);
         expect(draft.aiGenerated).toBe(false);
+        // Templates are low-confidence so they never auto-send — approval only.
+        expect(draft.confidence).toBe('low');
         expect(draft.sms).toContain('Hi Maria');
         expect(draft.sms).toContain('Techy Miramar');
         expect(draft.sms.length).toBeLessThanOrEqual(320);
