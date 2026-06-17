@@ -86,17 +86,19 @@ describe('findFollowUpCandidates', () => {
         expect(out).toEqual([]);
     });
 
-    it('includes answered quote calls (intent by category) and follow_up_needed calls; drops no-intent calls', async () => {
+    it('keeps quote/parts leads; drops status-check, follow_up, and no-intent calls', async () => {
         candidatesResult.mockResolvedValue({
             data: [
-                row('quote', { category: 'repair_quote', follow_up_needed: false }),     // intent by category
-                row('flagged', { category: 'other', follow_up_needed: true }),            // intent by flag
-                row('noise', { category: 'other', follow_up_needed: false }),             // no intent → dropped
+                row('quote', { category: 'repair_quote' }),                          // kept
+                row('parts', { category: 'parts_inquiry' }),                         // kept
+                row('rena', { category: 'status_check', follow_up_needed: true }),   // existing customer → dropped
+                row('vague', { category: 'follow_up', follow_up_needed: true }),     // too vague → dropped
+                row('noise', { category: 'other', follow_up_needed: true }),         // no sales intent → dropped
             ],
             error: null,
         });
         const out = await findFollowUpCandidates('biz-1');
-        expect(out.map((c) => c.id).sort()).toEqual(['flagged', 'quote']);
+        expect(out.map((c) => c.id).sort()).toEqual(['parts', 'quote']);
     });
 });
 
