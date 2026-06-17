@@ -52,10 +52,12 @@ export interface DraftResult {
     confidence: DraftConfidence;
 }
 
-// Categories worth chasing when the job didn't convert. An answered call where
-// someone asked for a quote and never came in is the single best follow-up
-// candidate — exactly what we want, even though it isn't a "missed call".
-const FOLLOWUP_CATEGORIES = ['repair_quote', 'parts_inquiry', 'status_check', 'follow_up'];
+// Categories worth chasing when the job didn't convert: genuine NEW sales
+// intent. Deliberately excludes 'status_check' (existing customer asking about
+// an in-progress repair — they're not a lost lead, and texting "still waiting
+// for you?" reads wrong) and 'follow_up' (too vague). An answered call where
+// someone asked a quote and never came in is the single best candidate.
+const FOLLOWUP_CATEGORIES = ['repair_quote', 'parts_inquiry'];
 // callback_status values that mean "resolved" — never chase these.
 const RESOLVED_STATUSES = ['booked', 'lost'];
 
@@ -91,12 +93,9 @@ export async function findFollowUpCandidates(businessId: string, minAgeHours = M
         return [];
     }
     const candidates = (data || []).filter(
-        (c) =>
-            c.customer_phone &&
-            c.category !== 'spam' &&
-            c.category !== 'wrong_number' &&
-            // buying intent: a follow-up-worthy category, or the auditor flagged it
-            (FOLLOWUP_CATEGORIES.includes(c.category || '') || c.follow_up_needed === true),
+        // New-sales intent only — a quote/parts category. (No follow_up_needed
+        // catch-all: it lets status-check / existing-customer calls back in.)
+        (c) => c.customer_phone && FOLLOWUP_CATEGORIES.includes(c.category || ''),
     ) as FollowUpCandidate[];
 
     if (candidates.length === 0) return [];

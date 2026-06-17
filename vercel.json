@@ -34,7 +34,7 @@
     },
     {
       "path": "/api/cron/followup-drafts",
-      "schedule": "*/10 * * * *"
+      "schedule": "0 * * * *"
     },
     {
       "path": "/api/cron/owner-no-reply-alert",

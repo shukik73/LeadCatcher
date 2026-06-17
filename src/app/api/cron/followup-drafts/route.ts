@@ -12,18 +12,17 @@ export const dynamic = 'force-dynamic';
 
 const TAG = '[FollowUp Engine]';
 
-// 15-min cool-off: give the owner a chance to handle the lead first, but text
-// while it's still warm. (Runs every 10 min via Vercel cron.)
-const MIN_AGE_HOURS = 0.25;
-// Auto-send only chases genuinely fresh leads, so flipping the switch on can't
-// blast days of backlog. Older-but-still-warm leads go to the approval queue.
-const AUTO_SEND_MAX_AGE_HOURS = 24;
-// Hard ceiling on automatic texts per business per day — backstop against a
-// reprocess or a bad day generating a flood.
+// Two calm review slots per day, business-local: a morning sweep of overnight/
+// evening leads, and an end-of-day sweep before close. Generation AND the owner
+// ping happen ONLY at these hours — no all-day drafting or repeat nags. The
+// cron fires hourly at :00, so each slot runs exactly once.
+const DIGEST_HOURS = [10, 18];
+// Look back far enough that the 10am slot catches everything since the 6pm slot
+// (evening + overnight), with margin.
+const MAX_AGE_HOURS = 20;
+// Auto-send (parked; flag default OFF) — kept so the path still works if a shop
+// opts in later. At digest cadence it fires at most twice/day.
 const AUTO_SEND_DAILY_CAP = 12;
-// Owner gets the "drafts waiting" nudge at these business-local hours only,
-// so the 10-min engine cadence doesn't turn into 144 pings/day.
-const PING_HOURS = [9, 13, 18];
 
 function verifyCronSecret(header: string | null): boolean {
     const secret = process.env.CRON_SECRET;
@@ -58,14 +57,16 @@ async function autoSentTodayCount(businessId: string): Promise<number> {
 }
 
 /**
- * GET /api/cron/followup-drafts  (Vercel Cron, every 10 min)
+ * GET /api/cron/followup-drafts  (Vercel Cron, hourly at :00)
  *
- * The follow-up engine. For each business, find calls that showed buying intent
- * but never converted, AI-draft a personalized SMS, then route it:
+ * Twice-daily follow-up digest. Only runs at the business-local DIGEST_HOURS
+ * (10am, 6pm); every other hour it's a no-op. At a digest hour, for each
+ * business it finds quote leads that never converted, AI-drafts a personalized
+ * SMS, routes each:
  *   - should_send=false        -> suppressed (recorded, never re-drafted)
- *   - auto-send ON + high conf -> SENT automatically (guards + caps + hours)
+ *   - auto-send ON + high conf -> SENT automatically (guards + caps)
  *   - otherwise                -> pending (owner approval queue)
- * Owner is pinged about the pending queue at 9am/1pm/6pm local only.
+ * then sends ONE owner ping with the pending count. One ping per slot.
  */
 export async function GET(request: Request) {
     if (!verifyCronSecret(request.headers.get('authorization'))) {
@@ -85,6 +86,11 @@ export async function GET(request: Request) {
 
         const results = [];
         for (const business of businesses || []) {
+            const tz = business.timezone || 'America/New_York';
+            if (!DIGEST_HOURS.includes(localHour(tz))) {
+                results.push({ businessId: business.id, skipped: 'not a digest hour' });
+                continue;
+            }
             try {
                 results.push({ businessId: business.id, ...(await processBusiness(business)) });
             } catch (bizError) {
@@ -120,7 +126,9 @@ async function processBusiness(business: BusinessRow) {
         .eq('status', 'pending')
         .lt('created_at', new Date(Date.now() - 48 * 3600_000).toISOString());
 
-    const candidates = await findFollowUpCandidates(business.id, MIN_AGE_HOURS);
+    // Digest mode: chase quote leads since the last slot (no per-call cool-off
+    // needed — we only run twice a day).
+    const candidates = await findFollowUpCandidates(business.id, 0);
 
     const autoOn = business.followup_auto_send && isBusinessHours(business.business_hours, tz);
     let autoBudget = autoOn ? Math.max(0, AUTO_SEND_DAILY_CAP - (await autoSentTodayCount(business.id))) : 0;
@@ -143,7 +151,7 @@ async function processBusiness(business: BusinessRow) {
             autoOn &&
             autoBudget > 0 &&
             draft.confidence === 'high' &&
-            ageHours <= AUTO_SEND_MAX_AGE_HOURS &&
+            ageHours <= MAX_AGE_HOURS &&
             !(await alreadyTextedToday(business.id, candidate.customer_phone));
 
         if (autoEligible) {
@@ -171,9 +179,9 @@ async function processBusiness(business: BusinessRow) {
         created++;
     }
 
-    // Nudge the owner about the review queue, only at the digest hours.
+    // One owner nudge per slot (we only reach here at a digest hour).
     let pinged = false;
-    if (PING_HOURS.includes(localHour(tz)) && business.owner_phone && business.forwarding_number) {
+    if (business.owner_phone && business.forwarding_number) {
         const { count: pendingCount } = await supabaseAdmin
             .from('pending_followups')
             .select('id', { count: 'exact', head: true })
