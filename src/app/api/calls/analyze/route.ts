@@ -76,11 +76,14 @@ export async function POST(request: Request) {
 
         const input = parsed.data;
 
-        // Idempotency check — if already analyzed, return existing
+        // Idempotency check — if already analyzed, return existing.
+        // Scope to the caller's business so a source_call_id from another tenant
+        // can't be probed/poisoned through this service-role (RLS-bypassing) query.
         const { data: existing } = await supabaseAdmin
             .from('call_analyses')
             .select('id, category, urgency, callback_status')
             .eq('source_call_id', input.source_call_id)
+            .eq('business_id', business.id)
             .single();
 
         if (existing) {

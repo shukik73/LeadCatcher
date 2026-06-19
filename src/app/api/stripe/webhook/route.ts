@@ -57,7 +57,7 @@ export async function POST(request: Request) {
     try {
         switch (event.type) {
             case 'checkout.session.completed':
-                await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
+                await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session, event.created, event.id);
                 break;
 
             case 'customer.subscription.updated':
@@ -65,11 +65,11 @@ export async function POST(request: Request) {
                 break;
 
             case 'customer.subscription.deleted':
-                await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
+                await handleSubscriptionDeleted(event.data.object as Stripe.Subscription, event.created, event.id);
                 break;
 
             case 'invoice.payment_failed':
-                await handlePaymentFailed(event.data.object as Stripe.Invoice);
+                await handlePaymentFailed(event.data.object as Stripe.Invoice, event.created, event.id);
                 break;
 
             default:
@@ -86,7 +86,42 @@ export async function POST(request: Request) {
     return new Response('OK', { status: 200 });
 }
 
-async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+/**
+ * Monotonic ordering guard. Stamps the Stripe event.created timestamp on the
+ * webhook_events row, then checks whether a NEWER stripe event for the same
+ * business has already been processed. Returns true if THIS event is stale (an
+ * out-of-order replay) and should be skipped, so an older event can never
+ * overwrite newer subscription state.
+ *
+ * Applied to every subscription-mutating handler — not just `subscription.updated`
+ * — so a delayed/retried `subscription.deleted` or `payment_failed` cannot clobber
+ * a newer `active` state (and vice-versa). Stamping all stripe rows keeps the
+ * cross-event-type comparison consistent.
+ */
+async function isStaleStripeEvent(businessId: string, eventCreatedAt: number, eventId: string): Promise<boolean> {
+    const eventTimestamp = new Date(eventCreatedAt * 1000).toISOString();
+
+    await supabaseAdmin.from('webhook_events')
+        .update({ business_id: businessId, created_at: eventTimestamp })
+        .eq('event_id', eventId);
+
+    const { data: newerEvents } = await supabaseAdmin
+        .from('webhook_events')
+        .select('id')
+        .eq('event_type', 'stripe')
+        .eq('status', 'processed')
+        .eq('business_id', businessId)
+        .gt('created_at', eventTimestamp)
+        .limit(1);
+
+    if (newerEvents && newerEvents.length > 0) {
+        logger.info(`[${TAG}] Skipping out-of-order event`, { businessId, eventId, eventTimestamp });
+        return true;
+    }
+    return false;
+}
+
+async function handleCheckoutCompleted(session: Stripe.Checkout.Session, eventCreatedAt: number, eventId: string) {
     const businessId = session.metadata?.business_id;
     const planId = session.metadata?.plan_id;
     const subscriptionId = session.subscription as string;
@@ -97,6 +132,8 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         });
         return;
     }
+
+    if (await isStaleStripeEvent(businessId, eventCreatedAt, eventId)) return;
 
     // Fetch the subscription to get trial/period details
     const subscription = await stripe.subscriptions.retrieve(subscriptionId) as Stripe.Subscription;
@@ -142,31 +179,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription, even
         return;
     }
 
-    // Store business_id and Stripe event timestamp on the webhook_events row
-    // so we can do ordering checks across events for the same business.
-    const eventTimestamp = new Date(eventCreatedAt * 1000).toISOString();
-    await supabaseAdmin.from('webhook_events')
-        .update({ business_id: business.id, created_at: eventTimestamp })
-        .eq('event_id', eventId);
-
-    // Monotonic ordering guard: check if we already processed a newer event
-    // for this business. If so, skip to avoid overwriting newer state.
-    const { data: newerEvents } = await supabaseAdmin
-        .from('webhook_events')
-        .select('id')
-        .eq('event_type', 'stripe')
-        .eq('status', 'processed')
-        .eq('business_id', business.id)
-        .gt('created_at', eventTimestamp)
-        .limit(1);
-
-    if (newerEvents && newerEvents.length > 0) {
-        logger.info(`[${TAG}] Skipping out-of-order subscription update`, {
-            businessId: business.id,
-            eventTimestamp,
-        });
-        return;
-    }
+    if (await isStaleStripeEvent(business.id, eventCreatedAt, eventId)) return;
 
     // Determine plan from the price
     const priceId = subscription.items.data[0]?.price?.id;
@@ -193,7 +206,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription, even
     });
 }
 
-async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
+async function handleSubscriptionDeleted(subscription: Stripe.Subscription, eventCreatedAt: number, eventId: string) {
     const customerId = subscription.customer as string;
 
     const { data: business } = await supabaseAdmin
@@ -206,6 +219,8 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
         logger.warn(`[${TAG}] No business for customer`, { customerId });
         return;
     }
+
+    if (await isStaleStripeEvent(business.id, eventCreatedAt, eventId)) return;
 
     await supabaseAdmin
         .from('businesses')
@@ -220,7 +235,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     });
 }
 
-async function handlePaymentFailed(invoice: Stripe.Invoice) {
+async function handlePaymentFailed(invoice: Stripe.Invoice, eventCreatedAt: number, eventId: string) {
     const customerId = invoice.customer as string;
 
     const { data: business } = await supabaseAdmin
@@ -230,6 +245,8 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
         .single();
 
     if (!business) return;
+
+    if (await isStaleStripeEvent(business.id, eventCreatedAt, eventId)) return;
 
     await supabaseAdmin
         .from('businesses')

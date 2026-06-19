@@ -6,7 +6,7 @@ import { checkBillingStatus } from '@/lib/billing-guard';
 import { claimWebhookEvent, markWebhookProcessed, markWebhookFailed, markWebhookFailedIfProcessing, setWebhookBusinessId, checkOptOut } from '@/lib/webhook-common';
 import { signCallbackParams } from '@/lib/callback-signature';
 import { checkSmsRateLimit } from '@/lib/sms-rate-limit';
-import { appendBookingLink } from '@/lib/sms-template';
+import { renderMissedCallSms } from '@/lib/sms-template';
 import { getWebhookBaseUrl } from '@/lib/webhook-url';
 import { logger } from '@/lib/logger';
 import twilio from 'twilio';
@@ -135,8 +135,10 @@ async function handleVoiceWebhook(callSid: string | null, callerRaw: string, cal
         const template = isOpen
             ? (business.sms_template || defaultOpen)
             : (business.sms_template_closed || defaultClosed);
-        const baseMessage = template.replace(/\{\{business_name\}\}/g, business.name || 'our business');
-        autoReplyBody = appendBookingLink(baseMessage, business.booking_url);
+        // Caller is typically unknown at missed-call time; renderMissedCallSms
+        // resolves {{first_name}} to a friendly fallback and strips any leftover
+        // {{token}} so no raw placeholder is ever texted to the customer.
+        autoReplyBody = renderMissedCallSms(template, business);
 
         try {
             await client.messages.create({

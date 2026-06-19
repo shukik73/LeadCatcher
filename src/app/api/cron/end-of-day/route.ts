@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { logger } from '@/lib/logger';
+import { checkBillingStatus } from '@/lib/billing-guard';
 import { timingSafeEqual } from 'crypto';
 import twilio from 'twilio';
 
@@ -64,6 +65,13 @@ export async function GET(request: Request) {
 
                 if (hour !== 19) {
                     results.push({ businessId: biz.id, skipped: true });
+                    continue;
+                }
+
+                // Don't spend SMS on inactive/canceled accounts (revenue leak).
+                const billing = await checkBillingStatus(biz.id);
+                if (!billing.allowed) {
+                    results.push({ businessId: biz.id, skipped: true, reason: 'Billing inactive' });
                     continue;
                 }
 
