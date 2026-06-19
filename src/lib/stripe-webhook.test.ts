@@ -126,6 +126,8 @@ describe('Stripe Webhook Route', () => {
         const claimChain = {
             select: vi.fn().mockReturnThis(),
             eq: vi.fn().mockReturnThis(),
+            gt: vi.fn().mockReturnThis(),
+            limit: vi.fn().mockResolvedValue({ data: [], error: null }),
             maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'wh-1' }, error: null }),
             insert: vi.fn().mockReturnThis(),
             update: vi.fn().mockReturnThis(),
@@ -159,6 +161,8 @@ describe('Stripe Webhook Route', () => {
         const claimChain = {
             select: vi.fn().mockReturnThis(),
             eq: vi.fn().mockReturnThis(),
+            gt: vi.fn().mockReturnThis(),
+            limit: vi.fn().mockResolvedValue({ data: [], error: null }),
             maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'wh-1' }, error: null }),
             insert: vi.fn().mockReturnThis(),
             update: vi.fn().mockReturnThis(),
