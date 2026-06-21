@@ -11,6 +11,8 @@ export const dynamic = 'force-dynamic';
 const settingsSchema = z.object({
     sms_template: z.string().min(1).max(1600).nullable().optional(),
     sms_template_closed: z.string().min(1).max(1600).nullable().optional(),
+    address: z.string().min(1).max(300).nullable().optional(),
+    services: z.string().min(1).max(1000).nullable().optional(),
     timezone: z.string().min(1).max(100).regex(/^[A-Za-z_/]+$/).optional(),
     business_hours: z.record(z.string(), z.object({
         open: z.string().regex(/^\d{2}:\d{2}$/),
