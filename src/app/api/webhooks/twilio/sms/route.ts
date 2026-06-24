@@ -247,16 +247,28 @@ async function handleSmsWebhook(messageSid: string | null, fromRaw: string, toRa
             // Atomic race guard: when two inbound texts land at the same instant,
             // only the one that wins this conditional update gets to reply. The
             // row-level lock makes the second update match zero rows.
+            // last_auto_reply_at defaults to epoch (migration 012), never NULL,
+            // so a single .lt(cutoff) reliably means "no reply in the window" —
+            // no fragile .or()/null handling that previously errored and muted
+            // the bot entirely.
             const claimCutoff = new Date(Date.now() - AUTO_REPLY_DEBOUNCE_MS).toISOString();
-            const { data: claimed } = await supabaseAdmin
+            const { data: claimed, error: claimError } = await supabaseAdmin
                 .from('leads')
                 .update({ last_auto_reply_at: new Date().toISOString() })
                 .eq('id', leadId)
-                .or(`last_auto_reply_at.is.null,last_auto_reply_at.lt.${claimCutoff}`)
+                .lt('last_auto_reply_at', claimCutoff)
                 .select('id')
                 .maybeSingle();
 
-            if (claimed) {
+            if (claimError) {
+                logger.error(`[${TAG}] Auto-reply claim failed`, claimError, { leadId });
+            }
+
+            // Degrade open: a broken guard must never silence the bot. Reply when
+            // we won the claim OR the claim mechanism itself errored. Only a clean
+            // "already replied within the debounce window" (no row, no error)
+            // suppresses the reply.
+            if (claimed || claimError) {
                 const replyRateLimit = await checkSmsRateLimit(business.id, from);
                 if (replyRateLimit.allowed) {
                     try {
