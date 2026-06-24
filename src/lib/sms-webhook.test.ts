@@ -303,6 +303,41 @@ describe('SMS Webhook - AI receptionist', () => {
         );
     });
 
+    it('still replies when the auto-reply claim errors (degrade open — never go silent)', async () => {
+        vi.mocked(validateTwilioRequest).mockResolvedValue(true);
+        const recMod = await import('@/lib/ai-receptionist');
+        vi.mocked(recMod.generateReceptionistReply).mockResolvedValue({
+            reply: 'Yes, we fix that! Swing by and the first check is free.',
+            should_reply: true, qualified: false, extracted: { device: 'ps5' }, confidence: 'high',
+        });
+
+        const businessData = {
+            id: 'biz-1', owner_phone: '+15550001111', name: 'Test Biz', auto_reply_enabled: true,
+            forwarding_number: '+15559876543', address: '123 Main St', services: 'consoles', business_hours: null, timezone: 'America/New_York',
+        };
+        mockSupabaseFrom.mockImplementation((table: string) => {
+            if (table === 'businesses') return mockSupabaseChain({ data: businessData, error: null });
+            if (table === 'opt_outs') return mockSupabaseChain({ data: null, error: null });
+            if (table === 'leads') {
+                // Lead lookup (.single) succeeds; the claim (.maybeSingle) errors.
+                const chain = mockSupabaseChain({
+                    data: { id: 'lead-1', caller_name: null, qualification_status: 'none', qualification_data: {}, qualification_step: 0, qualification_summary_sent_at: null },
+                    error: null,
+                });
+                chain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: { message: 'claim boom' } });
+                return chain;
+            }
+            return mockSupabaseChain({ data: null, error: null });
+        });
+
+        await POST(createFormDataRequest({ From: '+15551234567', To: '+15559876543', Body: 'do you fix ps5?' }));
+
+        // The claim failed, but the customer must STILL get an answer.
+        expect(mockMessagesCreate).toHaveBeenCalledWith(
+            expect.objectContaining({ to: '+15551234567', body: expect.stringContaining('first check is free') }),
+        );
+    });
+
     it('does not reply to the customer when auto-reply is off', async () => {
         vi.mocked(validateTwilioRequest).mockResolvedValue(true);
 
