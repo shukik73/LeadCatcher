@@ -100,14 +100,29 @@ export async function findFollowUpCandidates(businessId: string, minAgeHours = M
 
     if (candidates.length === 0) return [];
 
-    // Drop calls that already have a draft (any status)
+    // One follow-up per CALLER, not per call. Collapse multiple calls from the
+    // same number to the freshest one (candidates are ordered newest-first), so
+    // a customer who called twice gets a single text instead of one per call.
+    const seenPhone = new Set<string>();
+    const perCaller = candidates.filter((c) => {
+        if (seenPhone.has(c.customer_phone)) return false;
+        seenPhone.add(c.customer_phone);
+        return true;
+    });
+
+    // Drop callers who already have a draft from this or a prior run — matched
+    // by phone (not just call id), so a repeat call never stacks a second
+    // pending text on the same person.
     const { data: existing } = await supabaseAdmin
         .from('pending_followups')
-        .select('call_analysis_id')
-        .in('call_analysis_id', candidates.map((c) => c.id));
-    const drafted = new Set((existing || []).map((r) => r.call_analysis_id));
+        .select('customer_phone')
+        .eq('business_id', businessId)
+        .in('customer_phone', perCaller.map((c) => c.customer_phone));
+    const draftedPhones = new Set((existing || []).map((r) => r.customer_phone));
 
-    return candidates.filter((c) => !drafted.has(c.id)).slice(0, MAX_DRAFTS_PER_RUN);
+    return perCaller
+        .filter((c) => !draftedPhones.has(c.customer_phone))
+        .slice(0, MAX_DRAFTS_PER_RUN);
 }
 
 /**

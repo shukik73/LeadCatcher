@@ -31,9 +31,9 @@ vi.mock('@/lib/supabase-server', () => ({
                 chain.limit = vi.fn(() => candidatesResult());
                 return chain;
             }
-            // pending_followups: .select().in()
+            // pending_followups: .select().eq().in()
             return {
-                select: vi.fn(() => ({ in: vi.fn(() => existingDraftsResult()) })),
+                select: vi.fn(() => ({ eq: vi.fn(() => ({ in: vi.fn(() => existingDraftsResult()) })) })),
             };
         },
     },
@@ -72,12 +72,28 @@ describe('findFollowUpCandidates', () => {
         expect(out.map((c) => c.id)).toEqual(['a']);
     });
 
-    it('drops calls that already have a draft in any status', async () => {
-        candidatesResult.mockResolvedValue({ data: [row('a'), row('b')], error: null });
-        existingDraftsResult.mockResolvedValue({ data: [{ call_analysis_id: 'a' }], error: null });
+    it('drops callers who already have a draft (matched by phone, any status)', async () => {
+        candidatesResult.mockResolvedValue({
+            data: [row('a', { customer_phone: '+13050001111' }), row('b', { customer_phone: '+13050002222' })],
+            error: null,
+        });
+        existingDraftsResult.mockResolvedValue({ data: [{ customer_phone: '+13050001111' }], error: null });
 
         const out = await findFollowUpCandidates('biz-1');
         expect(out.map((c) => c.id)).toEqual(['b']);
+    });
+
+    it('collapses multiple calls from the same number into ONE follow-up (per caller, not per call)', async () => {
+        candidatesResult.mockResolvedValue({
+            data: [
+                // newest-first, as the DB query orders them; both from the same caller
+                row('call-2', { customer_phone: '+19998887777', created_at: new Date(Date.now() - 2 * 3600_000).toISOString() }),
+                row('call-1', { customer_phone: '+19998887777', created_at: new Date(Date.now() - 6 * 3600_000).toISOString() }),
+            ],
+            error: null,
+        });
+        const out = await findFollowUpCandidates('biz-1');
+        expect(out.map((c) => c.id)).toEqual(['call-2']); // freshest call only
     });
 
     it('returns empty on query error instead of throwing', async () => {
@@ -89,11 +105,11 @@ describe('findFollowUpCandidates', () => {
     it('keeps quote/parts leads; drops status-check, follow_up, and no-intent calls', async () => {
         candidatesResult.mockResolvedValue({
             data: [
-                row('quote', { category: 'repair_quote' }),                          // kept
-                row('parts', { category: 'parts_inquiry' }),                         // kept
-                row('rena', { category: 'status_check', follow_up_needed: true }),   // existing customer → dropped
-                row('vague', { category: 'follow_up', follow_up_needed: true }),     // too vague → dropped
-                row('noise', { category: 'other', follow_up_needed: true }),         // no sales intent → dropped
+                row('quote', { category: 'repair_quote', customer_phone: '+13050000001' }),                          // kept
+                row('parts', { category: 'parts_inquiry', customer_phone: '+13050000002' }),                         // kept
+                row('rena', { category: 'status_check', follow_up_needed: true, customer_phone: '+13050000003' }),   // existing customer → dropped
+                row('vague', { category: 'follow_up', follow_up_needed: true, customer_phone: '+13050000004' }),     // too vague → dropped
+                row('noise', { category: 'other', follow_up_needed: true, customer_phone: '+13050000005' }),         // no sales intent → dropped
             ],
             error: null,
         });
