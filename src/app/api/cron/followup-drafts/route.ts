@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { findFollowUpCandidates, draftFollowUpSms } from '@/lib/followup-drafts';
 import { sendFollowUpSms, alreadyTextedToday } from '@/lib/followup-send';
+import { customerCameInAfterCall } from '@/lib/followup-repairdesk-guard';
 import { isBusinessHours, type BusinessHours } from '@/lib/business-logic';
 import { checkSmsRateLimit } from '@/lib/sms-rate-limit';
 import { checkBillingStatus } from '@/lib/billing-guard';
@@ -76,7 +77,7 @@ export async function GET(request: Request) {
     try {
         const { data: businesses, error } = await supabaseAdmin
             .from('businesses')
-            .select('id, name, timezone, owner_phone, forwarding_number, business_hours, followup_auto_send')
+            .select('id, name, timezone, owner_phone, forwarding_number, business_hours, followup_auto_send, repairdesk_api_key')
             .not('repairdesk_api_key', 'is', null);
 
         if (error) {
@@ -113,6 +114,7 @@ interface BusinessRow {
     forwarding_number: string | null;
     business_hours: BusinessHours | null;
     followup_auto_send: boolean;
+    repairdesk_api_key: string | null;
 }
 
 async function processBusiness(business: BusinessRow) {
@@ -155,24 +157,39 @@ async function processBusiness(business: BusinessRow) {
             !(await alreadyTextedToday(business.id, candidate.customer_phone));
 
         if (autoEligible) {
-            const res = await sendFollowUpSms({
-                businessId: business.id,
-                forwardingNumber: business.forwarding_number,
-                customerPhone: candidate.customer_phone,
-                body: draft.sms,
-            });
-            if (res.sent) {
-                await insertDraft(business.id, candidate, draft, 'sent', 'auto');
-                autoSent++;
-                autoBudget--;
-                continue;
-            }
-            if (res.optedOut) {
+            // RepairDesk guard: never auto-text someone who already came in.
+            // If RepairDesk can't be reached we fail safe — fall to the approval
+            // queue rather than risk a "come on by!" to someone at the counter.
+            const guard = await customerCameInAfterCall(
+                business.repairdesk_api_key!, candidate.customer_phone, candidate.created_at,
+            );
+            if (guard.cameIn) {
+                // Already came in — record so we don't re-draft, and never text.
                 await insertDraft(business.id, candidate, draft, 'skipped');
                 continue;
             }
-            // transient failure (rate limit / billing / twilio) — fall back to
-            // the approval queue so the lead isn't lost.
+            if (guard.checked) {
+                const res = await sendFollowUpSms({
+                    businessId: business.id,
+                    forwardingNumber: business.forwarding_number,
+                    customerPhone: candidate.customer_phone,
+                    body: draft.sms,
+                });
+                if (res.sent) {
+                    await insertDraft(business.id, candidate, draft, 'sent', 'auto');
+                    autoSent++;
+                    autoBudget--;
+                    continue;
+                }
+                if (res.optedOut) {
+                    await insertDraft(business.id, candidate, draft, 'skipped');
+                    continue;
+                }
+                // transient failure (rate limit / billing / twilio) — fall back to
+                // the approval queue so the lead isn't lost.
+            }
+            // RepairDesk unverifiable (guard.checked === false) — fall through to
+            // the approval queue; don't auto-send what we couldn't check.
         }
 
         await insertDraft(business.id, candidate, draft, 'pending');

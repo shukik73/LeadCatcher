@@ -28,6 +28,7 @@ const settingsSchema = z.object({
     auto_reply_enabled: z.boolean().optional(),
     daily_digest_enabled: z.boolean().optional(),
     status_updates_enabled: z.boolean().optional(),
+    followup_auto_send: z.boolean().optional(),
     booking_url: z.union([
         z.string().min(1).max(512).url(),
         z.literal(''),
