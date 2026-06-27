@@ -85,6 +85,7 @@ export default function SettingsPage() {
     const [autoReplyEnabled, setAutoReplyEnabled] = useState(false);
     const [dailyDigestEnabled, setDailyDigestEnabled] = useState(true);
     const [statusUpdatesEnabled, setStatusUpdatesEnabled] = useState(false);
+    const [autoSendFollowups, setAutoSendFollowups] = useState(false);
     const [bookingUrl, setBookingUrl] = useState('');
     const [googleReviewLink, setGoogleReviewLink] = useState('');
     const [savingFeatures, setSavingFeatures] = useState(false);
@@ -106,7 +107,7 @@ export default function SettingsPage() {
 
         const { data: business } = await supabase
             .from('businesses')
-            .select('id, sms_template, sms_template_closed, address, services, timezone, business_hours, repairdesk_store_url, business_phone, owner_phone, carrier, forwarding_number, auto_reply_enabled, daily_digest_enabled, status_updates_enabled, booking_url, google_review_link')
+            .select('id, sms_template, sms_template_closed, address, services, timezone, business_hours, repairdesk_store_url, business_phone, owner_phone, carrier, forwarding_number, auto_reply_enabled, daily_digest_enabled, status_updates_enabled, followup_auto_send, booking_url, google_review_link')
             .eq('user_id', user.id)
             .single();
 
@@ -125,6 +126,7 @@ export default function SettingsPage() {
             setRepairDeskSubdomain(business.repairdesk_store_url || '');
             setAutoReplyEnabled(business.auto_reply_enabled ?? false);
             setDailyDigestEnabled(business.daily_digest_enabled ?? true);
+            setAutoSendFollowups(business.followup_auto_send ?? false);
             setStatusUpdatesEnabled(business.status_updates_enabled ?? false);
             setBookingUrl(business.booking_url || '');
             setGoogleReviewLink(business.google_review_link || '');
@@ -827,6 +829,7 @@ export default function SettingsPage() {
                                             auto_reply_enabled: autoReplyEnabled,
                                             daily_digest_enabled: dailyDigestEnabled,
                                             status_updates_enabled: statusUpdatesEnabled,
+                                            followup_auto_send: autoSendFollowups,
                                             booking_url: bookingUrl || null,
                                             google_review_link: googleReviewLink || null,
                                         }),
@@ -875,6 +878,19 @@ export default function SettingsPage() {
                         <Switch
                             checked={statusUpdatesEnabled}
                             onCheckedChange={setStatusUpdatesEnabled}
+                        />
+                    </div>
+                    <div className="flex items-center justify-between py-2">
+                        <div className="pr-4">
+                            <p className="text-sm font-medium">Auto-send follow-ups</p>
+                            <p className="text-xs text-slate-500">
+                                When on, high-confidence follow-ups text customers automatically — no approval needed.
+                                It first checks RepairDesk and skips anyone who already came in. Off: drafts wait in your queue for approval.
+                            </p>
+                        </div>
+                        <Switch
+                            checked={autoSendFollowups}
+                            onCheckedChange={setAutoSendFollowups}
                         />
                     </div>
 
