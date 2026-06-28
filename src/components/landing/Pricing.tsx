@@ -9,83 +9,76 @@ const plans = [
     {
         id: 'starter',
         name: 'Starter',
-        description: 'Perfect for solo operators.',
+        description: 'For one-person shops.',
         price: 299,
         features: [
-            "Up to 100 automated texts",
-            "Standard call forwarding",
-            "Basic Lead Alerts (SMS)",
-            "Email Support"
+            'Auto text-back on every missed call',
+            'Your simple daily list of who’s waiting',
+            'Keep your current number',
         ],
-        cta: 'Start Trial',
         popular: false,
     },
     {
         id: 'pro',
         name: 'Pro',
-        description: 'For growing teams & shops.',
+        description: 'For growing teams.',
         price: 499,
         features: [
-            "Unlimited automated texts",
-            "Priority Owner Alerts",
-            "2-Way Texting Relay",
-            "Dedicated Support Line",
-            "Custom Auto-Reply Message"
+            'Everything in Starter',
+            'Two-way texting from the app',
+            'Shared inbox & instant owner alerts',
         ],
-        cta: 'Get Started',
         popular: true,
     },
 ];
 
 export default function Pricing() {
     return (
-        <section id="pricing" className="py-24 bg-slate-50">
-            <div className="container px-4 mx-auto">
-                <div className="text-center max-w-3xl mx-auto mb-16">
-                    <h2 className="text-3xl md:text-5xl font-bold mb-4 text-slate-900">Simple, transparent pricing.</h2>
-                    <p className="text-xl text-slate-500">Start with a 14-day free trial. No charge for 14 days &mdash; cancel anytime.</p>
+        <section id="pricing" className="bg-[#16120B] py-24">
+            <div className="container mx-auto px-4 md:px-6">
+                <div className="mb-14 text-center">
+                    <h2 className="mb-4 text-3xl font-bold tracking-tight text-stone-50 md:text-4xl">One saved job covers the year.</h2>
+                    <p className="text-lg text-stone-400">14 days free · no card to start · cancel anytime, no contracts.</p>
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-                    {plans.map(plan => (
+                <div className="mx-auto grid max-w-4xl gap-6 md:grid-cols-2">
+                    {plans.map((plan) => (
                         <div
                             key={plan.id}
-                            className={`bg-white p-8 rounded-3xl border flex flex-col transition-all duration-300 ${
-                                plan.popular
-                                    ? 'shadow-xl border-blue-100 hover:shadow-2xl relative overflow-hidden transform hover:-translate-y-1'
-                                    : 'shadow-sm border-slate-200 hover:shadow-xl'
+                            className={`relative flex flex-col rounded-3xl border p-8 ${
+                                plan.popular ? 'border-[#E0A43B]/40 bg-[#211B11]' : 'border-white/5 bg-[#1E1810]'
                             }`}
                         >
                             {plan.popular && (
-                                <div className="absolute top-0 right-0 bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded-bl-xl uppercase tracking-wider">
+                                <div className="absolute right-6 top-6 rounded-full bg-[#E0A43B] px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-[#1A1206]">
                                     Most Popular
                                 </div>
                             )}
-                            <div className="mb-8">
-                                <h3 className="text-2xl font-bold text-slate-900">{plan.name}</h3>
-                                <p className="text-slate-500 mt-2">{plan.description}</p>
+                            <div className="mb-6">
+                                <h3 className="text-xl font-bold text-stone-50">{plan.name}</h3>
+                                <p className="mt-1 text-sm text-stone-400">{plan.description}</p>
                             </div>
                             <div className="mb-8">
-                                <span className="text-5xl font-bold text-slate-900">${plan.price}</span>
-                                <span className="text-slate-500 text-lg">/mo</span>
+                                <span className="text-5xl font-bold text-stone-50">${plan.price}</span>
+                                <span className="text-lg text-stone-500">/mo</span>
                             </div>
-                            <ul className="space-y-4 mb-8 flex-1">
+                            <ul className="mb-8 flex-1 space-y-3">
                                 {plan.features.map((feature, i) => (
-                                    <li key={i} className={`flex items-center gap-3 ${plan.popular ? 'text-slate-700 font-medium' : 'text-slate-600'}`}>
-                                        <Check className={`h-5 w-5 flex-shrink-0 ${plan.popular ? 'text-blue-600' : 'text-blue-500'}`} />
+                                    <li key={i} className="flex items-center gap-3 text-stone-300">
+                                        <Check className="h-5 w-5 shrink-0 text-[#E0A43B]" />
                                         <span>{feature}</span>
                                     </li>
                                 ))}
                             </ul>
                             <Button
                                 asChild
-                                className={`w-full text-lg h-12 rounded-xl ${
+                                className={`h-12 w-full rounded-xl text-base font-semibold ${
                                     plan.popular
-                                        ? 'bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200'
-                                        : 'bg-slate-100 text-slate-900 hover:bg-slate-200 border border-slate-200'
+                                        ? 'bg-[#E0A43B] text-[#1A1206] hover:brightness-110'
+                                        : 'border border-white/10 bg-white/5 text-stone-100 hover:bg-white/10'
                                 }`}
                             >
-                                <Link href={`/onboarding?plan=${plan.id}`}>{plan.cta}</Link>
+                                <Link href={`/onboarding?plan=${plan.id}`}>Start free</Link>
                             </Button>
                         </div>
                     ))}

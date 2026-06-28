@@ -1,62 +1,50 @@
 "use client";
 
-import { Phone, MessageSquare, Bell, CheckCircle2 } from 'lucide-react';
+import { Phone, MessageSquare, PhoneCall } from 'lucide-react';
 
 const steps = [
     {
+        step: 'Step 1',
         icon: Phone,
-        title: "Customer Calls",
-        description: "A potential customer calls your business line while you're busy working.",
-        color: "bg-red-100 text-red-600"
+        title: 'A call goes unanswered',
+        description: "You're under a sink or up a ladder. It rings out, the way it always does.",
     },
     {
+        step: 'Step 2',
         icon: MessageSquare,
-        title: "Auto Text Sent",
-        description: "Within seconds, they receive a friendly text letting them know you'll follow up.",
-        color: "bg-blue-100 text-blue-600"
+        title: 'We text them back',
+        description: 'In seconds — sounding like you, not a robot. The customer feels looked after.',
     },
     {
-        icon: Bell,
-        title: "You Get Notified",
-        description: "Get an instant alert with the caller's info and voicemail summary.",
-        color: "bg-amber-100 text-amber-600"
+        step: 'Step 3',
+        icon: PhoneCall,
+        title: 'You call back when free',
+        description: "One tidy list shows who's waiting. Tap to call. The job's still warm.",
     },
-    {
-        icon: CheckCircle2,
-        title: "Close the Deal",
-        description: "Follow up when you're ready. The lead stays warm, and you win the job.",
-        color: "bg-green-100 text-green-600"
-    }
 ];
 
 export default function HowItWorks() {
     return (
-        <section id="how-it-works" className="py-24 bg-white">
-            <div className="container px-4 mx-auto">
-                <div className="text-center max-w-3xl mx-auto mb-16">
-                    <h2 className="text-3xl md:text-5xl font-bold mb-4 text-slate-900">
-                        How it works
+        <section id="how-it-works" className="bg-[#16120B] py-24">
+            <div className="container mx-auto px-4 md:px-6">
+                <div className="mb-14 max-w-2xl">
+                    <h2 className="mb-4 text-3xl font-bold tracking-tight text-stone-50 md:text-4xl">
+                        Three steps. No learning curve.
                     </h2>
-                    <p className="text-xl text-slate-500">
-                        Set up in 5 minutes. Never lose a lead to a missed call again.
+                    <p className="text-lg text-stone-400">
+                        No dashboards to babysit. No new gadgets. It works quietly in the background.
                     </p>
                 </div>
 
-                <div className="grid md:grid-cols-4 gap-8 max-w-5xl mx-auto">
-                    {steps.map((step, index) => (
-                        <div key={index} className="relative">
-                            {/* Connector line */}
-                            {index < steps.length - 1 && (
-                                <div className="hidden md:block absolute top-8 left-1/2 w-full h-0.5 bg-slate-200" />
-                            )}
-
-                            <div className="relative flex flex-col items-center text-center">
-                                <div className={`h-16 w-16 rounded-full ${step.color} flex items-center justify-center mb-4 relative z-10`}>
-                                    <step.icon size={28} />
-                                </div>
-                                <h3 className="font-semibold text-lg text-slate-900 mb-2">{step.title}</h3>
-                                <p className="text-slate-500 text-sm">{step.description}</p>
-                            </div>
+                <div className="grid gap-6 md:grid-cols-3">
+                    {steps.map((step) => (
+                        <div key={step.step} className="rounded-2xl border border-white/5 bg-[#1E1810] p-8">
+                            <span className="mb-6 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-[#E0A43B]/15 text-[#E0A43B]">
+                                <step.icon className="h-5 w-5" />
+                            </span>
+                            <p className="mb-2 text-xs font-bold uppercase tracking-widest text-[#E0A43B]">{step.step}</p>
+                            <h3 className="mb-2 text-lg font-semibold text-stone-50">{step.title}</h3>
+                            <p className="text-sm leading-relaxed text-stone-400">{step.description}</p>
                         </div>
                     ))}
                 </div>
