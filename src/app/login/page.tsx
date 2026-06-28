@@ -81,8 +81,8 @@ export default function LoginPage() {
     // Forgot Password View
     if (viewMode === 'forgotPassword') {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-                <Card className="w-full max-w-md bg-white/80 backdrop-blur-sm border-slate-200 shadow-xl">
+            <div className="dark min-h-screen flex items-center justify-center bg-background p-4">
+                <Card className="w-full max-w-md bg-card/80 backdrop-blur-sm border-border shadow-xl">
                     <CardHeader className="space-y-1 text-center">
                         <CardTitle className="text-2xl font-bold tracking-tight">Reset Password</CardTitle>
                         <CardDescription>
@@ -94,7 +94,7 @@ export default function LoginPage() {
                             <div className="space-y-2">
                                 <Label htmlFor="email">Email</Label>
                                 <div className="relative">
-                                    <Mail className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                                     <Input
                                         id="email"
                                         type="email"
@@ -106,7 +106,7 @@ export default function LoginPage() {
                                     />
                                 </div>
                             </div>
-                            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={loading}>
+                            <Button type="submit" className="w-full" disabled={loading}>
                                 {loading ? (
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 ) : (
@@ -119,14 +119,14 @@ export default function LoginPage() {
                             <button
                                 type="button"
                                 onClick={() => setViewMode('signIn')}
-                                className="text-sm text-blue-600 hover:underline inline-flex items-center gap-1"
+                                className="text-sm text-primary hover:underline inline-flex items-center gap-1"
                             >
                                 <ArrowLeft className="h-3 w-3" />
                                 Back to Sign In
                             </button>
                         </div>
                     </CardContent>
-                    <CardFooter className="flex flex-col gap-4 text-center text-sm text-slate-500">
+                    <CardFooter className="flex flex-col gap-4 text-center text-sm text-muted-foreground">
                         <Link href="/" className="hover:underline">Back to Home</Link>
                     </CardFooter>
                 </Card>
@@ -136,8 +136,8 @@ export default function LoginPage() {
 
     // Sign In / Sign Up View
     return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-            <Card className="w-full max-w-md bg-white/80 backdrop-blur-sm border-slate-200 shadow-xl">
+        <div className="dark min-h-screen flex items-center justify-center bg-background p-4">
+            <Card className="w-full max-w-md bg-card/80 backdrop-blur-sm border-border shadow-xl">
                 <CardHeader className="space-y-1 text-center">
                     <CardTitle className="text-2xl font-bold tracking-tight">LeadCatcher</CardTitle>
                     <CardDescription>
@@ -149,7 +149,7 @@ export default function LoginPage() {
                         <div className="space-y-2">
                             <Label htmlFor="email">Email</Label>
                             <div className="relative">
-                                <Mail className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                                 <Input
                                     id="email"
                                     type="email"
@@ -168,14 +168,14 @@ export default function LoginPage() {
                                     <button
                                         type="button"
                                         onClick={() => setViewMode('forgotPassword')}
-                                        className="text-xs text-blue-600 hover:underline"
+                                        className="text-xs text-primary hover:underline"
                                     >
                                         Forgot password?
                                     </button>
                                 )}
                             </div>
                             <div className="relative">
-                                <Lock className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                                 <Input
                                     id="password"
                                     type={showPassword ? "text" : "password"}
@@ -189,17 +189,17 @@ export default function LoginPage() {
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
+                                    className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
                                     aria-label={showPassword ? "Hide password" : "Show password"}
                                 >
                                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                 </button>
                             </div>
                             {viewMode === 'signUp' && (
-                                <p className="text-xs text-slate-500">Password must be at least 6 characters</p>
+                                <p className="text-xs text-muted-foreground">Password must be at least 6 characters</p>
                             )}
                         </div>
-                        <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={loading}>
+                        <Button type="submit" className="w-full" disabled={loading}>
                             {loading ? (
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                             ) : viewMode === 'signUp' ? (
@@ -217,13 +217,13 @@ export default function LoginPage() {
                                 setViewMode(viewMode === 'signUp' ? 'signIn' : 'signUp');
                                 setPassword('');
                             }}
-                            className="text-sm text-blue-600 hover:underline"
+                            className="text-sm text-primary hover:underline"
                         >
                             {viewMode === 'signUp' ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
                         </button>
                     </div>
                 </CardContent>
-                <CardFooter className="flex flex-col gap-4 text-center text-sm text-slate-500">
+                <CardFooter className="flex flex-col gap-4 text-center text-sm text-muted-foreground">
                     <Link href="/" className="hover:underline">Back to Home</Link>
                 </CardFooter>
             </Card>
