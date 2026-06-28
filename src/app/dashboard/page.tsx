@@ -35,6 +35,15 @@ interface Message {
 
 const PAGE_SIZE = 50;
 
+/** Append a message, deduping by id and keeping the thread in timestamp order.
+ *  Guards against realtime echoing a message we already rendered optimistically. */
+function mergeMessage(messages: Message[], incoming: Message): Message[] {
+    if (messages.some(m => m.id === incoming.id)) return messages;
+    return [...messages, incoming].sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+}
+
 export default function Dashboard() {
     const [searchQuery, setSearchQuery] = useState('');
     const [leads, setLeads] = useState<Lead[]>([]);
@@ -143,13 +152,13 @@ export default function Dashboard() {
                 const newMsg = payload.new as unknown as Message;
                 setLeads(prev => prev.map(lead => {
                     if (lead.id === newMsg.lead_id) {
-                        return { ...lead, messages: [...lead.messages, newMsg] };
+                        return { ...lead, messages: mergeMessage(lead.messages, newMsg) };
                     }
                     return lead;
                 }));
                 // Use ref to avoid stale closure
                 if (selectedLeadRef.current?.id === newMsg.lead_id) {
-                    setSelectedLead(prev => prev ? { ...prev, messages: [...prev.messages, newMsg] } : null);
+                    setSelectedLead(prev => prev ? { ...prev, messages: mergeMessage(prev.messages, newMsg) } : null);
                 }
             })
             .subscribe();
@@ -166,16 +175,31 @@ export default function Dashboard() {
 
     const handleSendReply = async () => {
         if (!replyText || !selectedLead) return;
+        const text = replyText;
+        const leadId = selectedLead.id;
         setSending(true);
         try {
             const res = await fetch('/api/messages/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ leadId: selectedLead.id, body: replyText })
+                body: JSON.stringify({ leadId, body: text })
             });
 
             if (!res.ok) throw new Error('Failed to send message');
             setReplyText('');
+
+            // Optimistically render the sent message immediately — realtime isn't
+            // guaranteed to echo it back, so don't wait on it.
+            const data = await res.json().catch(() => ({}));
+            const sent = data?.message as Message | undefined;
+            if (sent) {
+                setSelectedLead(prev =>
+                    prev && prev.id === leadId ? { ...prev, messages: mergeMessage(prev.messages, sent) } : prev
+                );
+                setLeads(prev => prev.map(l =>
+                    l.id === leadId ? { ...l, messages: mergeMessage(l.messages, sent) } : l
+                ));
+            }
             toast.success('Message sent!');
         } catch (error) {
             logger.error('Error sending message', error);

@@ -4,7 +4,9 @@ import { normalizePhoneNumber } from '@/lib/phone-utils';
 import { checkBillingStatus } from '@/lib/billing-guard';
 import { claimWebhookEvent, markWebhookProcessed, markWebhookFailed, markWebhookFailedIfProcessing, setWebhookBusinessId } from '@/lib/webhook-common';
 import { checkSmsRateLimit } from '@/lib/sms-rate-limit';
-import { qualifyLead, buildOwnerSummary, MAX_QUALIFICATION_QUESTIONS, type QualificationData } from '@/lib/lead-qualification';
+import { buildOwnerSummary, MAX_QUALIFICATION_QUESTIONS, type QualificationData } from '@/lib/lead-qualification';
+import { generateReceptionistReply } from '@/lib/ai-receptionist';
+import { summarizeHours, type BusinessHours } from '@/lib/business-hours';
 import { maybeSendHotLeadAlert } from '@/lib/hot-lead-alert';
 import { logger } from '@/lib/logger';
 import twilio from 'twilio';
@@ -12,6 +14,9 @@ import twilio from 'twilio';
 export const dynamic = 'force-dynamic';
 
 const TAG = 'SMS Webhook';
+
+// Two inbound texts arriving within this window only get one auto-reply.
+const AUTO_REPLY_DEBOUNCE_MS = 20_000;
 
 export async function POST(request: Request) {
     // 1. SECURITY: Validate request
@@ -63,7 +68,7 @@ async function handleSmsWebhook(messageSid: string | null, fromRaw: string, toRa
     // 2. ISOLATION: Find lead based on caller AND business number
     const { data: business } = await supabaseAdmin
         .from('businesses')
-        .select('id, owner_phone, name, auto_reply_enabled, forwarding_number')
+        .select('id, owner_phone, name, auto_reply_enabled, forwarding_number, address, services, business_hours, timezone')
         .eq('forwarding_number', to)
         .single();
 
@@ -170,7 +175,7 @@ async function handleSmsWebhook(messageSid: string | null, fromRaw: string, toRa
             onConflict: 'business_id,caller_phone',
             ignoreDuplicates: true,
         })
-        .select('id, caller_name, qualification_status, qualification_data, qualification_step')
+        .select('id, caller_name, qualification_status, qualification_data, qualification_step, qualification_summary_sent_at')
         .single();
 
     // If upsert returned nothing (ignoreDuplicates), fetch the existing lead
@@ -180,12 +185,13 @@ async function handleSmsWebhook(messageSid: string | null, fromRaw: string, toRa
         qualification_status: string | null;
         qualification_data: QualificationData | null;
         qualification_step: number | null;
+        qualification_summary_sent_at: string | null;
     };
     let leadCtx: LeadCtx | null = (upsertedLead as LeadCtx) ?? null;
     if (!leadCtx) {
         const { data: existingLead } = await supabaseAdmin
             .from('leads')
-            .select('id, caller_name, qualification_status, qualification_data, qualification_step')
+            .select('id, caller_name, qualification_status, qualification_data, qualification_step, qualification_summary_sent_at')
             .eq('caller_phone', from)
             .eq('business_id', business.id)
             .single();
@@ -225,88 +231,118 @@ async function handleSmsWebhook(messageSid: string | null, fromRaw: string, toRa
             logger.error('AI Analysis failed', error);
         }
 
-        // 4a. AI LEAD QUALIFICATION
-        // Asks at most 2-3 short questions to learn device/issue/urgency, then
-        // forwards a structured summary to the owner. Skipped when:
-        //   - billing inactive, customer opted out (already handled above)
-        //   - rate limit blocks the qualification reply
-        //   - lead is already qualified
-        const currentStatus = leadCtx?.qualification_status ?? 'none';
+        // 4a. AI RECEPTIONIST — answer-first conversational reply.
+        // ONE model call: answers the customer's actual question using real
+        // shop facts (services, address, hours), drives the visit, never quotes
+        // a price, and extracts device/issue/urgency for the owner on the side.
+        // Replaces the old device->issue->urgency interrogation.
+        // Customer-facing replies require auto_reply_enabled; when it's off the
+        // owner still gets the raw notification in section 5.
         const currentStep = leadCtx?.qualification_step ?? 0;
         const currentData: QualificationData = leadCtx?.qualification_data ?? {};
-        let qualificationHandled = false;
         let qualificationUrgency: string | null = currentData.urgency ?? null;
         let lastSummary = '';
 
-        if (billing.allowed && currentStatus !== 'qualified') {
-            const qualRateLimit = await checkSmsRateLimit(business.id, from);
-            if (qualRateLimit.allowed) {
-                try {
-                    const decision = await qualifyLead({
-                        customerMessage: body,
-                        existing: currentData,
-                        step: currentStep,
-                    });
-                    qualificationUrgency = decision.extracted.urgency ?? qualificationUrgency;
+        if (billing.allowed && business.auto_reply_enabled) {
+            // Atomic race guard: when two inbound texts land at the same instant,
+            // only the one that wins this conditional update gets to reply. The
+            // row-level lock makes the second update match zero rows.
+            // last_auto_reply_at defaults to epoch (migration 012), never NULL,
+            // so a single .lt(cutoff) reliably means "no reply in the window" —
+            // no fragile .or()/null handling that previously errored and muted
+            // the bot entirely.
+            const claimCutoff = new Date(Date.now() - AUTO_REPLY_DEBOUNCE_MS).toISOString();
+            const { data: claimed, error: claimError } = await supabaseAdmin
+                .from('leads')
+                .update({ last_auto_reply_at: new Date().toISOString() })
+                .eq('id', leadId)
+                .lt('last_auto_reply_at', claimCutoff)
+                .select('id')
+                .maybeSingle();
 
-                    // Persist qualification progress regardless of question/summary outcome.
-                    await supabaseAdmin.from('leads')
-                        .update({
-                            qualification_status: decision.qualified ? 'qualified' : 'in_progress',
-                            qualification_data: decision.extracted,
-                            qualification_step: Math.min(currentStep + 1, MAX_QUALIFICATION_QUESTIONS),
-                        })
-                        .eq('id', leadId);
+            if (claimError) {
+                logger.error(`[${TAG}] Auto-reply claim failed`, claimError, { leadId });
+            }
 
-                    if (!decision.qualified && decision.next_question) {
-                        try {
-                            const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-                            await client.messages.create({
-                                to: from,
-                                from: to,
-                                body: decision.next_question,
-                            });
-                            await supabaseAdmin.from('messages').insert({
-                                lead_id: leadId,
-                                direction: 'outbound',
-                                body: decision.next_question,
-                                is_ai_generated: true,
-                            });
-                            qualificationHandled = true;
-                        } catch (err) {
-                            logger.error(`[${TAG}] Failed to send qualification question`, err);
-                        }
-                    } else if (decision.qualified) {
-                        const summary = buildOwnerSummary({
-                            customerPhone: from,
-                            customerName: leadCtx?.caller_name,
-                            data: decision.extracted,
+            // Degrade open: a broken guard must never silence the bot. Reply when
+            // we won the claim OR the claim mechanism itself errored. Only a clean
+            // "already replied within the debounce window" (no row, no error)
+            // suppresses the reply.
+            if (claimed || claimError) {
+                const replyRateLimit = await checkSmsRateLimit(business.id, from);
+                if (replyRateLimit.allowed) {
+                    try {
+                        const hours = summarizeHours(
+                            business.business_hours as BusinessHours | null,
+                            business.timezone,
+                        );
+                        const result = await generateReceptionistReply({
+                            customerMessage: body,
+                            existing: currentData,
+                            context: {
+                                businessName: business.name || 'our shop',
+                                address: business.address,
+                                services: business.services,
+                                hoursLine: hours.todayLine,
+                                isOpenNow: hours.isOpenNow,
+                                freeCheck: true,
+                            },
                         });
-                        lastSummary = summary;
 
-                        const ownerRateLimit = await checkSmsRateLimit(business.id, business.owner_phone);
-                        if (business.owner_phone && ownerRateLimit.allowed) {
+                        qualificationUrgency = result.extracted.urgency ?? qualificationUrgency;
+
+                        // Persist extracted lead intel + status.
+                        await supabaseAdmin.from('leads')
+                            .update({
+                                qualification_status: result.qualified ? 'qualified' : 'in_progress',
+                                qualification_data: result.extracted,
+                                qualification_step: Math.min(currentStep + 1, MAX_QUALIFICATION_QUESTIONS),
+                            })
+                            .eq('id', leadId);
+
+                        // Reply to the customer.
+                        if (result.should_reply && result.reply) {
                             try {
                                 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-                                await client.messages.create({
-                                    to: business.owner_phone,
-                                    from: to,
-                                    body: summary,
+                                await client.messages.create({ to: from, from: to, body: result.reply });
+                                await supabaseAdmin.from('messages').insert({
+                                    lead_id: leadId,
+                                    direction: 'outbound',
+                                    body: result.reply,
+                                    is_ai_generated: true,
                                 });
-                                await supabaseAdmin.from('leads')
-                                    .update({ qualification_summary_sent_at: new Date().toISOString() })
-                                    .eq('id', leadId);
-                                qualificationHandled = true;
                             } catch (err) {
-                                logger.error(`[${TAG}] Failed to forward qualification summary`, err);
+                                logger.error(`[${TAG}] Failed to send receptionist reply`, err);
                             }
                         }
+
+                        // Forward a structured summary to the owner ONCE, when qualified.
+                        if (result.qualified && !leadCtx?.qualification_summary_sent_at) {
+                            const summary = buildOwnerSummary({
+                                customerPhone: from,
+                                customerName: leadCtx?.caller_name,
+                                data: result.extracted,
+                            });
+                            lastSummary = summary;
+                            const ownerRateLimit = await checkSmsRateLimit(business.id, business.owner_phone);
+                            if (business.owner_phone && ownerRateLimit.allowed) {
+                                try {
+                                    const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+                                    await client.messages.create({ to: business.owner_phone, from: to, body: summary });
+                                    await supabaseAdmin.from('leads')
+                                        .update({ qualification_summary_sent_at: new Date().toISOString() })
+                                        .eq('id', leadId);
+                                } catch (err) {
+                                    logger.error(`[${TAG}] Failed to forward lead summary`, err);
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        logger.error(`[${TAG}] Receptionist failed (non-blocking)`, error);
                     }
-                } catch (error) {
-                    logger.error(`[${TAG}] Qualification failed (non-blocking)`, error);
+                } else {
+                    logger.warn(`[${TAG}] Receptionist skipped - rate limited`, { businessId: business.id });
                 }
-            } else {
-                logger.warn(`[${TAG}] Qualification skipped - rate limited`, { businessId: business.id });
             }
         }
 
@@ -320,41 +356,6 @@ async function handleSmsWebhook(messageSid: string | null, fromRaw: string, toRa
                 summary: lastSummary || `New high-urgency lead from ${from}: "${body.slice(0, 140)}"`,
                 urgency: qualificationUrgency,
             });
-        }
-
-        // 4b. AI AUTO-REPLY (if enabled)
-        if (!qualificationHandled && business.auto_reply_enabled && billing.allowed) {
-            try {
-                const { generateAutoReply } = await import('@/lib/ai-auto-reply');
-                const autoReply = await generateAutoReply(body, business.name || 'our store');
-
-                if (autoReply && autoReply.should_reply && autoReply.reply) {
-                    const replyRateLimit = await checkSmsRateLimit(business.id, from);
-                    if (replyRateLimit.allowed) {
-                        const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-                        await client.messages.create({
-                            to: from,
-                            from: to,
-                            body: autoReply.reply,
-                        });
-
-                        // Log the auto-reply
-                        await supabaseAdmin.from('messages').insert({
-                            lead_id: leadId,
-                            direction: 'outbound',
-                            body: autoReply.reply,
-                            is_ai_generated: true,
-                        });
-
-                        logger.info(`[${TAG}] AI auto-reply sent`, {
-                            from, businessId: business.id,
-                            confidence: autoReply.confidence,
-                        });
-                    }
-                }
-            } catch (error) {
-                logger.error(`[${TAG}] AI auto-reply failed (non-blocking)`, error);
-            }
         }
 
         // 5. Notify Owner (only if billing is active and rate limit OK).
