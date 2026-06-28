@@ -64,11 +64,11 @@ export default function CoachingPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                    <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
                         <GraduationCap className="h-5 w-5" />
                         Coaching Dashboard
                     </h1>
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm text-muted-foreground">
                         Review staff performance and coaching opportunities
                     </p>
                 </div>
@@ -91,14 +91,14 @@ export default function CoachingPage() {
 
             {loading && !summary ? (
                 <div className="flex justify-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
             ) : summary ? (
                 <>
                     {/* Overview Stats */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         <StatCard
-                            icon={<Phone className="h-4 w-4 text-blue-500" />}
+                            icon={<Phone className="h-4 w-4 text-primary" />}
                             label="Total Calls"
                             value={summary.total_calls}
                         />
@@ -123,14 +123,14 @@ export default function CoachingPage() {
                     {/* Staff Performance */}
                     {summary.by_owner.length > 0 && (
                         <div>
-                            <h2 className="text-sm font-semibold text-slate-700 mb-3">Staff Performance</h2>
+                            <h2 className="text-sm font-semibold text-foreground mb-3">Staff Performance</h2>
                             <div className="grid gap-3 md:grid-cols-2">
                                 {summary.by_owner.map((owner) => (
                                     <Card key={owner.owner}>
                                         <CardHeader className="pb-2">
                                             <CardTitle className="text-sm flex items-center justify-between">
                                                 <span className="flex items-center gap-2">
-                                                    <Users className="h-4 w-4 text-slate-400" />
+                                                    <Users className="h-4 w-4 text-muted-foreground" />
                                                     {owner.owner}
                                                 </span>
                                                 <Badge variant="outline" className="text-xs">
@@ -143,25 +143,25 @@ export default function CoachingPage() {
                                             <div className="grid grid-cols-3 gap-2 text-center">
                                                 <div>
                                                     <p className="text-lg font-bold text-green-600">{owner.booked_rate}%</p>
-                                                    <p className="text-xs text-slate-500">Booked</p>
+                                                    <p className="text-xs text-muted-foreground">Booked</p>
                                                 </div>
                                                 <div>
-                                                    <p className="text-lg font-bold text-slate-700">
+                                                    <p className="text-lg font-bold text-foreground">
                                                         <span className="text-green-600">{owner.calls_booked}</span>
-                                                        <span className="text-slate-400 mx-1">/</span>
+                                                        <span className="text-muted-foreground mx-1">/</span>
                                                         <span className="text-red-500">{owner.calls_lost}</span>
                                                     </p>
-                                                    <p className="text-xs text-slate-500">Won / Lost</p>
+                                                    <p className="text-xs text-muted-foreground">Won / Lost</p>
                                                 </div>
                                                 <div>
-                                                    <p className="text-lg font-bold text-slate-700">
+                                                    <p className="text-lg font-bold text-foreground">
                                                         {owner.avg_response_minutes != null
                                                             ? owner.avg_response_minutes < 60
                                                                 ? `${owner.avg_response_minutes}m`
                                                                 : `${Math.round(owner.avg_response_minutes / 60)}h`
                                                             : '—'}
                                                     </p>
-                                                    <p className="text-xs text-slate-500">Avg Response</p>
+                                                    <p className="text-xs text-muted-foreground">Avg Response</p>
                                                 </div>
                                             </div>
 
@@ -171,7 +171,7 @@ export default function CoachingPage() {
                                                     <p className="text-xs font-medium text-amber-700 mb-1">Coaching Notes:</p>
                                                     <ul className="space-y-1">
                                                         {owner.coaching_notes.map((note, i) => (
-                                                            <li key={i} className="text-xs text-slate-600 pl-2 border-l-2 border-amber-200">
+                                                            <li key={i} className="text-xs text-muted-foreground pl-2 border-l-2 border-amber-200">
                                                                 {note}
                                                             </li>
                                                         ))}
@@ -227,7 +227,7 @@ export default function CoachingPage() {
                                     {summary.top_coaching_notes.map((note, i) => (
                                         <li key={i} className="flex gap-2 text-sm">
                                             <span className="text-amber-600 font-bold shrink-0">{i + 1}.</span>
-                                            <span className="text-slate-700">{note}</span>
+                                            <span className="text-foreground">{note}</span>
                                         </li>
                                     ))}
                                 </ol>
@@ -236,8 +236,8 @@ export default function CoachingPage() {
                     )}
 
                     {summary.total_calls === 0 && (
-                        <div className="text-center py-12 text-slate-500">
-                            <GraduationCap className="h-8 w-8 mx-auto mb-2 text-slate-300" />
+                        <div className="text-center py-12 text-muted-foreground">
+                            <GraduationCap className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
                             <p className="text-sm">No call data for this period.</p>
                             <p className="text-xs mt-1">Calls analyzed via the system will appear here with coaching insights.</p>
                         </div>
@@ -264,8 +264,8 @@ function StatCard({
             <CardContent className="py-3 flex items-center gap-3">
                 {icon}
                 <div>
-                    <p className={`text-lg font-bold ${highlight ? 'text-red-600' : 'text-slate-800'}`}>{value}</p>
-                    <p className="text-xs text-slate-500">{label}</p>
+                    <p className={`text-lg font-bold ${highlight ? 'text-red-600' : 'text-foreground'}`}>{value}</p>
+                    <p className="text-xs text-muted-foreground">{label}</p>
                 </div>
             </CardContent>
         </Card>

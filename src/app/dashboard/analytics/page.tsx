@@ -55,7 +55,7 @@ export default function AnalyticsPage() {
     if (loading && !data) {
         return (
             <div className="flex justify-center py-24">
-                <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
         );
     }
@@ -68,8 +68,8 @@ export default function AnalyticsPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5 text-blue-600" />
-                    <h1 className="text-xl font-bold text-slate-800">Lead Conversion</h1>
+                    <BarChart3 className="h-5 w-5 text-primary" />
+                    <h1 className="text-xl font-bold text-foreground">Lead Conversion</h1>
                 </div>
                 <Select value={period} onValueChange={setPeriod}>
                     <SelectTrigger className="w-[140px] h-8 text-xs">
@@ -91,7 +91,7 @@ export default function AnalyticsPage() {
                             icon={PhoneCall}
                             label="Total Calls"
                             value={f.total_calls}
-                            color="text-blue-600"
+                            color="text-primary"
                         />
                         <KPICard
                             icon={PhoneMissed}
@@ -128,20 +128,20 @@ export default function AnalyticsPage() {
                                     value={f.missed_calls}
                                     color="bg-red-100 text-red-700"
                                 />
-                                <ArrowRight className="h-4 w-4 text-slate-300 shrink-0" />
+                                <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
                                 <FunnelStep
                                     label="SMS Sent"
                                     value={f.sms_sent}
                                     color="bg-blue-100 text-blue-700"
                                 />
-                                <ArrowRight className="h-4 w-4 text-slate-300 shrink-0" />
+                                <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
                                 <FunnelStep
                                     label="Replied"
                                     value={f.contacted}
                                     color="bg-yellow-100 text-yellow-700"
                                     rate={r.missed_to_contact}
                                 />
-                                <ArrowRight className="h-4 w-4 text-slate-300 shrink-0" />
+                                <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
                                 <FunnelStep
                                     label="Booked"
                                     value={f.booked}
@@ -151,7 +151,7 @@ export default function AnalyticsPage() {
                             </div>
 
                             <div className="mt-4 pt-3 border-t flex items-center justify-between text-sm">
-                                <span className="text-slate-500">Overall Conversion</span>
+                                <span className="text-muted-foreground">Overall Conversion</span>
                                 <span className="font-bold text-lg text-green-600">
                                     {r.overall_conversion}%
                                 </span>
@@ -163,23 +163,23 @@ export default function AnalyticsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <Card>
                             <CardContent className="py-4 text-center">
-                                <MessageSquare className="h-5 w-5 mx-auto text-blue-500 mb-2" />
-                                <p className="text-2xl font-bold text-slate-800">{f.sms_sent}</p>
-                                <p className="text-xs text-slate-500">SMS Messages Sent</p>
+                                <MessageSquare className="h-5 w-5 mx-auto text-primary mb-2" />
+                                <p className="text-2xl font-bold text-foreground">{f.sms_sent}</p>
+                                <p className="text-xs text-muted-foreground">SMS Messages Sent</p>
                             </CardContent>
                         </Card>
                         <Card>
                             <CardContent className="py-4 text-center">
                                 <Users className="h-5 w-5 mx-auto text-green-500 mb-2" />
-                                <p className="text-2xl font-bold text-slate-800">{f.total_leads}</p>
-                                <p className="text-xs text-slate-500">Total Leads Captured</p>
+                                <p className="text-2xl font-bold text-foreground">{f.total_leads}</p>
+                                <p className="text-xs text-muted-foreground">Total Leads Captured</p>
                             </CardContent>
                         </Card>
                         <Card>
                             <CardContent className="py-4 text-center">
                                 <PhoneMissed className="h-5 w-5 mx-auto text-orange-500 mb-2" />
-                                <p className="text-2xl font-bold text-slate-800">{f.lost}</p>
-                                <p className="text-xs text-slate-500">Lost Opportunities</p>
+                                <p className="text-2xl font-bold text-foreground">{f.lost}</p>
+                                <p className="text-xs text-muted-foreground">Lost Opportunities</p>
                             </CardContent>
                         </Card>
                     </div>
@@ -197,7 +197,7 @@ export default function AnalyticsPage() {
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-sm">
                                         <thead>
-                                            <tr className="border-b text-left text-slate-500">
+                                            <tr className="border-b text-left text-muted-foreground">
                                                 <th className="pb-2 font-medium">#</th>
                                                 <th className="pb-2 font-medium">Name</th>
                                                 <th className="pb-2 font-medium text-right">Calls</th>
@@ -209,7 +209,7 @@ export default function AnalyticsPage() {
                                         <tbody>
                                             {data.leaderboard.map((emp, idx) => (
                                                 <tr key={emp.name} className="border-b last:border-0">
-                                                    <td className="py-2 text-slate-400">{idx + 1}</td>
+                                                    <td className="py-2 text-muted-foreground">{idx + 1}</td>
                                                     <td className="py-2 font-medium">{emp.name}</td>
                                                     <td className="py-2 text-right">{emp.calls}</td>
                                                     <td className="py-2 text-right">
@@ -245,9 +245,9 @@ function KPICard({ icon: Icon, label, value, color }: {
             <CardContent className="py-4">
                 <div className="flex items-center gap-2 mb-1">
                     <Icon className={`h-4 w-4 ${color}`} />
-                    <span className="text-xs text-slate-500">{label}</span>
+                    <span className="text-xs text-muted-foreground">{label}</span>
                 </div>
-                <p className="text-2xl font-bold text-slate-800">{value}</p>
+                <p className="text-2xl font-bold text-foreground">{value}</p>
             </CardContent>
         </Card>
     );
@@ -261,9 +261,9 @@ function FunnelStep({ label, value, color, rate }: {
             <div className={`inline-block px-4 py-2 rounded-lg ${color}`}>
                 <p className="text-lg font-bold">{value}</p>
             </div>
-            <p className="text-xs text-slate-500 mt-1">{label}</p>
+            <p className="text-xs text-muted-foreground mt-1">{label}</p>
             {rate != null && (
-                <p className="text-[10px] text-slate-400">{rate}% conversion</p>
+                <p className="text-[10px] text-muted-foreground">{rate}% conversion</p>
             )}
         </div>
     );

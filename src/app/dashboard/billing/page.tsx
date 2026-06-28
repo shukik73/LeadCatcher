@@ -121,23 +121,23 @@ export default function BillingPage() {
 
     if (loading) return (
         <div className="container mx-auto p-6 max-w-4xl space-y-8">
-            <div className="h-9 w-24 bg-slate-200 rounded animate-pulse" />
-            <div className="rounded-lg border border-slate-200 p-6 space-y-4">
-                <div className="h-6 w-40 bg-slate-200 rounded animate-pulse" />
-                <div className="h-4 w-64 bg-slate-100 rounded animate-pulse" />
-                <div className="h-10 w-48 bg-slate-100 rounded animate-pulse" />
+            <div className="h-9 w-24 bg-muted rounded animate-pulse" />
+            <div className="rounded-lg border border-border p-6 space-y-4">
+                <div className="h-6 w-40 bg-muted rounded animate-pulse" />
+                <div className="h-4 w-64 bg-muted rounded animate-pulse" />
+                <div className="h-10 w-48 bg-muted rounded animate-pulse" />
             </div>
             <div className="grid md:grid-cols-2 gap-6">
                 {[1, 2].map(i => (
-                    <div key={i} className="rounded-lg border border-slate-200 p-6 space-y-4">
-                        <div className="h-6 w-24 bg-slate-200 rounded animate-pulse" />
-                        <div className="h-8 w-32 bg-slate-200 rounded animate-pulse" />
+                    <div key={i} className="rounded-lg border border-border p-6 space-y-4">
+                        <div className="h-6 w-24 bg-muted rounded animate-pulse" />
+                        <div className="h-8 w-32 bg-muted rounded animate-pulse" />
                         <div className="space-y-2">
                             {Array.from({ length: 4 }).map((_, j) => (
-                                <div key={j} className="h-4 bg-slate-100 rounded animate-pulse" />
+                                <div key={j} className="h-4 bg-muted rounded animate-pulse" />
                             ))}
                         </div>
-                        <div className="h-10 bg-slate-100 rounded animate-pulse" />
+                        <div className="h-10 bg-muted rounded animate-pulse" />
                     </div>
                 ))}
             </div>
@@ -178,7 +178,7 @@ export default function BillingPage() {
                         </div>
 
                         {billing.stripe_current_period_end && (
-                            <p className="text-sm text-gray-500">
+                            <p className="text-sm text-muted-foreground">
                                 {isTrialing ? 'Trial ends' : 'Next billing date'}:{' '}
                                 {new Date(billing.stripe_current_period_end).toLocaleDateString()}
                             </p>
@@ -223,13 +223,13 @@ export default function BillingPage() {
 
             {/* No subscription prompt */}
             {!hasSubscription && (
-                <Card className="border-blue-200 bg-blue-50/50">
+                <Card className="border-primary/30 bg-primary/10">
                     <CardContent className="py-6">
                         <div className="flex items-start gap-3">
-                            <CreditCard className="h-6 w-6 text-blue-600 flex-shrink-0 mt-0.5" />
+                            <CreditCard className="h-6 w-6 text-primary flex-shrink-0 mt-0.5" />
                             <div>
-                                <h3 className="font-semibold text-blue-900">Get started with a 14-day free trial</h3>
-                                <p className="text-sm text-blue-700 mt-1">
+                                <h3 className="font-semibold text-foreground">Get started with a 14-day free trial</h3>
+                                <p className="text-sm text-muted-foreground mt-1">
                                     Choose a plan below to start your free trial. You&apos;ll enter your credit card on the next page
                                     and won&apos;t be charged until the trial ends.
                                 </p>
@@ -258,13 +258,13 @@ export default function BillingPage() {
                     return (
                         <Card
                             key={planId}
-                            className={isCurrent ? 'border-blue-500 border-2' : ''}
+                            className={isCurrent ? 'border-primary border-2' : ''}
                         >
                             <CardHeader>
                                 <div className="flex items-center justify-between">
                                     <CardTitle>{plan.name}</CardTitle>
                                     {isCurrent && (
-                                        <Badge className="bg-blue-100 text-blue-800">Current</Badge>
+                                        <Badge className="bg-primary/15 text-primary">Current</Badge>
                                     )}
                                 </div>
                                 <CardDescription>
@@ -276,7 +276,7 @@ export default function BillingPage() {
                                 <ul className="space-y-2">
                                     {plan.features.map((feature, i) => (
                                         <li key={i} className="flex items-center gap-2 text-sm">
-                                            <Check className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                                            <Check className="h-4 w-4 text-primary flex-shrink-0" />
                                             {feature}
                                         </li>
                                     ))}
@@ -311,7 +311,7 @@ export default function BillingPage() {
                 })}
             </div>
 
-            <p className="text-center text-sm text-gray-500">
+            <p className="text-center text-sm text-muted-foreground">
                 All plans include a 14-day free trial. Cancel anytime from the billing portal.
             </p>
         </div>
