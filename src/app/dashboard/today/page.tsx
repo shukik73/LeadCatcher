@@ -398,7 +398,7 @@ export default function TodayPage() {
                                     return (
                                         <Card
                                             key={lead.id}
-                                            className={isOverdue ? 'border-red-200 bg-red-50/30' : undefined}
+                                            className={isOverdue ? 'border-red-500/20 bg-red-500/10' : undefined}
                                         >
                                             <CardContent className="py-3 space-y-2">
                                                 <div className="flex flex-col sm:flex-row sm:items-center gap-3">

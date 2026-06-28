@@ -248,7 +248,7 @@ export default function HotLeadsPage() {
                         return (
                             <Card
                                 key={lead.id}
-                                className={isOverdue ? 'border-red-200 bg-red-50/30' : undefined}
+                                className={isOverdue ? 'border-red-500/20 bg-red-500/10' : undefined}
                             >
                                 <CardContent className="py-3 space-y-2">
                                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
@@ -266,7 +266,7 @@ export default function HotLeadsPage() {
 
                                             <div className="flex flex-wrap gap-1.5 mb-2">
                                                 {lead.sourceType === 'action_item' && (
-                                                    <span className="text-xs text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
+                                                    <span className="text-xs text-amber-300 bg-amber-500/15 px-1.5 py-0.5 rounded">
                                                         Action item
                                                     </span>
                                                 )}
@@ -316,7 +316,7 @@ export default function HotLeadsPage() {
 
                                         {/* Quick actions */}
                                         {lead.sourceType === 'action_item' ? (
-                                            <div className="text-xs text-muted-foreground bg-amber-50 border border-amber-100 rounded-md px-3 py-2 shrink-0 max-w-[180px]">
+                                            <div className="text-xs text-muted-foreground bg-amber-500/10 border border-amber-500/20 rounded-md px-3 py-2 shrink-0 max-w-[180px]">
                                                 Open task surfaced from action_items. Use call buttons only on call-analysis leads.
                                             </div>
                                         ) : (

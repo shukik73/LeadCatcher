@@ -462,10 +462,10 @@ export default function SettingsPage() {
                     {!isConnected && (
                         <div className="space-y-3">
                             {connectError && (
-                                <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+                                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 flex items-start gap-3">
                                     <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
                                     <div>
-                                        <p className="text-sm text-red-800 font-medium">Connection Failed</p>
+                                        <p className="text-sm text-red-300 font-medium">Connection Failed</p>
                                         <p className="text-sm text-red-600 mt-1">{connectError}</p>
                                     </div>
                                 </div>
@@ -719,7 +719,7 @@ export default function SettingsPage() {
                                             <CardTitle className="flex items-center gap-2">
                                                 RepairDesk Connection
                                                 {hasExistingApiKey && (
-                                                    <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                                                    <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-green-500/15 text-green-300">
                                                         <CheckCircle2 className="h-3 w-3" />
                                                         Connected
                                                     </span>
@@ -797,7 +797,7 @@ export default function SettingsPage() {
                                         </Button>
                                     </div>
                                     {rdTestError && (
-                                        <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{rdTestError}</p>
+                                        <p className="text-sm text-red-600 bg-red-500/10 p-3 rounded-md">{rdTestError}</p>
                                     )}
                                 </CardContent>
                             </Card>

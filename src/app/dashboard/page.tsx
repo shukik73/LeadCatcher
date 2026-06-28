@@ -220,7 +220,7 @@ export default function Dashboard() {
             <div className="h-screen flex items-center justify-center bg-background p-4">
                 <div className="max-w-md w-full text-center space-y-4">
                     <div className="flex justify-center">
-                        <div className="rounded-full bg-red-100 p-3">
+                        <div className="rounded-full bg-red-500/15 p-3">
                             <AlertCircle className="h-8 w-8 text-red-600" />
                         </div>
                     </div>

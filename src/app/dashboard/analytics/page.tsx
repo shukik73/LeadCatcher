@@ -126,26 +126,26 @@ export default function AnalyticsPage() {
                                 <FunnelStep
                                     label="Missed Calls"
                                     value={f.missed_calls}
-                                    color="bg-red-100 text-red-700"
+                                    color="bg-red-500/15 text-red-300"
                                 />
                                 <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
                                 <FunnelStep
                                     label="SMS Sent"
                                     value={f.sms_sent}
-                                    color="bg-blue-100 text-blue-700"
+                                    color="bg-primary/15 text-primary"
                                 />
                                 <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
                                 <FunnelStep
                                     label="Replied"
                                     value={f.contacted}
-                                    color="bg-yellow-100 text-yellow-700"
+                                    color="bg-yellow-500/15 text-yellow-300"
                                     rate={r.missed_to_contact}
                                 />
                                 <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
                                 <FunnelStep
                                     label="Booked"
                                     value={f.booked}
-                                    color="bg-green-100 text-green-700"
+                                    color="bg-green-500/15 text-green-300"
                                     rate={r.contact_to_book}
                                 />
                             </div>

@@ -168,10 +168,10 @@ export default function CoachingPage() {
                                             {/* Coaching notes for this owner */}
                                             {owner.coaching_notes.length > 0 && (
                                                 <div className="border-t pt-2">
-                                                    <p className="text-xs font-medium text-amber-700 mb-1">Coaching Notes:</p>
+                                                    <p className="text-xs font-medium text-amber-300 mb-1">Coaching Notes:</p>
                                                     <ul className="space-y-1">
                                                         {owner.coaching_notes.map((note, i) => (
-                                                            <li key={i} className="text-xs text-muted-foreground pl-2 border-l-2 border-amber-200">
+                                                            <li key={i} className="text-xs text-muted-foreground pl-2 border-l-2 border-amber-500/20">
                                                                 {note}
                                                             </li>
                                                         ))}
@@ -203,7 +203,7 @@ export default function CoachingPage() {
                                         <Badge
                                             key={p.pattern}
                                             variant="outline"
-                                            className="text-xs bg-amber-50 text-amber-800 border-amber-200"
+                                            className="text-xs bg-amber-500/10 text-amber-300 border-amber-500/20"
                                         >
                                             {p.pattern} ({p.count})
                                         </Badge>
@@ -260,7 +260,7 @@ function StatCard({
     highlight?: boolean;
 }) {
     return (
-        <Card className={highlight ? 'border-red-200 bg-red-50/30' : ''}>
+        <Card className={highlight ? 'border-red-500/20 bg-red-500/10' : ''}>
             <CardContent className="py-3 flex items-center gap-3">
                 {icon}
                 <div>
