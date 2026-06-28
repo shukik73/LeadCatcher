@@ -102,7 +102,7 @@ export function RepairDeskTicketCard({
             <CardContent className="space-y-3">
                 {rdTicketId && (
                     <div className="text-sm">
-                        <span className="text-slate-500">Ticket:</span>{' '}
+                        <span className="text-muted-foreground">Ticket:</span>{' '}
                         <span className="font-mono">#{rdTicketId}</span>
                         {rdTicketStatus && (
                             <Badge variant="outline" className="ml-2">{rdTicketStatus}</Badge>
@@ -111,7 +111,7 @@ export function RepairDeskTicketCard({
                 )}
 
                 {rdSyncedAt && (
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-muted-foreground">
                         Last synced: {new Date(rdSyncedAt).toLocaleString()}
                     </p>
                 )}
@@ -140,7 +140,7 @@ export function RepairDeskTicketCard({
                 </div>
 
                 {looked && tickets.length === 0 && (
-                    <p className="text-xs text-slate-500">No tickets found for this customer.</p>
+                    <p className="text-xs text-muted-foreground">No tickets found for this customer.</p>
                 )}
 
                 {tickets.length > 0 && (
@@ -151,8 +151,8 @@ export function RepairDeskTicketCard({
                                     <span className="font-mono text-xs">#{t.ticket_id}</span>
                                     <Badge variant="outline">{t.status}</Badge>
                                 </div>
-                                <p className="text-slate-600 mt-1">{t.device} — {t.issue}</p>
-                                {t.total > 0 && <p className="text-xs text-slate-500">${t.total.toFixed(2)}</p>}
+                                <p className="text-muted-foreground mt-1">{t.device} — {t.issue}</p>
+                                {t.total > 0 && <p className="text-xs text-muted-foreground">${t.total.toFixed(2)}</p>}
                             </div>
                         ))}
                     </div>

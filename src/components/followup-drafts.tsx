@@ -104,11 +104,11 @@ export function FollowUpDrafts() {
     // drafts between the 9am/1pm/6pm digests.
     if (drafts.length === 0) {
         return (
-            <Card className="border-slate-200">
+            <Card className="border-border">
                 <CardContent className="p-4 flex items-center justify-between gap-3">
                     <div>
-                        <h2 className="font-semibold text-slate-800 text-sm">No follow-up drafts right now</h2>
-                        <p className="text-xs text-slate-500 mt-0.5">
+                        <h2 className="font-semibold text-foreground text-sm">No follow-up drafts right now</h2>
+                        <p className="text-xs text-muted-foreground mt-0.5">
                             Chase customers who asked about a repair or sale but never came in.
                         </p>
                     </div>
@@ -119,34 +119,34 @@ export function FollowUpDrafts() {
     }
 
     return (
-        <Card className="border-amber-200 bg-amber-50/50">
+        <Card className="border-amber-500/20 bg-amber-500/10">
             <CardContent className="p-4 space-y-3">
                 <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                         <Sparkles className="h-4 w-4 text-amber-600" />
-                        <h2 className="font-semibold text-slate-800">
+                        <h2 className="font-semibold text-foreground">
                             Drafted follow-ups — your approval needed ({drafts.length})
                         </h2>
                     </div>
                     {GenerateButton}
                 </div>
-                <p className="text-xs text-slate-500 -mt-2">
+                <p className="text-xs text-muted-foreground -mt-2">
                     Customers who talked about a repair or sale but never came in. Review each text — nothing sends without you.
                 </p>
 
                 {drafts.map((draft) => (
-                    <div key={draft.id} className="rounded-lg border bg-white p-3 space-y-2">
+                    <div key={draft.id} className="rounded-lg border bg-card p-3 space-y-2">
                         <div className="flex items-center justify-between gap-2">
-                            <div className="text-sm font-medium text-slate-800">
+                            <div className="text-sm font-medium text-foreground">
                                 {draft.customer_name || 'Unknown customer'}
-                                <span className="ml-2 text-xs font-normal text-slate-500">{draft.customer_phone}</span>
+                                <span className="ml-2 text-xs font-normal text-muted-foreground">{draft.customer_phone}</span>
                             </div>
                             {!draft.ai_generated && (
                                 <Badge variant="outline" className="text-xs">generic draft</Badge>
                             )}
                         </div>
                         {draft.reason && (
-                            <p className="text-xs text-slate-500 italic">{draft.reason}</p>
+                            <p className="text-xs text-muted-foreground italic">{draft.reason}</p>
                         )}
 
                         {editingId === draft.id ? (
@@ -158,7 +158,7 @@ export function FollowUpDrafts() {
                                 className="text-sm"
                             />
                         ) : (
-                            <p className="text-sm text-slate-700 rounded bg-slate-50 p-2">{draft.draft_sms}</p>
+                            <p className="text-sm text-foreground rounded bg-muted p-2">{draft.draft_sms}</p>
                         )}
 
                         <div className="flex flex-wrap gap-2">

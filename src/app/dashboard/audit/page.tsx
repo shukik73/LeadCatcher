@@ -208,8 +208,8 @@ export default function AuditPage() {
         <div className="p-4 md:p-6 space-y-6 max-w-[900px]">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                    <ClipboardCheck className="h-5 w-5 text-blue-600" />
-                    <h1 className="text-xl font-bold text-slate-800">Phone Call Audit</h1>
+                    <ClipboardCheck className="h-5 w-5 text-primary" />
+                    <h1 className="text-xl font-bold text-foreground">Phone Call Audit</h1>
                 </div>
             </div>
 
@@ -292,7 +292,7 @@ export default function AuditPage() {
                         {callAnalysisId && (
                             <div className="space-y-1.5">
                                 <Label>Linked Call</Label>
-                                <p className="text-xs text-slate-500 mt-1 truncate">{callAnalysisId}</p>
+                                <p className="text-xs text-muted-foreground mt-1 truncate">{callAnalysisId}</p>
                             </div>
                         )}
                     </CardContent>
@@ -309,7 +309,7 @@ export default function AuditPage() {
                             </div>
                         </div>
                         {/* Score bar */}
-                        <div className="w-full bg-slate-100 rounded-full h-2 mt-2">
+                        <div className="w-full bg-muted rounded-full h-2 mt-2">
                             <div
                                 className={`h-2 rounded-full transition-all duration-300 ${
                                     livePercentage >= 80 ? 'bg-green-500' :
@@ -324,13 +324,13 @@ export default function AuditPage() {
                         {QUESTION_KEYS.map((key) => (
                             <div
                                 key={key}
-                                className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-50 transition-colors"
+                                className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted transition-colors"
                             >
                                 <div className="flex-1">
-                                    <span className="text-sm text-slate-700">
+                                    <span className="text-sm text-foreground">
                                         {QUESTION_LABELS[key]}
                                     </span>
-                                    <span className="text-xs text-slate-400 ml-2">
+                                    <span className="text-xs text-muted-foreground ml-2">
                                         ({QUESTION_WEIGHTS[key]} pts)
                                     </span>
                                 </div>
@@ -420,15 +420,15 @@ export default function AuditPage() {
                 <CardContent>
                     {auditsLoading && audits.length === 0 ? (
                         <div className="flex justify-center py-6">
-                            <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+                            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                         </div>
                     ) : audits.length === 0 ? (
-                        <p className="text-sm text-slate-500 text-center py-6">No audits yet</p>
+                        <p className="text-sm text-muted-foreground text-center py-6">No audits yet</p>
                     ) : (
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="border-b text-left text-slate-500">
+                                    <tr className="border-b text-left text-muted-foreground">
                                         <th className="pb-2 font-medium">Date</th>
                                         <th className="pb-2 font-medium">Employee</th>
                                         <th className="pb-2 font-medium">Store</th>
@@ -443,11 +443,11 @@ export default function AuditPage() {
                                             : 0;
                                         return (
                                             <tr key={audit.id} className="border-b last:border-0">
-                                                <td className="py-2 text-slate-600">
+                                                <td className="py-2 text-muted-foreground">
                                                     {new Date(audit.audit_date).toLocaleDateString()}
                                                 </td>
                                                 <td className="py-2">{audit.employee_name}</td>
-                                                <td className="py-2 text-slate-600">{audit.store_name}</td>
+                                                <td className="py-2 text-muted-foreground">{audit.store_name}</td>
                                                 <td className="py-2">
                                                     <Badge
                                                         variant={pct >= 80 ? 'default' : pct >= 60 ? 'secondary' : 'destructive'}

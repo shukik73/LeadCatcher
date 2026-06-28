@@ -65,8 +65,8 @@ export default function CustomerPage() {
     return (
         <div className="p-4 md:p-6 space-y-4 max-w-[900px]">
             <div className="flex items-center gap-2">
-                <User className="h-5 w-5 text-blue-600" />
-                <h1 className="text-xl font-bold text-slate-800">Customer Timeline</h1>
+                <User className="h-5 w-5 text-primary" />
+                <h1 className="text-xl font-bold text-foreground">Customer Timeline</h1>
             </div>
 
             {/* Search bar */}
@@ -89,30 +89,30 @@ export default function CustomerPage() {
                         <CardContent className="py-4">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                                        <User className="h-5 w-5 text-blue-600" />
+                                    <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
+                                        <User className="h-5 w-5 text-primary" />
                                     </div>
                                     <div>
-                                        <h2 className="font-semibold text-slate-800">
+                                        <h2 className="font-semibold text-foreground">
                                             {data.customer_name || 'Unknown Customer'}
                                         </h2>
-                                        <p className="text-sm text-slate-500 flex items-center gap-1">
+                                        <p className="text-sm text-muted-foreground flex items-center gap-1">
                                             <Phone className="h-3 w-3" /> {data.phone}
                                         </p>
                                     </div>
                                 </div>
                                 <div className="flex gap-4 text-center">
                                     <div>
-                                        <p className="text-lg font-bold text-slate-800">{data.stats.total_calls}</p>
-                                        <p className="text-xs text-slate-500">Calls</p>
+                                        <p className="text-lg font-bold text-foreground">{data.stats.total_calls}</p>
+                                        <p className="text-xs text-muted-foreground">Calls</p>
                                     </div>
                                     <div>
-                                        <p className="text-lg font-bold text-slate-800">{data.stats.total_messages}</p>
-                                        <p className="text-xs text-slate-500">Messages</p>
+                                        <p className="text-lg font-bold text-foreground">{data.stats.total_messages}</p>
+                                        <p className="text-xs text-muted-foreground">Messages</p>
                                     </div>
                                     <div>
-                                        <p className="text-lg font-bold text-slate-800">{data.stats.pending_actions}</p>
-                                        <p className="text-xs text-slate-500">Pending</p>
+                                        <p className="text-lg font-bold text-foreground">{data.stats.pending_actions}</p>
+                                        <p className="text-xs text-muted-foreground">Pending</p>
                                     </div>
                                 </div>
                             </div>
@@ -123,7 +123,7 @@ export default function CustomerPage() {
                     <div className="space-y-2">
                         {data.timeline.length === 0 ? (
                             <Card>
-                                <CardContent className="py-8 text-center text-sm text-slate-500">
+                                <CardContent className="py-8 text-center text-sm text-muted-foreground">
                                     No interactions found for this customer
                                 </CardContent>
                             </Card>
@@ -139,9 +139,9 @@ export default function CustomerPage() {
             {!data && !loading && (
                 <Card>
                     <CardContent className="py-12 text-center">
-                        <Search className="h-10 w-10 text-slate-300 mx-auto mb-3" />
-                        <p className="text-sm text-slate-500">Search for a customer by phone number</p>
-                        <p className="text-xs text-slate-400 mt-1">See all calls, messages, and actions in one place</p>
+                        <Search className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                        <p className="text-sm text-muted-foreground">Search for a customer by phone number</p>
+                        <p className="text-xs text-muted-foreground mt-1">See all calls, messages, and actions in one place</p>
                     </CardContent>
                 </Card>
             )}
@@ -179,9 +179,9 @@ function TimelineCard({ event }: { event: TimelineEvent }) {
                                 {`Quality: ${s(d.ai_quality_total)}%`}
                             </Badge>
                         )}
-                        <span className="text-xs text-slate-400 ml-auto">{time}</span>
+                        <span className="text-xs text-muted-foreground ml-auto">{time}</span>
                     </div>
-                    {d.summary != null && <p className="text-xs text-slate-600 mt-1">{s(d.summary)}</p>}
+                    {d.summary != null && <p className="text-xs text-muted-foreground mt-1">{s(d.summary)}</p>}
                     {d.coaching_note != null && (
                         <p className="text-xs text-amber-600 mt-1 italic">{s(d.coaching_note)}</p>
                     )}
@@ -200,7 +200,7 @@ function TimelineCard({ event }: { event: TimelineEvent }) {
                         {isInbound ? (
                             <ArrowDownLeft className="h-4 w-4 text-blue-500" />
                         ) : (
-                            <ArrowUpRight className="h-4 w-4 text-slate-400" />
+                            <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
                         )}
                         <span className="text-sm font-medium">
                             {isInbound ? 'Customer SMS' : 'Sent SMS'}
@@ -208,9 +208,9 @@ function TimelineCard({ event }: { event: TimelineEvent }) {
                         {d.is_ai_generated === true && (
                             <Badge variant="secondary" className="text-[10px]">AI</Badge>
                         )}
-                        <span className="text-xs text-slate-400 ml-auto">{time}</span>
+                        <span className="text-xs text-muted-foreground ml-auto">{time}</span>
                     </div>
-                    <p className="text-xs text-slate-600 mt-1">{s(d.body)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{s(d.body)}</p>
                 </CardContent>
             </Card>
         );
@@ -234,9 +234,9 @@ function TimelineCard({ event }: { event: TimelineEvent }) {
                         <Badge variant="outline" className="text-[10px]">
                             {s(d.action_type).replace(/_/g, ' ')}
                         </Badge>
-                        <span className="text-xs text-slate-400 ml-auto">{time}</span>
+                        <span className="text-xs text-muted-foreground ml-auto">{time}</span>
                     </div>
-                    {d.description != null && <p className="text-xs text-slate-600 mt-1">{s(d.description)}</p>}
+                    {d.description != null && <p className="text-xs text-muted-foreground mt-1">{s(d.description)}</p>}
                 </CardContent>
             </Card>
         );

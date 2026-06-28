@@ -47,15 +47,15 @@ export function Sidebar({
 
     return (
         <div className="flex flex-col h-full">
-            <div className="p-4 border-b border-slate-100">
-                <h2 className="font-semibold text-sm text-slate-500 uppercase tracking-wide mb-0">Missed Calls</h2>
+            <div className="p-4 border-b border-border">
+                <h2 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide mb-0">Missed Calls</h2>
             </div>
             <div className="p-4">
                 <div className="relative">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
                         placeholder="Search missed calls..."
-                        className="pl-9 bg-slate-50"
+                        className="pl-9 bg-muted"
                         value={searchQuery}
                         aria-label="Search missed calls by name, phone, or message content"
                         onChange={(e) => onSearchChange(e.target.value)}
@@ -64,7 +64,7 @@ export function Sidebar({
             </div>
             <div className="flex-1 overflow-y-auto" role="listbox" aria-label="Lead list">
                 {filteredLeads.length === 0 ? (
-                    <div className="p-8 text-center text-slate-400 text-sm">No missed calls match your search.</div>
+                    <div className="p-8 text-center text-muted-foreground text-sm">No missed calls match your search.</div>
                 ) : (
                     filteredLeads.map(lead => (
                         <div
@@ -79,13 +79,13 @@ export function Sidebar({
                                     onSelectLead(lead);
                                 }
                             }}
-                            className={`p-4 border-b border-slate-50 cursor-pointer hover:bg-slate-50 transition-colors ${selectedLead?.id === lead.id ? 'bg-blue-50/50 border-l-4 border-l-blue-600' : 'border-l-4 border-l-transparent'}`}
+                            className={`p-4 border-b border-border cursor-pointer hover:bg-accent transition-colors ${selectedLead?.id === lead.id ? 'bg-primary/10 border-l-4 border-l-primary' : 'border-l-4 border-l-transparent'}`}
                         >
                             <div className="flex justify-between mb-1">
-                                <span className="font-semibold text-slate-900">{lead.caller_name || lead.caller_phone}</span>
-                                <span className="text-xs text-slate-400">{formatDistanceToNow(new Date(lead.created_at))}</span>
+                                <span className="font-semibold text-foreground">{lead.caller_name || lead.caller_phone}</span>
+                                <span className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(lead.created_at))}</span>
                             </div>
-                            <p className="text-sm text-slate-500 truncate">
+                            <p className="text-sm text-muted-foreground truncate">
                                 {lead.messages.length > 0 ? lead.messages[lead.messages.length - 1].body : 'Missed Call'}
                             </p>
                             <div className="mt-2 flex gap-2">

@@ -63,8 +63,8 @@ export function DashboardNav() {
                 "w-full justify-start",
                 indent && "pl-8",
                 isActive(item.href)
-                    ? "bg-blue-50 text-blue-700"
-                    : indent ? "text-slate-500 hover:text-slate-900" : "text-slate-600 hover:text-slate-900"
+                    ? "bg-primary/15 text-primary"
+                    : indent ? "text-muted-foreground hover:text-foreground" : "text-foreground/70 hover:text-foreground"
             )}
             onClick={() => go(item.href)}
         >
@@ -82,8 +82,8 @@ export function DashboardNav() {
                 "w-full rounded-lg flex items-center gap-2.5 transition-colors",
                 indent ? "h-8 pl-6 pr-3 text-sm" : "h-9 px-3 text-sm font-medium",
                 isActive(item.href)
-                    ? "bg-blue-50 text-blue-600 font-medium"
-                    : indent ? "text-slate-400 hover:text-slate-700 hover:bg-slate-50" : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+                    ? "bg-primary/15 text-primary font-medium"
+                    : indent ? "text-muted-foreground hover:text-foreground hover:bg-accent" : "text-foreground/70 hover:text-foreground hover:bg-accent"
             )}
         >
             <item.icon className={cn("shrink-0", indent ? "h-3.5 w-3.5" : "h-4 w-4")} />
@@ -95,7 +95,7 @@ export function DashboardNav() {
         <button
             onClick={() => set(!open)}
             className={cn(
-                "w-full rounded-lg flex items-center gap-2.5 px-3 font-medium text-slate-400 hover:text-slate-600 transition-colors",
+                "w-full rounded-lg flex items-center gap-2.5 px-3 font-medium text-muted-foreground hover:text-foreground transition-colors",
                 desktop ? "h-8 mt-2 text-xs" : "h-9 justify-start text-sm"
             )}
         >
@@ -107,9 +107,9 @@ export function DashboardNav() {
     return (
         <>
             {/* Mobile top bar */}
-            <div className="md:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
-                <div className="flex items-center gap-2 font-bold text-slate-800">
-                    <div className="bg-blue-600 text-white p-1 rounded">
+            <div className="md:hidden dark bg-card text-foreground border-b border-border px-4 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-2 font-bold text-foreground">
+                    <div className="bg-primary text-primary-foreground p-1 rounded">
                         <MessageSquare size={14} fill="currentColor" />
                     </div>
                     LeadCatcher
@@ -126,7 +126,7 @@ export function DashboardNav() {
 
             {/* Mobile dropdown */}
             {mobileOpen && (
-                <div className="md:hidden bg-white border-b border-slate-200 px-2 pb-2 space-y-1">
+                <div className="md:hidden bg-card border-b border-border px-2 pb-2 space-y-1">
                     {PRIMARY_ITEMS.map((item) => mobileItem(item))}
 
                     {groupToggle('More', moreOpen, setMoreOpen, false)}
@@ -137,7 +137,7 @@ export function DashboardNav() {
 
                     <Button
                         variant="ghost"
-                        className="w-full justify-start text-slate-600 hover:text-red-600"
+                        className="w-full justify-start text-foreground/70 hover:text-red-400"
                         onClick={handleSignOut}
                     >
                         <LogOut className="h-4 w-4 mr-2" />
@@ -147,12 +147,12 @@ export function DashboardNav() {
             )}
 
             {/* Desktop sidebar */}
-            <div className="hidden md:flex w-48 bg-white border-r border-slate-200 flex-col py-4 shrink-0">
+            <div className="hidden md:flex w-48 bg-sidebar border-r border-border flex-col py-4 shrink-0">
                 <div className="flex items-center gap-2 px-4 mb-6">
-                    <div className="bg-blue-600 text-white p-1.5 rounded">
+                    <div className="bg-primary text-primary-foreground p-1.5 rounded">
                         <MessageSquare size={16} fill="currentColor" />
                     </div>
-                    <span className="font-bold text-sm text-slate-800">LeadCatcher</span>
+                    <span className="font-bold text-sm text-foreground">LeadCatcher</span>
                 </div>
 
                 <nav className="flex-1 flex flex-col gap-0.5 px-2">
@@ -168,7 +168,7 @@ export function DashboardNav() {
                 <div className="px-2 mt-2">
                     <button
                         onClick={handleSignOut}
-                        className="w-full h-9 rounded-lg flex items-center gap-2.5 px-3 text-sm font-medium text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        className="w-full h-9 rounded-lg flex items-center gap-2.5 px-3 text-sm font-medium text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors"
                     >
                         <LogOut className="h-4 w-4 shrink-0" />
                         Sign Out

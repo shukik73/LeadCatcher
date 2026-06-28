@@ -42,8 +42,8 @@ function SummaryCard({ label, value, accent }: { label: string; value: string | 
     return (
         <Card>
             <CardContent className="py-4">
-                <p className="text-xs font-medium text-slate-500">{label}</p>
-                <p className={`text-2xl font-bold mt-1 ${accent ?? 'text-slate-800'}`}>{value}</p>
+                <p className="text-xs font-medium text-muted-foreground">{label}</p>
+                <p className={`text-2xl font-bold mt-1 ${accent ?? 'text-foreground'}`}>{value}</p>
             </CardContent>
         </Card>
     );
@@ -169,11 +169,11 @@ export default function HotLeadsPage() {
     const Header = (
         <div className="flex items-start justify-between gap-3">
             <div>
-                <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
                     <Flame className="h-5 w-5 text-orange-500" />
                     Queue
                 </h1>
-                <p className="text-sm text-slate-500 mt-0.5">
+                <p className="text-sm text-muted-foreground mt-0.5">
                     Everything that needs you: callbacks, follow-up approvals, open leads.
                 </p>
             </div>
@@ -213,13 +213,13 @@ export default function HotLeadsPage() {
             {/* Loading state */}
             {loading && leads.length === 0 && !error && (
                 <div className="flex justify-center py-16">
-                    <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
             )}
 
             {/* Error state */}
             {error && (
-                <div className="text-center py-16 text-slate-500">
+                <div className="text-center py-16 text-muted-foreground">
                     <AlertTriangle className="h-8 w-8 mx-auto mb-2 text-red-400" />
                     <p className="text-sm">{error}</p>
                     <Button variant="outline" size="sm" className="mt-3" onClick={() => fetchLeads()}>
@@ -230,9 +230,9 @@ export default function HotLeadsPage() {
 
             {/* Empty state */}
             {!loading && !error && leads.length === 0 && (
-                <div className="text-center py-16 text-slate-500">
+                <div className="text-center py-16 text-muted-foreground">
                     <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-400" />
-                    <p className="text-sm font-medium text-slate-700">No hot leads right now.</p>
+                    <p className="text-sm font-medium text-foreground">No hot leads right now.</p>
                     <p className="text-xs mt-1">
                         When missed calls, callbacks, or AI action items need attention, they will appear here.
                     </p>
@@ -248,17 +248,17 @@ export default function HotLeadsPage() {
                         return (
                             <Card
                                 key={lead.id}
-                                className={isOverdue ? 'border-red-200 bg-red-50/30' : undefined}
+                                className={isOverdue ? 'border-red-500/20 bg-red-500/10' : undefined}
                             >
                                 <CardContent className="py-3 space-y-2">
                                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                                <User className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                                                <span className="font-medium text-sm text-slate-800">
+                                                <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                                <span className="font-medium text-sm text-foreground">
                                                     {lead.customerName || 'Unknown customer'}
                                                 </span>
-                                                <span className="text-xs text-slate-500 flex items-center gap-1">
+                                                <span className="text-xs text-muted-foreground flex items-center gap-1">
                                                     <Phone className="h-2.5 w-2.5" />
                                                     {lead.customerPhone || 'N/A'}
                                                 </span>
@@ -266,29 +266,29 @@ export default function HotLeadsPage() {
 
                                             <div className="flex flex-wrap gap-1.5 mb-2">
                                                 {lead.sourceType === 'action_item' && (
-                                                    <span className="text-xs text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
+                                                    <span className="text-xs text-amber-300 bg-amber-500/15 px-1.5 py-0.5 rounded">
                                                         Action item
                                                     </span>
                                                 )}
                                                 <UrgencyBadge urgency={lead.urgency} />
                                                 <CallbackStatusBadge status={lead.callbackStatus} />
                                                 {lead.callStatus && (
-                                                    <span className="text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded capitalize">
+                                                    <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded capitalize">
                                                         {lead.callStatus}
                                                     </span>
                                                 )}
                                                 {lead.rdTicketId && (
-                                                    <span className="text-xs text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded inline-flex items-center gap-1">
+                                                    <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded inline-flex items-center gap-1">
                                                         <Ticket className="h-2.5 w-2.5" />
                                                         #{lead.rdTicketId}
                                                     </span>
                                                 )}
                                             </div>
 
-                                            <p className="text-xs text-slate-600">{lead.summary || 'No summary'}</p>
+                                            <p className="text-xs text-muted-foreground">{lead.summary || 'No summary'}</p>
 
                                             {lead.followUpNotes && (
-                                                <p className="text-xs text-blue-600 mt-1 italic">
+                                                <p className="text-xs text-primary mt-1 italic">
                                                     Script: {lead.followUpNotes}
                                                 </p>
                                             )}
@@ -299,7 +299,7 @@ export default function HotLeadsPage() {
                                             )}
 
                                             {lead.dueBy && (
-                                                <p className={`text-xs mt-1 flex items-center gap-1 ${isOverdue ? 'text-red-600 font-medium' : 'text-slate-500'}`}>
+                                                <p className={`text-xs mt-1 flex items-center gap-1 ${isOverdue ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
                                                     <Clock className="h-3 w-3" />
                                                     Due: {new Date(lead.dueBy).toLocaleString(undefined, {
                                                         month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
@@ -308,7 +308,7 @@ export default function HotLeadsPage() {
                                                 </p>
                                             )}
                                             {lead.sourceCallId && (
-                                                <p className="text-[11px] text-slate-400 mt-1 truncate">
+                                                <p className="text-[11px] text-muted-foreground mt-1 truncate">
                                                     Call ID: {lead.sourceCallId}
                                                 </p>
                                             )}
@@ -316,7 +316,7 @@ export default function HotLeadsPage() {
 
                                         {/* Quick actions */}
                                         {lead.sourceType === 'action_item' ? (
-                                            <div className="text-xs text-slate-500 bg-amber-50 border border-amber-100 rounded-md px-3 py-2 shrink-0 max-w-[180px]">
+                                            <div className="text-xs text-muted-foreground bg-amber-500/10 border border-amber-500/20 rounded-md px-3 py-2 shrink-0 max-w-[180px]">
                                                 Open task surfaced from action_items. Use call buttons only on call-analysis leads.
                                             </div>
                                         ) : (
@@ -382,9 +382,9 @@ export default function HotLeadsPage() {
 
                                     {/* Inline booked-value capture — feeds recovered revenue */}
                                     {bookingOpenFor === lead.id && (
-                                        <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center gap-2">
+                                        <div className="pt-2 border-t border-border flex flex-col sm:flex-row sm:items-center gap-2">
                                             <div className="relative flex-1">
-                                                <DollarSign className="h-3.5 w-3.5 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2" />
+                                                <DollarSign className="h-3.5 w-3.5 text-muted-foreground absolute left-2 top-1/2 -translate-y-1/2" />
                                                 <Input
                                                     type="number" min="0" step="1" inputMode="decimal"
                                                     placeholder="Job value (optional)"
@@ -418,7 +418,7 @@ export default function HotLeadsPage() {
 
                                     {/* Inline add-note */}
                                     {noteOpenFor === lead.id && (
-                                        <div className="pt-2 border-t border-slate-100 space-y-2">
+                                        <div className="pt-2 border-t border-border space-y-2">
                                             <Textarea
                                                 value={noteText}
                                                 onChange={(e) => setNoteText(e.target.value)}

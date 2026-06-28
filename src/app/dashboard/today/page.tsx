@@ -76,11 +76,11 @@ function StatCard({
         <Card>
             <CardContent className="py-4">
                 <div className="flex items-center justify-between">
-                    <p className="text-xs font-medium text-slate-500">{label}</p>
-                    <Icon className={`h-4 w-4 ${accent ?? 'text-slate-400'}`} />
+                    <p className="text-xs font-medium text-muted-foreground">{label}</p>
+                    <Icon className={`h-4 w-4 ${accent ?? 'text-muted-foreground'}`} />
                 </div>
-                <p className={`text-2xl font-bold mt-1 ${accent ?? 'text-slate-800'}`}>{value}</p>
-                {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
+                <p className={`text-2xl font-bold mt-1 ${accent ?? 'text-foreground'}`}>{value}</p>
+                {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
             </CardContent>
         </Card>
     );
@@ -100,7 +100,7 @@ function RecoveryFunnel({ stats }: { stats: RecoveryStats | null }) {
     return (
         <Card>
             <CardContent className="py-4 space-y-3">
-                <p className="text-xs font-medium text-slate-500">
+                <p className="text-xs font-medium text-muted-foreground">
                     Recovery funnel · last {PERIOD_DAYS} days
                 </p>
                 <div className="space-y-2">
@@ -110,8 +110,8 @@ function RecoveryFunnel({ stats }: { stats: RecoveryStats | null }) {
                         const conv = prev && prev > 0 ? Math.round((s.value / prev) * 100) : null;
                         return (
                             <div key={s.label} className="flex items-center gap-3">
-                                <span className="w-24 shrink-0 text-xs text-slate-600">{s.label}</span>
-                                <div className="h-6 flex-1 overflow-hidden rounded bg-slate-100">
+                                <span className="w-24 shrink-0 text-xs text-muted-foreground">{s.label}</span>
+                                <div className="h-6 flex-1 overflow-hidden rounded bg-muted">
                                     <div
                                         className={`flex h-full items-center justify-end rounded px-2 ${s.color}`}
                                         style={{ width: `${s.value > 0 ? Math.max(pct, 8) : 0}%` }}
@@ -121,14 +121,14 @@ function RecoveryFunnel({ stats }: { stats: RecoveryStats | null }) {
                                         )}
                                     </div>
                                 </div>
-                                <span className="w-12 shrink-0 text-right text-[11px] text-slate-400">
+                                <span className="w-12 shrink-0 text-right text-[11px] text-muted-foreground">
                                     {conv != null ? `${conv}%` : ''}
                                 </span>
                             </div>
                         );
                     })}
                 </div>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-muted-foreground">
                     Percentages show stage-to-stage conversion. Aim to lift the drop from replied to booked.
                 </p>
             </CardContent>
@@ -280,11 +280,11 @@ export default function TodayPage() {
             {/* Header */}
             <div className="flex items-start justify-between gap-3">
                 <div>
-                    <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                    <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
                         <Sun className="h-5 w-5 text-amber-500" />
                         {greeting(now)}
                     </h1>
-                    <p className="text-sm text-slate-500 mt-0.5">
+                    <p className="text-sm text-muted-foreground mt-0.5">
                         {now.toLocaleDateString(undefined, {
                             weekday: 'long', month: 'long', day: 'numeric',
                         })}
@@ -299,7 +299,7 @@ export default function TodayPage() {
                     </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                    <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-slate-400" title="This screen updates automatically every minute">
+                    <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-muted-foreground" title="This screen updates automatically every minute">
                         <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
                         Live
                     </span>
@@ -310,7 +310,7 @@ export default function TodayPage() {
             </div>
 
             {error && (
-                <div className="text-center py-12 text-slate-500">
+                <div className="text-center py-12 text-muted-foreground">
                     <AlertTriangle className="h-8 w-8 mx-auto mb-2 text-red-400" />
                     <p className="text-sm">{error}</p>
                     <Button variant="outline" size="sm" className="mt-3" onClick={() => load()}>
@@ -323,7 +323,7 @@ export default function TodayPage() {
                 <>
                     {/* Money-forward KPI row (last 30 days) */}
                     <div>
-                        <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
                             Last {PERIOD_DAYS} days
                         </p>
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -361,13 +361,13 @@ export default function TodayPage() {
                     {/* Needs attention now — the callback queue */}
                     <div>
                         <div className="flex items-center justify-between mb-2">
-                            <h2 className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+                            <h2 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
                                 <Flame className="h-4 w-4 text-orange-500" />
                                 Needs your attention
                             </h2>
                             {callbacks.length > 0 && (
                                 <Button
-                                    variant="ghost" size="sm" className="h-7 text-xs text-slate-500"
+                                    variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground"
                                     onClick={() => router.push('/dashboard/hot-leads')}
                                 >
                                     View all ({summary?.total ?? callbacks.length})
@@ -378,14 +378,14 @@ export default function TodayPage() {
 
                         {loading && callbacks.length === 0 ? (
                             <div className="flex justify-center py-12">
-                                <Loader2 className="h-7 w-7 animate-spin text-slate-300" />
+                                <Loader2 className="h-7 w-7 animate-spin text-muted-foreground" />
                             </div>
                         ) : topCallbacks.length === 0 ? (
                             <Card>
                                 <CardContent className="py-10 text-center">
                                     <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-400" />
-                                    <p className="text-sm font-medium text-slate-700">Nothing needs a callback right now.</p>
-                                    <p className="text-xs text-slate-400 mt-1">
+                                    <p className="text-sm font-medium text-foreground">Nothing needs a callback right now.</p>
+                                    <p className="text-xs text-muted-foreground mt-1">
                                         New missed calls and AI follow-ups will show up here automatically.
                                     </p>
                                 </CardContent>
@@ -398,24 +398,24 @@ export default function TodayPage() {
                                     return (
                                         <Card
                                             key={lead.id}
-                                            className={isOverdue ? 'border-red-200 bg-red-50/30' : undefined}
+                                            className={isOverdue ? 'border-red-500/20 bg-red-500/10' : undefined}
                                         >
                                             <CardContent className="py-3 space-y-2">
                                                 <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2 flex-wrap mb-1">
-                                                            <User className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                                                            <span className="font-medium text-sm text-slate-800 truncate">
+                                                            <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                                            <span className="font-medium text-sm text-foreground truncate">
                                                                 {lead.customerName || lead.customerPhone || 'Unknown caller'}
                                                             </span>
                                                             <UrgencyBadge urgency={lead.urgency} />
                                                             <CallbackStatusBadge status={lead.callbackStatus} />
                                                         </div>
-                                                        <p className="text-xs text-slate-600 line-clamp-2">
+                                                        <p className="text-xs text-muted-foreground line-clamp-2">
                                                             {lead.summary || 'Missed call — follow up to win the job.'}
                                                         </p>
                                                         {lead.dueBy && (
-                                                            <p className={`text-xs mt-1 flex items-center gap-1 ${isOverdue ? 'text-red-600 font-medium' : 'text-slate-500'}`}>
+                                                            <p className={`text-xs mt-1 flex items-center gap-1 ${isOverdue ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
                                                                 <Clock className="h-3 w-3" />
                                                                 Due {new Date(lead.dueBy).toLocaleString(undefined, {
                                                                     month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
@@ -447,7 +447,7 @@ export default function TodayPage() {
                                                                 : <><CheckCircle className="h-3.5 w-3.5 mr-1" />Booked</>}
                                                         </Button>
                                                         <Button
-                                                            size="sm" variant="ghost" className="h-8 px-2 text-xs text-slate-400 hover:text-slate-700"
+                                                            size="sm" variant="ghost" className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
                                                             disabled={busy}
                                                             title="Clear from Today — not chasing this one"
                                                             onClick={() => dismiss(lead.id)}
@@ -459,9 +459,9 @@ export default function TodayPage() {
 
                                                 {/* Inline booked-value capture — makes recovered revenue exact */}
                                                 {bookingId === lead.id && (
-                                                    <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center gap-2">
+                                                    <div className="pt-2 border-t border-border flex flex-col sm:flex-row sm:items-center gap-2">
                                                         <div className="relative flex-1">
-                                                            <DollarSign className="h-3.5 w-3.5 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2" />
+                                                            <DollarSign className="h-3.5 w-3.5 text-muted-foreground absolute left-2 top-1/2 -translate-y-1/2" />
                                                             <Input
                                                                 type="number" min="0" step="1" inputMode="decimal"
                                                                 placeholder="Job value (optional)"
@@ -502,27 +502,27 @@ export default function TodayPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <button
                             onClick={() => router.push('/dashboard')}
-                            className="text-left rounded-lg border border-slate-200 bg-white p-4 hover:border-blue-300 hover:bg-blue-50/40 transition-colors"
+                            className="text-left rounded-lg border border-border bg-card p-4 hover:border-primary/50 hover:bg-primary/5 transition-colors"
                         >
-                            <Phone className="h-5 w-5 text-blue-500 mb-2" />
-                            <p className="text-sm font-medium text-slate-800">Open inbox</p>
-                            <p className="text-xs text-slate-500">Reply to every conversation</p>
+                            <Phone className="h-5 w-5 text-primary mb-2" />
+                            <p className="text-sm font-medium text-foreground">Open inbox</p>
+                            <p className="text-xs text-muted-foreground">Reply to every conversation</p>
                         </button>
                         <button
                             onClick={() => router.push('/dashboard/followups')}
-                            className="text-left rounded-lg border border-slate-200 bg-white p-4 hover:border-blue-300 hover:bg-blue-50/40 transition-colors"
+                            className="text-left rounded-lg border border-border bg-card p-4 hover:border-primary/50 hover:bg-primary/5 transition-colors"
                         >
                             <Clock className="h-5 w-5 text-amber-500 mb-2" />
-                            <p className="text-sm font-medium text-slate-800">Follow-ups</p>
-                            <p className="text-xs text-slate-500">Scheduled callbacks &amp; reminders</p>
+                            <p className="text-sm font-medium text-foreground">Follow-ups</p>
+                            <p className="text-xs text-muted-foreground">Scheduled callbacks &amp; reminders</p>
                         </button>
                         <button
                             onClick={() => router.push('/dashboard/analytics')}
-                            className="text-left rounded-lg border border-slate-200 bg-white p-4 hover:border-blue-300 hover:bg-blue-50/40 transition-colors"
+                            className="text-left rounded-lg border border-border bg-card p-4 hover:border-primary/50 hover:bg-primary/5 transition-colors"
                         >
                             <TrendingUp className="h-5 w-5 text-green-500 mb-2" />
-                            <p className="text-sm font-medium text-slate-800">Analytics</p>
-                            <p className="text-xs text-slate-500">Trends &amp; recovery over time</p>
+                            <p className="text-sm font-medium text-foreground">Analytics</p>
+                            <p className="text-xs text-muted-foreground">Trends &amp; recovery over time</p>
                         </button>
                     </div>
                 </>
