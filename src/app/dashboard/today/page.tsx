@@ -9,7 +9,7 @@ import { UrgencyBadge, CallbackStatusBadge } from '@/components/urgency-badge';
 import {
     Sun, RefreshCw, Loader2, Phone, PhoneCall, User, Clock,
     CheckCircle, AlertTriangle, TrendingUp, PhoneOff, DollarSign,
-    CalendarCheck, ArrowRight, Flame,
+    CalendarCheck, ArrowRight, Flame, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -32,6 +32,7 @@ interface CallbackLead {
     dueBy: string | null;
     summary: string | null;
     followUpNotes: string | null;
+    createdAt: string;
 }
 
 interface HotLeadsSummary {
@@ -43,6 +44,9 @@ interface HotLeadsSummary {
 
 const PERIOD_DAYS = 30;
 const MAX_CALLBACKS = 6;
+// A missed call older than this is cold — chasing it reads as spam, so it drops
+// off Today automatically (it still lives in the full Queue / Calls history).
+const STALE_HOURS = 72;
 
 function greeting(date: Date): string {
     const h = date.getHours();
@@ -245,8 +249,31 @@ export default function TodayPage() {
         markBooked(leadId, parsed);
     };
 
+    // Clear a lead off Today without booking it — "handled / not chasing this one".
+    const dismiss = async (leadId: string) => {
+        setActioningId(leadId);
+        try {
+            const res = await fetch(`/api/calls/${leadId}/mark-lost`, { method: 'POST' });
+            const data = await res.json();
+            if (res.ok && (data.success || data.id)) {
+                setCallbacks((prev) => prev.filter((l) => l.id !== leadId));
+            } else {
+                toast.error(data.error || 'Could not dismiss');
+            }
+        } catch {
+            toast.error('Could not dismiss');
+        } finally {
+            setActioningId(null);
+        }
+    };
+
     const dueNow = summary?.dueNow ?? 0;
-    const topCallbacks = callbacks.slice(0, MAX_CALLBACKS);
+    // Auto-expire stale leads off Today: a call older than STALE_HOURS is cold.
+    const staleCutoff = Date.now() - STALE_HOURS * 3600_000;
+    const freshCallbacks = callbacks.filter(
+        (l) => !l.createdAt || new Date(l.createdAt).getTime() >= staleCutoff,
+    );
+    const topCallbacks = freshCallbacks.slice(0, MAX_CALLBACKS);
 
     return (
         <div className="p-4 md:p-6 space-y-5 max-w-5xl">
@@ -418,6 +445,14 @@ export default function TodayPage() {
                                                             {busy
                                                                 ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                                                 : <><CheckCircle className="h-3.5 w-3.5 mr-1" />Booked</>}
+                                                        </Button>
+                                                        <Button
+                                                            size="sm" variant="ghost" className="h-8 px-2 text-xs text-slate-400 hover:text-slate-700"
+                                                            disabled={busy}
+                                                            title="Clear from Today — not chasing this one"
+                                                            onClick={() => dismiss(lead.id)}
+                                                        >
+                                                            <X className="h-3.5 w-3.5" />
                                                         </Button>
                                                     </div>
                                                 </div>

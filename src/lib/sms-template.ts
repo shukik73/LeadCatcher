@@ -5,6 +5,9 @@
 
 const BOOKING_LINK_TOKEN = /\{\{\s*booking_link\s*\}\}/g;
 const BUSINESS_NAME_TOKEN = /\{\{\s*business_name\s*\}\}/g;
+const FIRST_NAME_TOKEN = /\{\{\s*first_name\s*\}\}/g;
+/** Any remaining {{token}} after known substitutions — must never reach a customer. */
+const ANY_TOKEN = /\{\{\s*\w+\s*\}\}/g;
 
 /**
  * Apply booking-link logic to a templated SMS body:
@@ -38,11 +41,41 @@ export function replaceBusinessName(body: string, name: string | null | undefine
     return body.replace(BUSINESS_NAME_TOKEN, name || 'our business');
 }
 
-/** One-shot helper that applies both business_name and booking_link substitutions. */
+/**
+ * Replace the {{first_name}} token with the caller's first name. Missed-call SMS
+ * usually fires before the caller is known, so an empty/missing name falls back to
+ * a friendly generic ("there") rather than leaving a blank or a raw token.
+ */
+export function replaceFirstName(body: string, firstName: string | null | undefined): string {
+    const name = (firstName || '').trim();
+    return body.replace(FIRST_NAME_TOKEN, name || 'there');
+}
+
+/**
+ * Strip any unresolved {{token}} placeholders so a raw token can never be texted to
+ * a customer (e.g. a template using an unsupported variable). Tidies the whitespace
+ * and dangling punctuation a removed token leaves behind.
+ */
+export function stripUnknownTokens(body: string): string {
+    return body
+        .replace(ANY_TOKEN, '')
+        .replace(/\s+([,.!?;:])/g, '$1') // " ," -> ","
+        .replace(/[ \t]{2,}/g, ' ')      // collapse runs of spaces
+        .trim();
+}
+
+/**
+ * One-shot helper that renders a missed-call SMS template: substitutes
+ * business_name, first_name and booking_link, then strips any leftover token so no
+ * unresolved placeholder ever reaches the customer.
+ */
 export function renderMissedCallSms(
     template: string,
     business: { name: string | null; booking_url: string | null | undefined },
+    firstName?: string | null,
 ): string {
-    const withName = replaceBusinessName(template, business.name);
-    return appendBookingLink(withName, business.booking_url);
+    let body = replaceBusinessName(template, business.name);
+    body = replaceFirstName(body, firstName);
+    body = appendBookingLink(body, business.booking_url);
+    return stripUnknownTokens(body);
 }

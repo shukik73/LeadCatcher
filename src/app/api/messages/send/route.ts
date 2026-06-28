@@ -150,13 +150,18 @@ export async function POST(request: Request) {
             to: toNumber,
         });
 
-        // 5. Log Message to Database
-        const { error: msgError } = await supabaseAdmin.from('messages').insert({
-            lead_id: leadId,
-            direction: 'outbound',
-            body: body,
-            // created_at is default now()
-        });
+        // 5. Log Message to Database. Return the inserted row so the dashboard
+        // can render it instantly (realtime isn't guaranteed to echo it back).
+        const { data: savedMessage, error: msgError } = await supabaseAdmin
+            .from('messages')
+            .insert({
+                lead_id: leadId,
+                direction: 'outbound',
+                body: body,
+                // created_at is default now()
+            })
+            .select('id, lead_id, direction, body, is_ai_generated, created_at')
+            .single();
 
         if (msgError) {
             logger.error('Failed to save outbound message to DB', msgError);
@@ -166,7 +171,7 @@ export async function POST(request: Request) {
         // 6. Update Lead Status (optional, e.g. move to 'Contacted')
         await supabaseAdmin.from('leads').update({ status: 'Contacted' }).eq('id', leadId).eq('status', 'New');
 
-        return new Response(JSON.stringify({ success: true }), {
+        return new Response(JSON.stringify({ success: true, message: savedMessage ?? null }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' }
         });
