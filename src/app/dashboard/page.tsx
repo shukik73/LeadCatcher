@@ -217,7 +217,7 @@ export default function Dashboard() {
 
     if (error && leads.length === 0) {
         return (
-            <div className="h-screen flex items-center justify-center bg-slate-50 p-4">
+            <div className="h-screen flex items-center justify-center bg-background p-4">
                 <div className="max-w-md w-full text-center space-y-4">
                     <div className="flex justify-center">
                         <div className="rounded-full bg-red-100 p-3">
@@ -225,8 +225,8 @@ export default function Dashboard() {
                         </div>
                     </div>
                     <div className="space-y-2">
-                        <h2 className="text-xl font-bold text-slate-900">Failed to Load Leads</h2>
-                        <p className="text-slate-500">{error}</p>
+                        <h2 className="text-xl font-bold text-foreground">Failed to Load Leads</h2>
+                        <p className="text-muted-foreground">{error}</p>
                     </div>
                     <Button onClick={() => { setError(null); setLoading(true); window.location.reload(); }} variant="outline" className="gap-2">
                         <RefreshCw className="h-4 w-4" />
@@ -238,13 +238,13 @@ export default function Dashboard() {
     }
 
     return (
-        <div className="flex h-full bg-slate-50 overflow-hidden flex-col">
+        <div className="flex h-full bg-background overflow-hidden flex-col">
             {/* Setup progress card */}
             <SetupCard />
 
             <div className="flex flex-1 overflow-hidden flex-col md:flex-row">
             {/* Mobile leads toggle */}
-            <div className="md:hidden bg-white border-b border-slate-200 p-3">
+            <div className="md:hidden bg-card border-b border-border p-3">
                 <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                     <SheetTrigger asChild>
                         <Button variant="outline" size="sm" className="w-full gap-2">
@@ -268,7 +268,7 @@ export default function Dashboard() {
             </div>
 
             {/* Desktop Leads Sidebar */}
-            <div className="hidden md:flex w-80 bg-white border-r border-slate-200 flex-col">
+            <div className="hidden md:flex w-80 bg-card border-r border-border flex-col">
                 <Sidebar
                     leads={leads}
                     selectedLead={selectedLead}
@@ -277,7 +277,7 @@ export default function Dashboard() {
                     onSelectLead={handleSelectLead}
                 />
                 {hasMore && (
-                    <div className="p-3 border-t border-slate-200">
+                    <div className="p-3 border-t border-border">
                         <Button
                             variant="ghost"
                             size="sm"
@@ -297,14 +297,14 @@ export default function Dashboard() {
                 {selectedLead ? (
                     <>
                         {/* Header */}
-                        <header className="bg-white border-b border-slate-200 p-4 flex justify-between items-center">
+                        <header className="bg-card border-b border-border p-4 flex justify-between items-center">
                             <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
+                                <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
                                     <User size={20} />
                                 </div>
                                 <div>
-                                    <h2 className="font-bold text-slate-900">{selectedLead.caller_phone}</h2>
-                                    <p className="text-xs text-slate-500">{selectedLead.caller_name || 'Unknown Caller'}</p>
+                                    <h2 className="font-bold text-foreground">{selectedLead.caller_phone}</h2>
+                                    <p className="text-xs text-muted-foreground">{selectedLead.caller_name || 'Unknown Caller'}</p>
                                 </div>
                             </div>
                             <div className="flex gap-2">
@@ -330,16 +330,16 @@ export default function Dashboard() {
                         </header>
 
                         {/* Messages */}
-                        <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50/50 flex flex-col">
+                        <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-background/50 flex flex-col">
                             <div className="flex-1" />
                             {selectedLead.messages.length === 0 && (
-                                <div className="text-center text-slate-400 text-sm py-10">Start the conversation...</div>
+                                <div className="text-center text-muted-foreground text-sm py-10">Start the conversation...</div>
                             )}
                             {selectedLead.messages.map(msg => (
                                 <div key={msg.id} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[85%] md:max-w-[70%] p-3 rounded-2xl ${msg.direction === 'outbound' ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-white border border-slate-200 text-slate-800 rounded-bl-sm shadow-sm'}`}>
+                                    <div className={`max-w-[85%] md:max-w-[70%] p-3 rounded-2xl ${msg.direction === 'outbound' ? 'bg-primary text-primary-foreground rounded-br-sm' : 'bg-card border border-border text-foreground rounded-bl-sm shadow-sm'}`}>
                                         <p className="text-sm">{msg.body}</p>
-                                        <p className={`text-[10px] mt-1 ${msg.direction === 'outbound' ? 'text-blue-100' : 'text-slate-400'}`}>
+                                        <p className={`text-[10px] mt-1 ${msg.direction === 'outbound' ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
                                             {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </p>
                                     </div>
@@ -349,7 +349,7 @@ export default function Dashboard() {
                         </div>
 
                         {/* Input */}
-                        <div className="p-4 bg-white border-t border-slate-200">
+                        <div className="p-4 bg-card border-t border-border">
                             <div className="flex gap-2">
                                 <div className="flex-1 relative">
                                     <Input
@@ -371,7 +371,7 @@ export default function Dashboard() {
                                         maxLength={1600}
                                         aria-label="Type your reply message"
                                     />
-                                    <div className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+                                    <div className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
                                         <span className={replyText.length > 1520 ? 'text-orange-500' : ''}>
                                             {replyText.length}/1600
                                         </span>
@@ -381,7 +381,7 @@ export default function Dashboard() {
                                     {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                                 </Button>
                             </div>
-                            <p className="text-xs text-slate-400 mt-2 text-center">Reply STOP to opt out.</p>
+                            <p className="text-xs text-muted-foreground mt-2 text-center">Reply STOP to opt out.</p>
                         </div>
                     </>
                 ) : leads.length === 0 ? (
@@ -389,18 +389,18 @@ export default function Dashboard() {
                     <div className="flex-1 flex items-center justify-center p-8">
                         <div className="max-w-sm text-center space-y-5">
                             <div className="flex justify-center">
-                                <div className="rounded-full bg-blue-50 p-4">
-                                    <PhoneOff className="h-10 w-10 text-blue-400" />
+                                <div className="rounded-full bg-primary/10 p-4">
+                                    <PhoneOff className="h-10 w-10 text-primary" />
                                 </div>
                             </div>
                             <div className="space-y-2">
-                                <h2 className="text-xl font-bold text-slate-900">No missed calls captured yet</h2>
-                                <p className="text-slate-500 text-sm">
+                                <h2 className="text-xl font-bold text-foreground">No missed calls captured yet</h2>
+                                <p className="text-muted-foreground text-sm">
                                     Activate forwarding and place one test call. Your first lead will appear here automatically.
                                 </p>
                             </div>
                             <div className="flex flex-col sm:flex-row gap-2 justify-center">
-                                <Button onClick={() => window.location.href = '/dashboard/settings'} className="bg-blue-600 hover:bg-blue-700 gap-2">
+                                <Button onClick={() => window.location.href = '/dashboard/settings'} className="gap-2">
                                     <PhoneForwarded className="h-4 w-4" />
                                     Activate Forwarding
                                 </Button>
@@ -412,7 +412,7 @@ export default function Dashboard() {
                         </div>
                     </div>
                 ) : (
-                    <div className="flex-1 flex items-center justify-center text-slate-400 p-8 text-center">
+                    <div className="flex-1 flex items-center justify-center text-muted-foreground p-8 text-center">
                         Select a lead to view conversation
                     </div>
                 )}

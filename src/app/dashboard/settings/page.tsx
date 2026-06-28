@@ -376,13 +376,13 @@ export default function SettingsPage() {
 
     if (loading) return (
         <div className="container mx-auto p-6 max-w-3xl space-y-8">
-            <div className="h-9 w-32 bg-slate-200 rounded animate-pulse" />
-            <div className="rounded-lg border border-slate-200 p-6 space-y-4">
-                <div className="h-6 w-56 bg-slate-200 rounded animate-pulse" />
-                <div className="h-4 w-80 bg-slate-100 rounded animate-pulse" />
+            <div className="h-9 w-32 bg-muted rounded animate-pulse" />
+            <div className="rounded-lg border border-border p-6 space-y-4">
+                <div className="h-6 w-56 bg-muted rounded animate-pulse" />
+                <div className="h-4 w-80 bg-muted rounded animate-pulse" />
                 <div className="space-y-3">
-                    <div className="h-24 bg-slate-100 rounded animate-pulse" />
-                    <div className="h-24 bg-slate-100 rounded animate-pulse" />
+                    <div className="h-24 bg-muted rounded animate-pulse" />
+                    <div className="h-24 bg-muted rounded animate-pulse" />
                 </div>
             </div>
         </div>
@@ -473,7 +473,7 @@ export default function SettingsPage() {
                             <Button
                                 onClick={handleConnectPhone}
                                 disabled={connecting || !businessPhone.trim()}
-                                className="bg-blue-600 hover:bg-blue-700"
+                                className=""
                             >
                                 {connecting ? (
                                     <>
@@ -532,7 +532,7 @@ export default function SettingsPage() {
                             rows={4}
                             maxLength={1000}
                         />
-                        <p className="text-xs text-slate-400">
+                        <p className="text-xs text-muted-foreground">
                             List everything you service so the AI can confidently say &quot;yes, we do that.&quot;
                         </p>
                     </div>
@@ -581,7 +581,7 @@ export default function SettingsPage() {
                                     className="h-24"
                                 />
                             </div>
-                            <p className="text-sm text-gray-500">
+                            <p className="text-sm text-muted-foreground">
                                 Use {'{{first_name}}'} for caller name and {'{{business_name}}'} for your business name.
                             </p>
 
@@ -589,32 +589,32 @@ export default function SettingsPage() {
                             {!showMoreTemplates ? (
                                 <button
                                     onClick={() => setShowMoreTemplates(true)}
-                                    className="text-sm text-blue-600 hover:underline"
+                                    className="text-sm text-primary hover:underline"
                                 >
                                     More Templates
                                 </button>
                             ) : (
                                 <div className="space-y-4 border-t pt-4">
-                                    <p className="text-sm font-medium text-slate-700">Pick a template:</p>
+                                    <p className="text-sm font-medium text-foreground">Pick a template:</p>
                                     <div className="space-y-3">
-                                        <Label className="text-xs text-slate-500">Business Hours</Label>
+                                        <Label className="text-xs text-muted-foreground">Business Hours</Label>
                                         {MORE_OPEN_TEMPLATES.map((t, i) => (
                                             <button
                                                 key={i}
                                                 onClick={() => { setSmsTemplate(t); setShowMoreTemplates(false); }}
-                                                className="block w-full text-left p-3 text-sm rounded-lg border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                                                className="block w-full text-left p-3 text-sm rounded-lg border border-border hover:border-primary/50 hover:bg-primary/10 transition-colors"
                                             >
                                                 {t}
                                             </button>
                                         ))}
                                     </div>
                                     <div className="space-y-3">
-                                        <Label className="text-xs text-slate-500">After Hours</Label>
+                                        <Label className="text-xs text-muted-foreground">After Hours</Label>
                                         {MORE_CLOSED_TEMPLATES.map((t, i) => (
                                             <button
                                                 key={i}
                                                 onClick={() => { setSmsTemplateClosed(t); setShowMoreTemplates(false); }}
-                                                className="block w-full text-left p-3 text-sm rounded-lg border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                                                className="block w-full text-left p-3 text-sm rounded-lg border border-border hover:border-primary/50 hover:bg-primary/10 transition-colors"
                                             >
                                                 {t}
                                             </button>
@@ -624,7 +624,7 @@ export default function SettingsPage() {
                             )}
                         </div>
                     ) : (
-                        <div className="bg-slate-50 rounded-lg p-4 text-sm text-slate-700 leading-relaxed">
+                        <div className="bg-muted rounded-lg p-4 text-sm text-foreground leading-relaxed">
                             &ldquo;{smsTemplate}&rdquo;
                         </div>
                     )}
@@ -682,7 +682,7 @@ export default function SettingsPage() {
                                             onChange={(e) => handleHourChange(day, 'open', e.target.value)}
                                             className="w-28 text-sm"
                                         />
-                                        <span className="text-xs text-gray-400">to</span>
+                                        <span className="text-xs text-muted-foreground">to</span>
                                         <Input
                                             type="time"
                                             value={hours[day]?.close ?? '17:00'}
@@ -691,7 +691,7 @@ export default function SettingsPage() {
                                         />
                                     </div>
                                 ) : (
-                                    <span className="text-gray-400 italic text-sm pr-4">Closed</span>
+                                    <span className="text-muted-foreground italic text-sm pr-4">Closed</span>
                                 )}
                             </div>
                         ))}
@@ -704,7 +704,7 @@ export default function SettingsPage() {
                 <AccordionItem value="advanced" className="border rounded-lg">
                     <AccordionTrigger className="px-6 hover:no-underline">
                         <div className="flex items-center gap-2">
-                            <Settings2 className="h-5 w-5 text-slate-500" />
+                            <Settings2 className="h-5 w-5 text-muted-foreground" />
                             <span className="text-base font-semibold">Advanced Settings (for technical setup)</span>
                         </div>
                     </AccordionTrigger>
@@ -756,7 +756,7 @@ export default function SettingsPage() {
                                             }}
                                             placeholder={hasExistingApiKey ? 'Key saved (click to change)' : 'Enter your RepairDesk API key'}
                                         />
-                                        <p className="text-sm text-gray-500">
+                                        <p className="text-sm text-muted-foreground">
                                             RepairDesk: Store Settings &rarr; Other Info &rarr; API Key.
                                         </p>
                                     </div>
@@ -771,7 +771,7 @@ export default function SettingsPage() {
                                                 placeholder="yourshop"
                                                 className="max-w-40"
                                             />
-                                            <span className="text-sm text-gray-500 whitespace-nowrap">.repairdesk.co</span>
+                                            <span className="text-sm text-muted-foreground whitespace-nowrap">.repairdesk.co</span>
                                         </div>
                                     </div>
                                     <div className="flex flex-wrap gap-2">
@@ -853,7 +853,7 @@ export default function SettingsPage() {
                     <div className="flex items-center justify-between py-2">
                         <div>
                             <p className="text-sm font-medium">AI Auto-Reply</p>
-                            <p className="text-xs text-slate-500">Automatically reply to customer SMS with AI-generated responses</p>
+                            <p className="text-xs text-muted-foreground">Automatically reply to customer SMS with AI-generated responses</p>
                         </div>
                         <Switch
                             checked={autoReplyEnabled}
@@ -863,7 +863,7 @@ export default function SettingsPage() {
                     <div className="flex items-center justify-between py-2">
                         <div>
                             <p className="text-sm font-medium">Daily Digest</p>
-                            <p className="text-xs text-slate-500">Receive a morning briefing SMS with yesterday&apos;s summary at 7 AM</p>
+                            <p className="text-xs text-muted-foreground">Receive a morning briefing SMS with yesterday&apos;s summary at 7 AM</p>
                         </div>
                         <Switch
                             checked={dailyDigestEnabled}
@@ -873,7 +873,7 @@ export default function SettingsPage() {
                     <div className="flex items-center justify-between py-2">
                         <div>
                             <p className="text-sm font-medium">Repair Status Updates</p>
-                            <p className="text-xs text-slate-500">Auto-SMS customers when their repair ticket status changes in RepairDesk</p>
+                            <p className="text-xs text-muted-foreground">Auto-SMS customers when their repair ticket status changes in RepairDesk</p>
                         </div>
                         <Switch
                             checked={statusUpdatesEnabled}
@@ -883,7 +883,7 @@ export default function SettingsPage() {
                     <div className="flex items-center justify-between py-2">
                         <div className="pr-4">
                             <p className="text-sm font-medium">Auto-send follow-ups</p>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-muted-foreground">
                                 When on, high-confidence follow-ups text customers automatically — no approval needed.
                                 It first checks RepairDesk and skips anyone who already came in. Off: drafts wait in your queue for approval.
                             </p>
@@ -903,7 +903,7 @@ export default function SettingsPage() {
                                 onChange={(e) => setBookingUrl(e.target.value)}
                                 placeholder="https://calendly.com/your-store or your booking page URL"
                             />
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-muted-foreground">
                                 Used in missed-call SMS via {'{{booking_link}}'} template variable
                             </p>
                         </div>
@@ -915,7 +915,7 @@ export default function SettingsPage() {
                                 onChange={(e) => setGoogleReviewLink(e.target.value)}
                                 placeholder="https://g.page/r/your-store/review"
                             />
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-muted-foreground">
                                 Sent to customers after their repair is completed in RepairDesk
                             </p>
                         </div>
