@@ -179,10 +179,10 @@ export default function Wizard() {
         <div className="max-w-xl mx-auto">
             {/* Progress Bar */}
             <div className="mb-8 flex justify-between relative" role="progressbar" aria-valuenow={step} aria-valuemin={1} aria-valuemax={3} aria-label={`Onboarding progress: step ${step} of 3`}>
-                <div className="absolute top-1/2 left-0 w-full h-1 bg-slate-100 -z-10 rounded-full"></div>
-                <div className={`absolute top-1/2 left-0 h-1 bg-blue-600 -z-10 rounded-full transition-all duration-500`} style={{ width: `${((step - 1) / 2) * 100}%` }}></div>
+                <div className="absolute top-1/2 left-0 w-full h-1 bg-muted -z-10 rounded-full"></div>
+                <div className={`absolute top-1/2 left-0 h-1 bg-primary -z-10 rounded-full transition-all duration-500`} style={{ width: `${((step - 1) / 2) * 100}%` }}></div>
                 {[1, 2, 3].map((s) => (
-                    <div key={s} className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${step >= s ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                    <div key={s} className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${step >= s ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'}`}>
                         {s}
                     </div>
                 ))}
@@ -198,7 +198,7 @@ export default function Wizard() {
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: -20 }}
                     >
-                        <Card className="border-slate-200 shadow-sm">
+                        <Card className="border-border shadow-sm">
                             <CardHeader>
                                 <CardTitle>Set up your business</CardTitle>
                                 <CardDescription>Enter your info and we will connect everything automatically.</CardDescription>
@@ -220,7 +220,7 @@ export default function Wizard() {
                                     <div className="space-y-2">
                                         <Label htmlFor="ownerPhone">Owner Mobile Number</Label>
                                         <Input id="ownerPhone" placeholder="(786) 555-9876" {...businessForm.register('ownerPhone')} />
-                                        <p className="text-xs text-slate-500">We will text this number when you miss a call.</p>
+                                        <p className="text-xs text-muted-foreground">We will text this number when you miss a call.</p>
                                         {businessForm.formState.errors.ownerPhone && <p className="text-xs text-red-500">{businessForm.formState.errors.ownerPhone.message}</p>}
                                     </div>
 
@@ -242,17 +242,17 @@ export default function Wizard() {
 
                                     {/* Connection Error */}
                                     {verificationError && (
-                                        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+                                        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 flex items-start gap-3">
                                             <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
                                             <div>
-                                                <p className="text-sm text-red-800 font-medium">Connection Failed</p>
+                                                <p className="text-sm text-red-300 font-medium">Connection Failed</p>
                                                 <p className="text-sm text-red-600 mt-1">{verificationError}</p>
                                             </div>
                                         </div>
                                     )}
                                 </CardContent>
                                 <CardFooter>
-                                    <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isConnecting}>
+                                    <Button type="submit" className="w-full bg-primary hover:bg-primary" disabled={isConnecting}>
                                         {isConnecting ? (
                                             <>
                                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -276,38 +276,38 @@ export default function Wizard() {
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: -20 }}
                     >
-                        <Card className="border-slate-200 shadow-sm">
+                        <Card className="border-border shadow-sm">
                             <CardHeader>
                                 <CardTitle>Activate Call Forwarding</CardTitle>
                                 <CardDescription>One quick dial from your business phone and you are all set.</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-6">
                                 {/* Success banner */}
-                                <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
+                                <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 flex items-start gap-3">
                                     <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
                                     <div>
-                                        <p className="text-sm text-green-800 font-medium">Phone Connected!</p>
+                                        <p className="text-sm text-green-300 font-medium">Phone Connected!</p>
                                         <p className="text-sm text-green-600 mt-1">Your business line is linked to LeadCatcher.</p>
                                     </div>
                                 </div>
 
                                 {/* Dial code */}
-                                <div className="bg-slate-50 p-6 rounded-xl border border-dashed border-slate-300 text-center">
-                                    <p className="text-sm text-slate-500 mb-1">Pick up your business phone and dial:</p>
-                                    <div className="text-3xl font-mono font-bold text-slate-900 tracking-wider flex items-center justify-center gap-3 mt-2">
+                                <div className="bg-muted p-6 rounded-xl border border-dashed border-border text-center">
+                                    <p className="text-sm text-muted-foreground mb-1">Pick up your business phone and dial:</p>
+                                    <div className="text-3xl font-mono font-bold text-foreground tracking-wider flex items-center justify-center gap-3 mt-2">
                                         {carrier === 'Verizon' ? '*71' : '*72'} {formatPhoneDisplay(forwardingNumber)}
                                         <Button variant="ghost" size="icon" onClick={handleCopyCode} aria-label="Copy forwarding code"><Copy size={16} /></Button>
                                     </div>
                                 </div>
 
                                 {/* Explanation */}
-                                <div className="bg-blue-50 p-4 rounded-lg flex items-start gap-3">
-                                    <div className="bg-blue-100 p-2 rounded-full text-blue-600">
+                                <div className="bg-primary/10 p-4 rounded-lg flex items-start gap-3">
+                                    <div className="bg-primary/15 p-2 rounded-full text-primary">
                                         <Phone size={16} />
                                     </div>
                                     <div>
-                                        <h4 className="font-semibold text-blue-900 text-sm">What does this do?</h4>
-                                        <p className="text-xs text-blue-700 mt-1">
+                                        <h4 className="font-semibold text-foreground text-sm">What does this do?</h4>
+                                        <p className="text-xs text-primary mt-1">
                                             This tells your carrier to forward calls to LeadCatcher <strong>only when you don&apos;t answer</strong>. Your phone still rings normally — we only catch the ones you miss.
                                         </p>
                                     </div>
@@ -315,7 +315,7 @@ export default function Wizard() {
                             </CardContent>
                             <CardFooter className="flex gap-2">
                                 <Button variant="outline" className="w-full" onClick={() => setStep(1)}>Back</Button>
-                                <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={() => setStep(3)}>I dialed the code</Button>
+                                <Button className="w-full bg-primary hover:bg-primary" onClick={() => setStep(3)}>I dialed the code</Button>
                             </CardFooter>
                         </Card>
                     </motion.div>
@@ -329,7 +329,7 @@ export default function Wizard() {
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: -20 }}
                     >
-                        <Card className="border-slate-200 shadow-sm">
+                        <Card className="border-border shadow-sm">
                             <CardHeader>
                                 <CardTitle>{isVerified ? 'You are all set!' : 'Verify It Works'}</CardTitle>
                                 <CardDescription>
@@ -342,22 +342,22 @@ export default function Wizard() {
                             <CardContent className="py-10 text-center">
                                 {isVerified ? (
                                     <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="flex flex-col items-center">
-                                        <div className="h-20 w-20 bg-green-100 rounded-full flex items-center justify-center text-green-600 mb-4">
+                                        <div className="h-20 w-20 bg-green-500/15 rounded-full flex items-center justify-center text-green-600 mb-4">
                                             <CheckCircle2 size={40} />
                                         </div>
-                                        <h3 className="text-xl font-bold text-slate-900">It Works!</h3>
-                                        <p className="text-slate-500 mt-2">Your missed calls are now being caught.</p>
+                                        <h3 className="text-xl font-bold text-foreground">It Works!</h3>
+                                        <p className="text-muted-foreground mt-2">Your missed calls are now being caught.</p>
                                     </motion.div>
                                 ) : (
                                     <div className="flex flex-col items-center">
-                                        <div className={`h-20 w-20 rounded-full flex items-center justify-center mb-4 transition-colors ${isVerifying ? 'bg-blue-50 text-blue-600 animate-pulse' : 'bg-slate-100 text-slate-400'}`}>
+                                        <div className={`h-20 w-20 rounded-full flex items-center justify-center mb-4 transition-colors ${isVerifying ? 'bg-primary/10 text-primary animate-pulse' : 'bg-muted text-muted-foreground'}`}>
                                             <Phone size={40} className={isVerifying ? 'animate-bounce' : ''} />
                                         </div>
-                                        {isVerifying && <p className="text-slate-600 font-medium">Calling your business phone...</p>}
-                                        {isVerifying && <p className="text-xs text-slate-400 mt-1">Do not answer — let it forward.</p>}
-                                        {!isVerifying && !verificationError && <p className="text-slate-500">Ready to test?</p>}
+                                        {isVerifying && <p className="text-muted-foreground font-medium">Calling your business phone...</p>}
+                                        {isVerifying && <p className="text-xs text-muted-foreground mt-1">Do not answer — let it forward.</p>}
+                                        {!isVerifying && !verificationError && <p className="text-muted-foreground">Ready to test?</p>}
                                         {verificationError && (
-                                            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mt-4 text-left flex items-start gap-3">
+                                            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 mt-4 text-left flex items-start gap-3">
                                                 <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
                                                 <p className="text-sm text-red-600">{verificationError}</p>
                                             </div>
@@ -369,7 +369,7 @@ export default function Wizard() {
                                 {!isVerified ? (
                                     <>
                                         <Button variant="outline" className="w-full" onClick={() => setStep(2)} disabled={isVerifying}>Back</Button>
-                                        <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={runTestCall} disabled={isVerifying}>
+                                        <Button className="w-full bg-primary hover:bg-primary" onClick={runTestCall} disabled={isVerifying}>
                                             {isVerifying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Phone className="mr-2 h-4 w-4" />}
                                             {isVerifying ? 'Calling...' : 'Run Test Call'}
                                         </Button>

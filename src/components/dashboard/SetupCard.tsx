@@ -60,11 +60,11 @@ export function SetupCard() {
     if (loading || dismissed) return null;
     if (allComplete) {
         return (
-            <Card className="border-green-200 bg-green-50 mx-4 mt-4 md:mx-6">
+            <Card className="border-green-500/20 bg-green-500/10 mx-4 mt-4 md:mx-6">
                 <CardContent className="py-4 flex items-center gap-3">
                     <CheckCircle2 className="h-6 w-6 text-green-600 flex-shrink-0" />
                     <div className="flex-1">
-                        <p className="font-semibold text-green-800">LeadCatcher is Live</p>
+                        <p className="font-semibold text-green-300">LeadCatcher is Live</p>
                         <p className="text-sm text-green-600">Missed calls will be captured automatically.</p>
                     </div>
                     <Button variant="ghost" size="sm" onClick={() => setDismissed(true)} className="text-green-600">
@@ -88,17 +88,17 @@ export function SetupCard() {
     };
 
     return (
-        <Card className="border-blue-200 bg-gradient-to-r from-blue-50 to-white mx-4 mt-4 md:mx-6">
+        <Card className="border-primary/20 bg-gradient-to-r from-primary/10 to-card mx-4 mt-4 md:mx-6">
             <CardContent className="py-5 space-y-4">
                 <div className="flex items-center justify-between">
-                    <h3 className="font-bold text-slate-900 text-lg">Get Live in 3 Steps</h3>
-                    <span className="text-sm font-medium text-blue-600">{percent}% complete</span>
+                    <h3 className="font-bold text-foreground text-lg">Get Live in 3 Steps</h3>
+                    <span className="text-sm font-medium text-primary">{percent}% complete</span>
                 </div>
 
                 {/* Progress bar */}
-                <div className="h-2 bg-blue-100 rounded-full overflow-hidden">
+                <div className="h-2 bg-primary/15 rounded-full overflow-hidden">
                     <div
-                        className="h-full bg-blue-600 rounded-full transition-all duration-500"
+                        className="h-full bg-primary rounded-full transition-all duration-500"
                         style={{ width: `${percent}%` }}
                     />
                 </div>
@@ -112,10 +112,10 @@ export function SetupCard() {
                                 {done ? (
                                     <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
                                 ) : (
-                                    <Circle className="h-5 w-5 text-slate-300 flex-shrink-0" />
+                                    <Circle className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                                 )}
-                                <step.icon className={`h-4 w-4 flex-shrink-0 ${done ? 'text-green-500' : 'text-slate-400'}`} />
-                                <span className={`text-sm ${done ? 'text-slate-500 line-through' : 'text-slate-700 font-medium'}`}>
+                                <step.icon className={`h-4 w-4 flex-shrink-0 ${done ? 'text-green-500' : 'text-muted-foreground'}`} />
+                                <span className={`text-sm ${done ? 'text-muted-foreground line-through' : 'text-foreground font-medium'}`}>
                                     {step.label}
                                 </span>
                             </div>
@@ -123,7 +123,7 @@ export function SetupCard() {
                     })}
                 </div>
 
-                <Button onClick={handleContinue} className="bg-blue-600 hover:bg-blue-700 gap-2">
+                <Button onClick={handleContinue} className="bg-primary hover:bg-primary gap-2">
                     Continue Setup
                     <ArrowRight className="h-4 w-4" />
                 </Button>

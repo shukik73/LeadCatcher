@@ -32,7 +32,7 @@ export function AudioPlayer({ src }: AudioPlayerProps) {
     };
 
     return (
-        <div className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2">
+        <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2">
             <audio
                 ref={audioRef}
                 src={src}
@@ -43,14 +43,14 @@ export function AudioPlayer({ src }: AudioPlayerProps) {
             <Button variant="ghost" size="icon" onClick={toggle} className="h-8 w-8" aria-label={playing ? 'Pause recording' : 'Play recording'}>
                 {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
             </Button>
-            <Volume2 className="h-4 w-4 text-slate-400" />
-            <div className="flex-1 bg-slate-200 rounded-full h-1.5 relative">
+            <Volume2 className="h-4 w-4 text-muted-foreground" />
+            <div className="flex-1 bg-muted rounded-full h-1.5 relative">
                 <div
-                    className="bg-blue-600 h-full rounded-full transition-all"
+                    className="bg-primary h-full rounded-full transition-all"
                     style={{ width: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }}
                 />
             </div>
-            <span className="text-xs text-slate-500 tabular-nums">
+            <span className="text-xs text-muted-foreground tabular-nums">
                 {formatTime(currentTime)} / {formatTime(duration)}
             </span>
         </div>

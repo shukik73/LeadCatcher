@@ -96,7 +96,7 @@ export function CallDetailPanel({ call, open, onClose, onUpdated }: CallDetailPa
                     <SheetDescription className="flex items-center gap-2">
                         <Phone className="h-3 w-3" />
                         {call.customer_phone || 'No phone'}
-                        <span className="text-slate-400">|</span>
+                        <span className="text-muted-foreground">|</span>
                         {new Date(call.created_at).toLocaleString()}
                     </SheetDescription>
                 </SheetHeader>
@@ -122,7 +122,7 @@ export function CallDetailPanel({ call, open, onClose, onUpdated }: CallDetailPa
                                 <CardTitle className="text-sm">Summary</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <p className="text-sm text-slate-700">{call.summary}</p>
+                                <p className="text-sm text-foreground">{call.summary}</p>
                             </CardContent>
                         </Card>
                     )}
@@ -146,7 +146,7 @@ export function CallDetailPanel({ call, open, onClose, onUpdated }: CallDetailPa
                                 <CardTitle className="text-sm">Transcript</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <p className="text-sm text-slate-600 whitespace-pre-wrap max-h-48 overflow-y-auto">
+                                <p className="text-sm text-muted-foreground whitespace-pre-wrap max-h-48 overflow-y-auto">
                                     {call.transcript}
                                 </p>
                             </CardContent>
@@ -163,19 +163,19 @@ export function CallDetailPanel({ call, open, onClose, onUpdated }: CallDetailPa
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <p className="text-sm text-slate-700 italic">{call.follow_up_notes}</p>
+                                <p className="text-sm text-foreground italic">{call.follow_up_notes}</p>
                             </CardContent>
                         </Card>
                     )}
 
                     {/* Coaching Note */}
                     {call.coaching_note && (
-                        <Card className="border-amber-200 bg-amber-50/50">
+                        <Card className="border-amber-500/20 bg-amber-500/10">
                             <CardHeader className="pb-2">
-                                <CardTitle className="text-sm text-amber-800">Coaching Note</CardTitle>
+                                <CardTitle className="text-sm text-amber-300">Coaching Note</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <p className="text-sm text-amber-700">{call.coaching_note}</p>
+                                <p className="text-sm text-amber-300">{call.coaching_note}</p>
                             </CardContent>
                         </Card>
                     )}
@@ -185,7 +185,7 @@ export function CallDetailPanel({ call, open, onClose, onUpdated }: CallDetailPa
                         <CardHeader className="pb-2">
                             <CardTitle className="text-sm">Contact History</CardTitle>
                         </CardHeader>
-                        <CardContent className="text-sm text-slate-600 space-y-1">
+                        <CardContent className="text-sm text-muted-foreground space-y-1">
                             <p>Attempts: {call.contact_attempts}</p>
                             {call.last_contacted_at && (
                                 <p>Last contact: {new Date(call.last_contacted_at).toLocaleString()}</p>
@@ -203,7 +203,7 @@ export function CallDetailPanel({ call, open, onClose, onUpdated }: CallDetailPa
                                 <CardTitle className="text-sm">Internal Notes</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <pre className="text-xs text-slate-600 whitespace-pre-wrap max-h-32 overflow-y-auto">
+                                <pre className="text-xs text-muted-foreground whitespace-pre-wrap max-h-32 overflow-y-auto">
                                     {call.internal_notes}
                                 </pre>
                             </CardContent>
@@ -302,7 +302,7 @@ export function CallDetailPanel({ call, open, onClose, onUpdated }: CallDetailPa
 
                             {/* Log Outcome */}
                             <div className="border-t pt-3 space-y-2">
-                                <p className="text-xs font-medium text-slate-500">Log Outcome</p>
+                                <p className="text-xs font-medium text-muted-foreground">Log Outcome</p>
                                 <Textarea
                                     placeholder="Outcome notes (optional)..."
                                     value={outcomeNotes}

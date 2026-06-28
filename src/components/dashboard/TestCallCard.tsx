@@ -92,33 +92,33 @@ export function TestCallCard({ isConnected }: { isConnected: boolean }) {
             </CardHeader>
             <CardContent className="space-y-4">
                 {verified ? (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
+                    <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 flex items-start gap-3">
                         <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
                         <div>
-                            <p className="text-sm text-green-800 font-medium">Forwarding verified</p>
+                            <p className="text-sm text-green-300 font-medium">Forwarding verified</p>
                             <p className="text-sm text-green-600 mt-1">
                                 Missed calls are being captured automatically. You can re-run the test anytime.
                             </p>
                         </div>
                     </div>
                 ) : (
-                    <p className="text-sm text-slate-600">
+                    <p className="text-sm text-muted-foreground">
                         We&apos;ll ring your business phone. <strong>Decline or ignore it</strong> so the
                         call forwards to your LeadCatcher number — that proves forwarding works.
                     </p>
                 )}
 
                 {!isConnected && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
+                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 flex items-start gap-2">
                         <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                        <p className="text-sm text-amber-700">
+                        <p className="text-sm text-amber-300">
                             Connect your phone in the section above before running a test call.
                         </p>
                     </div>
                 )}
 
                 {error && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 flex items-start gap-2">
                         <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
                         <p className="text-sm text-red-600">{error}</p>
                     </div>
@@ -128,7 +128,7 @@ export function TestCallCard({ isConnected }: { isConnected: boolean }) {
                     onClick={runTestCall}
                     disabled={calling || !isConnected}
                     variant={verified ? 'outline' : 'default'}
-                    className={verified ? undefined : 'bg-blue-600 hover:bg-blue-700'}
+                    className={verified ? undefined : 'bg-primary hover:bg-primary'}
                 >
                     {calling ? (
                         <>

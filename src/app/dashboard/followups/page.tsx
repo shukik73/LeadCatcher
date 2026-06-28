@@ -77,8 +77,8 @@ export default function FollowUpsPage() {
             <FollowUpDrafts />
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-xl font-bold text-slate-800">Follow-Up Queue</h1>
-                    <p className="text-sm text-slate-500">
+                    <h1 className="text-xl font-bold text-foreground">Follow-Up Queue</h1>
+                    <p className="text-sm text-muted-foreground">
                         {followups.length} pending follow-up{followups.length !== 1 ? 's' : ''}
                         {overdueCount > 0 && (
                             <span className="text-red-600 ml-2 inline-flex items-center gap-1">
@@ -113,7 +113,7 @@ export default function FollowUpsPage() {
 
             {loading ? (
                 <div className="flex justify-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
             ) : (
                 <FollowUpQueue

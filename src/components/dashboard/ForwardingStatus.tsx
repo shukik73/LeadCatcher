@@ -25,21 +25,21 @@ export function ForwardingStatus({ isConnected, forwardingNumber, carrier, forma
 
     if (isConnected) {
         return (
-            <div className="rounded-lg border-2 border-green-200 bg-green-50 p-5 space-y-3">
+            <div className="rounded-lg border-2 border-green-500/20 bg-green-500/10 p-5 space-y-3">
                 <div className="flex items-center gap-2">
                     <CheckCircle2 className="h-6 w-6 text-green-600" />
-                    <span className="font-semibold text-green-800 text-lg">Forwarding Active</span>
+                    <span className="font-semibold text-green-300 text-lg">Forwarding Active</span>
                 </div>
-                <p className="text-sm text-green-700">
+                <p className="text-sm text-green-300">
                     Missed calls to your business line are forwarded to {formatPhoneDisplay(forwardingNumber)}.
                 </p>
                 {carrier && (
-                    <div className="bg-white rounded-lg border border-green-200 p-4 space-y-2">
-                        <p className="text-sm text-slate-600">
+                    <div className="bg-card rounded-lg border border-green-500/20 p-4 space-y-2">
+                        <p className="text-sm text-muted-foreground">
                             Dial this code from your business line to enable forwarding:
                         </p>
                         <div className="flex items-center gap-2">
-                            <code className="text-lg font-mono font-bold text-slate-900 bg-slate-100 px-3 py-1.5 rounded">
+                            <code className="text-lg font-mono font-bold text-foreground bg-muted px-3 py-1.5 rounded">
                                 {fullDialCode}
                             </code>
                             <Button variant="outline" size="sm" onClick={handleCopy} className="gap-1.5">
@@ -54,10 +54,10 @@ export function ForwardingStatus({ isConnected, forwardingNumber, carrier, forma
     }
 
     return (
-        <div className="rounded-lg border-2 border-red-200 bg-red-50 p-5">
+        <div className="rounded-lg border-2 border-red-500/20 bg-red-500/10 p-5">
             <div className="flex items-center gap-2">
                 <XCircle className="h-6 w-6 text-red-500" />
-                <span className="font-semibold text-red-800 text-lg">Forwarding Not Active</span>
+                <span className="font-semibold text-red-300 text-lg">Forwarding Not Active</span>
             </div>
             <p className="text-sm text-red-600 mt-2">
                 Connect your business phone to start capturing missed calls.

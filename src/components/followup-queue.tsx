@@ -58,7 +58,7 @@ export function FollowUpQueue({ followups, onUpdated, onSelectCall }: FollowUpQu
 
     if (followups.length === 0) {
         return (
-            <div className="text-center py-12 text-slate-500">
+            <div className="text-center py-12 text-muted-foreground">
                 <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-400" />
                 <p className="text-sm">All caught up! No pending follow-ups.</p>
             </div>
@@ -75,7 +75,7 @@ export function FollowUpQueue({ followups, onUpdated, onSelectCall }: FollowUpQu
                         tabIndex={0}
                         role="button"
                         aria-label={`View follow-up for ${fu.customer_name || fu.customer_phone || 'unknown'}`}
-                        className={`cursor-pointer transition-colors hover:border-blue-200 ${isOverdue ? 'border-red-200 bg-red-50/30' : ''}`}
+                        className={`cursor-pointer transition-colors hover:border-primary/20 ${isOverdue ? 'border-red-500/20 bg-red-500/10' : ''}`}
                         onClick={() => onSelectCall(fu.id)}
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectCall(fu.id); } }}
                     >
@@ -83,11 +83,11 @@ export function FollowUpQueue({ followups, onUpdated, onSelectCall }: FollowUpQu
                             <div className="flex items-start justify-between gap-3">
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 mb-1">
-                                        <User className="h-3 w-3 text-slate-400" />
-                                        <span className="font-medium text-sm text-slate-800">
+                                        <User className="h-3 w-3 text-muted-foreground" />
+                                        <span className="font-medium text-sm text-foreground">
                                             {fu.customer_name || 'Unknown'}
                                         </span>
-                                        <span className="text-xs text-slate-500 flex items-center gap-1">
+                                        <span className="text-xs text-muted-foreground flex items-center gap-1">
                                             <Phone className="h-2.5 w-2.5" />
                                             {fu.customer_phone || 'N/A'}
                                         </span>
@@ -98,22 +98,22 @@ export function FollowUpQueue({ followups, onUpdated, onSelectCall }: FollowUpQu
                                         <UrgencyBadge urgency={fu.urgency} />
                                         <CallbackStatusBadge status={fu.callback_status} />
                                         {fu.owner && (
-                                            <span className="text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                                            <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                                                 {fu.owner}
                                             </span>
                                         )}
                                     </div>
 
-                                    <p className="text-xs text-slate-600 truncate">{fu.summary || 'No summary'}</p>
+                                    <p className="text-xs text-muted-foreground truncate">{fu.summary || 'No summary'}</p>
 
                                     {fu.follow_up_notes && (
-                                        <p className="text-xs text-blue-600 mt-1 italic truncate">
+                                        <p className="text-xs text-primary mt-1 italic truncate">
                                             Script: {fu.follow_up_notes}
                                         </p>
                                     )}
 
                                     {fu.due_by && (
-                                        <p className={`text-xs mt-1 flex items-center gap-1 ${isOverdue ? 'text-red-600 font-medium' : 'text-slate-500'}`}>
+                                        <p className={`text-xs mt-1 flex items-center gap-1 ${isOverdue ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
                                             <Clock className="h-3 w-3" />
                                             Due: {new Date(fu.due_by).toLocaleString(undefined, {
                                                 month: 'short',

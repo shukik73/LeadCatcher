@@ -4,16 +4,16 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 const urgencyConfig = {
-    high: { label: 'High', className: 'bg-red-100 text-red-800 border-red-200' },
-    medium: { label: 'Medium', className: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-    low: { label: 'Low', className: 'bg-green-100 text-green-800 border-green-200' },
+    high: { label: 'High', className: 'bg-red-500/15 text-red-300 border-red-500/20' },
+    medium: { label: 'Medium', className: 'bg-yellow-500/15 text-yellow-300 border-yellow-500/20' },
+    low: { label: 'Low', className: 'bg-green-500/15 text-green-300 border-green-500/20' },
 } as const;
 
 const sentimentConfig = {
-    positive: { label: 'Positive', className: 'bg-green-100 text-green-800 border-green-200' },
-    neutral: { label: 'Neutral', className: 'bg-slate-100 text-slate-700 border-slate-200' },
-    negative: { label: 'Negative', className: 'bg-orange-100 text-orange-800 border-orange-200' },
-    frustrated: { label: 'Frustrated', className: 'bg-red-100 text-red-800 border-red-200' },
+    positive: { label: 'Positive', className: 'bg-green-500/15 text-green-300 border-green-500/20' },
+    neutral: { label: 'Neutral', className: 'bg-muted text-muted-foreground border-border' },
+    negative: { label: 'Negative', className: 'bg-orange-500/15 text-orange-300 border-orange-500/20' },
+    frustrated: { label: 'Frustrated', className: 'bg-red-500/15 text-red-300 border-red-500/20' },
 } as const;
 
 const categoryConfig = {
@@ -26,11 +26,11 @@ const categoryConfig = {
 } as const;
 
 const statusConfig = {
-    pending: { label: 'Pending', className: 'bg-blue-100 text-blue-800 border-blue-200' },
-    called: { label: 'Called', className: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
-    no_answer: { label: 'No Answer', className: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-    booked: { label: 'Booked', className: 'bg-green-100 text-green-800 border-green-200' },
-    lost: { label: 'Lost', className: 'bg-red-100 text-red-800 border-red-200' },
+    pending: { label: 'Pending', className: 'bg-primary/15 text-primary border-primary/20' },
+    called: { label: 'Called', className: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/20' },
+    no_answer: { label: 'No Answer', className: 'bg-yellow-500/15 text-yellow-300 border-yellow-500/20' },
+    booked: { label: 'Booked', className: 'bg-green-500/15 text-green-300 border-green-500/20' },
+    lost: { label: 'Lost', className: 'bg-red-500/15 text-red-300 border-red-500/20' },
 } as const;
 
 export function UrgencyBadge({ urgency }: { urgency: string | null }) {

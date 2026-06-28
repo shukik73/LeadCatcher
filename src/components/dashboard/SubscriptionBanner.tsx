@@ -12,7 +12,7 @@ export function SubscriptionBanner({ status, trialDaysLeft }: SubscriptionBanner
     // Trial banner — only show when 3 or fewer days remain
     if (status === 'trialing' && trialDaysLeft !== null && trialDaysLeft <= 3) {
         return (
-            <div className="bg-blue-600 text-white text-center py-2 px-4 text-sm">
+            <div className="bg-primary text-white text-center py-2 px-4 text-sm">
                 Your free trial ends in {trialDaysLeft} day{trialDaysLeft !== 1 ? 's' : ''}.{' '}
                 <Link href="/dashboard/billing" className="underline font-semibold">
                     Subscribe now
@@ -51,7 +51,7 @@ export function SubscriptionBanner({ status, trialDaysLeft }: SubscriptionBanner
     // No subscription / first-run — simple trial banner
     if (!status) {
         return (
-            <div className="bg-blue-600 text-white text-center py-2 px-4 text-sm">
+            <div className="bg-primary text-white text-center py-2 px-4 text-sm">
                 You&apos;re on trial — get your first missed-call lead today.
             </div>
         );

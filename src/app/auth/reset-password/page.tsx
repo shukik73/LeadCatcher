@@ -68,8 +68,8 @@ export default function ResetPasswordPage() {
     // Error state - invalid/expired link
     if (error) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-                <Card className="w-full max-w-md bg-white/80 backdrop-blur-sm border-slate-200 shadow-xl">
+            <div className="min-h-screen flex items-center justify-center bg-muted p-4">
+                <Card className="w-full max-w-md bg-card/80 backdrop-blur-sm border-border shadow-xl">
                     <CardHeader className="space-y-1 text-center">
                         <CardTitle className="text-2xl font-bold tracking-tight text-red-600">Link Expired</CardTitle>
                         <CardDescription>
@@ -78,7 +78,7 @@ export default function ResetPasswordPage() {
                     </CardHeader>
                     <CardContent className="text-center">
                         <Link href="/login">
-                            <Button className="bg-blue-600 hover:bg-blue-700">
+                            <Button className="bg-primary hover:bg-primary">
                                 Back to Login
                             </Button>
                         </Link>
@@ -91,10 +91,10 @@ export default function ResetPasswordPage() {
     // Success state
     if (success) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-                <Card className="w-full max-w-md bg-white/80 backdrop-blur-sm border-slate-200 shadow-xl">
+            <div className="min-h-screen flex items-center justify-center bg-muted p-4">
+                <Card className="w-full max-w-md bg-card/80 backdrop-blur-sm border-border shadow-xl">
                     <CardHeader className="space-y-1 text-center">
-                        <div className="mx-auto h-12 w-12 rounded-full bg-green-100 flex items-center justify-center mb-4">
+                        <div className="mx-auto h-12 w-12 rounded-full bg-green-500/15 flex items-center justify-center mb-4">
                             <CheckCircle2 className="h-6 w-6 text-green-600" />
                         </div>
                         <CardTitle className="text-2xl font-bold tracking-tight">Password Updated!</CardTitle>
@@ -109,8 +109,8 @@ export default function ResetPasswordPage() {
 
     // Password reset form
     return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-            <Card className="w-full max-w-md bg-white/80 backdrop-blur-sm border-slate-200 shadow-xl">
+        <div className="min-h-screen flex items-center justify-center bg-muted p-4">
+            <Card className="w-full max-w-md bg-card/80 backdrop-blur-sm border-border shadow-xl">
                 <CardHeader className="space-y-1 text-center">
                     <CardTitle className="text-2xl font-bold tracking-tight">Set New Password</CardTitle>
                     <CardDescription>
@@ -122,7 +122,7 @@ export default function ResetPasswordPage() {
                         <div className="space-y-2">
                             <Label htmlFor="password">New Password</Label>
                             <div className="relative">
-                                <Lock className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                                 <Input
                                     id="password"
                                     type={showPassword ? "text" : "password"}
@@ -136,17 +136,17 @@ export default function ResetPasswordPage() {
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
+                                    className="absolute right-3 top-3 text-muted-foreground hover:text-muted-foreground"
                                 >
                                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                 </button>
                             </div>
-                            <p className="text-xs text-slate-500">Password must be at least 6 characters</p>
+                            <p className="text-xs text-muted-foreground">Password must be at least 6 characters</p>
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="confirmPassword">Confirm Password</Label>
                             <div className="relative">
-                                <Lock className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                                 <Input
                                     id="confirmPassword"
                                     type={showPassword ? "text" : "password"}
@@ -159,7 +159,7 @@ export default function ResetPasswordPage() {
                                 />
                             </div>
                         </div>
-                        <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={loading}>
+                        <Button type="submit" className="w-full bg-primary hover:bg-primary" disabled={loading}>
                             {loading ? (
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                             ) : (
@@ -168,7 +168,7 @@ export default function ResetPasswordPage() {
                         </Button>
                     </form>
                 </CardContent>
-                <CardFooter className="flex flex-col gap-4 text-center text-sm text-slate-500">
+                <CardFooter className="flex flex-col gap-4 text-center text-sm text-muted-foreground">
                     <Link href="/login" className="hover:underline">Back to Login</Link>
                 </CardFooter>
             </Card>

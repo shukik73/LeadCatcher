@@ -35,7 +35,7 @@ export function CallsTable({
             <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                     <thead>
-                        <tr className="border-b bg-slate-50 text-left">
+                        <tr className="border-b bg-muted text-left">
                             <th className="px-3 py-2 w-8">
                                 <input
                                     type="checkbox"
@@ -51,15 +51,15 @@ export function CallsTable({
                                     }}
                                 />
                             </th>
-                            <th className="px-3 py-2 text-xs font-medium text-slate-500">Customer</th>
-                            <th className="px-3 py-2 text-xs font-medium text-slate-500">Summary</th>
-                            <th className="px-3 py-2 text-xs font-medium text-slate-500">Category</th>
-                            <th className="px-3 py-2 text-xs font-medium text-slate-500">Urgency</th>
-                            <th className="px-3 py-2 text-xs font-medium text-slate-500">Sentiment</th>
-                            <th className="px-3 py-2 text-xs font-medium text-slate-500">Status</th>
-                            <th className="px-3 py-2 text-xs font-medium text-slate-500">Owner</th>
-                            <th className="px-3 py-2 text-xs font-medium text-slate-500">Due</th>
-                            <th className="px-3 py-2 text-xs font-medium text-slate-500">Date</th>
+                            <th className="px-3 py-2 text-xs font-medium text-muted-foreground">Customer</th>
+                            <th className="px-3 py-2 text-xs font-medium text-muted-foreground">Summary</th>
+                            <th className="px-3 py-2 text-xs font-medium text-muted-foreground">Category</th>
+                            <th className="px-3 py-2 text-xs font-medium text-muted-foreground">Urgency</th>
+                            <th className="px-3 py-2 text-xs font-medium text-muted-foreground">Sentiment</th>
+                            <th className="px-3 py-2 text-xs font-medium text-muted-foreground">Status</th>
+                            <th className="px-3 py-2 text-xs font-medium text-muted-foreground">Owner</th>
+                            <th className="px-3 py-2 text-xs font-medium text-muted-foreground">Due</th>
+                            <th className="px-3 py-2 text-xs font-medium text-muted-foreground">Date</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -69,8 +69,8 @@ export function CallsTable({
                                 tabIndex={0}
                                 role="button"
                                 aria-label={`View call from ${call.customer_name || call.customer_phone || 'unknown'}`}
-                                className={`border-b hover:bg-slate-50 cursor-pointer transition-colors ${
-                                    isOverdue(call) ? 'bg-red-50/50' : ''
+                                className={`border-b hover:bg-muted cursor-pointer transition-colors ${
+                                    isOverdue(call) ? 'bg-red-500/10' : ''
                                 }`}
                                 onClick={() => onSelectCall(call)}
                                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectCall(call); } }}
@@ -86,12 +86,12 @@ export function CallsTable({
                                 </td>
                                 <td className="px-3 py-2">
                                     <div className="flex items-center gap-1.5">
-                                        <User className="h-3 w-3 text-slate-400 shrink-0" />
+                                        <User className="h-3 w-3 text-muted-foreground shrink-0" />
                                         <div>
-                                            <p className="font-medium text-slate-800 text-xs">
+                                            <p className="font-medium text-foreground text-xs">
                                                 {call.customer_name || 'Unknown'}
                                             </p>
-                                            <p className="text-xs text-slate-500 flex items-center gap-1">
+                                            <p className="text-xs text-muted-foreground flex items-center gap-1">
                                                 <Phone className="h-2.5 w-2.5" />
                                                 {call.customer_phone || 'N/A'}
                                             </p>
@@ -99,7 +99,7 @@ export function CallsTable({
                                     </div>
                                 </td>
                                 <td className="px-3 py-2 max-w-[200px]">
-                                    <p className="text-xs text-slate-600 truncate">
+                                    <p className="text-xs text-muted-foreground truncate">
                                         {call.summary || 'No summary'}
                                     </p>
                                 </td>
@@ -116,11 +116,11 @@ export function CallsTable({
                                     <CallbackStatusBadge status={call.callback_status} />
                                 </td>
                                 <td className="px-3 py-2">
-                                    <span className="text-xs text-slate-600">{call.owner || '—'}</span>
+                                    <span className="text-xs text-muted-foreground">{call.owner || '—'}</span>
                                 </td>
                                 <td className="px-3 py-2">
                                     {call.due_by ? (
-                                        <span className={`text-xs flex items-center gap-1 ${isOverdue(call) ? 'text-red-600 font-medium' : 'text-slate-500'}`}>
+                                        <span className={`text-xs flex items-center gap-1 ${isOverdue(call) ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
                                             <Clock className="h-3 w-3" />
                                             {new Date(call.due_by).toLocaleString(undefined, {
                                                 month: 'short',
@@ -130,11 +130,11 @@ export function CallsTable({
                                             })}
                                         </span>
                                     ) : (
-                                        <span className="text-xs text-slate-400">—</span>
+                                        <span className="text-xs text-muted-foreground">—</span>
                                     )}
                                 </td>
                                 <td className="px-3 py-2">
-                                    <span className="text-xs text-slate-500">
+                                    <span className="text-xs text-muted-foreground">
                                         {new Date(call.created_at).toLocaleDateString()}
                                     </span>
                                 </td>
@@ -142,7 +142,7 @@ export function CallsTable({
                         ))}
                         {calls.length === 0 && (
                             <tr>
-                                <td colSpan={10} className="px-3 py-8 text-center text-sm text-slate-500">
+                                <td colSpan={10} className="px-3 py-8 text-center text-sm text-muted-foreground">
                                     No calls found matching your filters.
                                 </td>
                             </tr>
@@ -154,7 +154,7 @@ export function CallsTable({
             {/* Pagination */}
             {pagination.totalPages > 1 && (
                 <div className="flex items-center justify-between px-3 py-2 border-t">
-                    <span className="text-xs text-slate-500">
+                    <span className="text-xs text-muted-foreground">
                         {pagination.total} calls total | Page {pagination.page} of {pagination.totalPages}
                     </span>
                     <div className="flex gap-1">

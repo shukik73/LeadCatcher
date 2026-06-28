@@ -40,7 +40,7 @@ export function CallFilters({ filters, onChange }: CallFiltersProps) {
     return (
         <div className="flex flex-wrap gap-2 items-end">
             <div className="space-y-1">
-                <label className="text-xs text-slate-500">Category</label>
+                <label className="text-xs text-muted-foreground">Category</label>
                 <Select value={filters.category || '_all'} onValueChange={(v) => update('category', v === '_all' ? '' : v)}>
                     <SelectTrigger className="w-[140px] h-8 text-xs">
                         <SelectValue placeholder="All" />
@@ -58,7 +58,7 @@ export function CallFilters({ filters, onChange }: CallFiltersProps) {
             </div>
 
             <div className="space-y-1">
-                <label className="text-xs text-slate-500">Urgency</label>
+                <label className="text-xs text-muted-foreground">Urgency</label>
                 <Select value={filters.urgency || '_all'} onValueChange={(v) => update('urgency', v === '_all' ? '' : v)}>
                     <SelectTrigger className="w-[110px] h-8 text-xs">
                         <SelectValue placeholder="All" />
@@ -73,7 +73,7 @@ export function CallFilters({ filters, onChange }: CallFiltersProps) {
             </div>
 
             <div className="space-y-1">
-                <label className="text-xs text-slate-500">Status</label>
+                <label className="text-xs text-muted-foreground">Status</label>
                 <Select value={filters.callback_status || '_all'} onValueChange={(v) => update('callback_status', v === '_all' ? '' : v)}>
                     <SelectTrigger className="w-[120px] h-8 text-xs">
                         <SelectValue placeholder="All" />
@@ -90,7 +90,7 @@ export function CallFilters({ filters, onChange }: CallFiltersProps) {
             </div>
 
             <div className="space-y-1">
-                <label className="text-xs text-slate-500">Sentiment</label>
+                <label className="text-xs text-muted-foreground">Sentiment</label>
                 <Select value={filters.sentiment || '_all'} onValueChange={(v) => update('sentiment', v === '_all' ? '' : v)}>
                     <SelectTrigger className="w-[120px] h-8 text-xs">
                         <SelectValue placeholder="All" />
@@ -106,7 +106,7 @@ export function CallFilters({ filters, onChange }: CallFiltersProps) {
             </div>
 
             <div className="space-y-1">
-                <label className="text-xs text-slate-500">Owner</label>
+                <label className="text-xs text-muted-foreground">Owner</label>
                 <Input
                     className="w-[120px] h-8 text-xs"
                     placeholder="Any"
@@ -116,7 +116,7 @@ export function CallFilters({ filters, onChange }: CallFiltersProps) {
             </div>
 
             <div className="space-y-1">
-                <label className="text-xs text-slate-500">From</label>
+                <label className="text-xs text-muted-foreground">From</label>
                 <Input
                     type="date"
                     className="w-[130px] h-8 text-xs"
@@ -126,7 +126,7 @@ export function CallFilters({ filters, onChange }: CallFiltersProps) {
             </div>
 
             <div className="space-y-1">
-                <label className="text-xs text-slate-500">To</label>
+                <label className="text-xs text-muted-foreground">To</label>
                 <Input
                     type="date"
                     className="w-[130px] h-8 text-xs"

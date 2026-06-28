@@ -45,9 +45,9 @@ interface ActionItem {
 }
 
 const PRIORITY_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
-    high: { label: 'High', color: 'bg-red-100 text-red-700 border-red-200', icon: ArrowUp },
-    medium: { label: 'Medium', color: 'bg-yellow-100 text-yellow-700 border-yellow-200', icon: ArrowRight },
-    low: { label: 'Low', color: 'bg-green-100 text-green-700 border-green-200', icon: ArrowDown },
+    high: { label: 'High', color: 'bg-red-500/15 text-red-300 border-red-500/20', icon: ArrowUp },
+    medium: { label: 'Medium', color: 'bg-yellow-500/15 text-yellow-300 border-yellow-500/20', icon: ArrowRight },
+    low: { label: 'Low', color: 'bg-green-500/15 text-green-300 border-green-500/20', icon: ArrowDown },
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -144,8 +144,8 @@ export default function ActionsPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                    <ListTodo className="h-5 w-5 text-blue-600" />
-                    <h1 className="text-xl font-bold text-slate-800">Action List</h1>
+                    <ListTodo className="h-5 w-5 text-primary" />
+                    <h1 className="text-xl font-bold text-foreground">Action List</h1>
                     {pendingCount > 0 && (
                         <Badge variant="secondary" className="ml-2">
                             {pendingCount} pending
@@ -223,14 +223,14 @@ export default function ActionsPage() {
             {/* Action Items List */}
             {loading && items.length === 0 ? (
                 <div className="flex justify-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
             ) : items.length === 0 ? (
                 <Card>
                     <CardContent className="py-12 text-center">
-                        <ListTodo className="h-10 w-10 text-slate-300 mx-auto mb-3" />
-                        <p className="text-sm text-slate-500">No action items found</p>
-                        <p className="text-xs text-slate-400 mt-1">AI-generated actions will appear here after call reviews</p>
+                        <ListTodo className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                        <p className="text-sm text-muted-foreground">No action items found</p>
+                        <p className="text-xs text-muted-foreground mt-1">AI-generated actions will appear here after call reviews</p>
                     </CardContent>
                 </Card>
             ) : (
@@ -252,7 +252,7 @@ export default function ActionsPage() {
                                         {/* Content */}
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 flex-wrap">
-                                                <h3 className="text-sm font-medium text-slate-800 truncate">
+                                                <h3 className="text-sm font-medium text-foreground truncate">
                                                     {item.title}
                                                 </h3>
                                                 <Badge variant="outline" className="text-[10px] shrink-0">
@@ -264,12 +264,12 @@ export default function ActionsPage() {
                                             </div>
 
                                             {item.description && (
-                                                <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
                                                     {item.description}
                                                 </p>
                                             )}
 
-                                            <div className="flex items-center gap-3 mt-2 text-xs text-slate-400">
+                                            <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
                                                 {item.customer_name && (
                                                     <span className="flex items-center gap-1">
                                                         <User className="h-3 w-3" />
@@ -308,7 +308,7 @@ export default function ActionsPage() {
                                                     <Button
                                                         size="sm"
                                                         variant="ghost"
-                                                        className="h-7 text-xs text-green-600 hover:text-green-700"
+                                                        className="h-7 text-xs text-green-600 hover:text-green-300"
                                                         disabled={isUpdating}
                                                         onClick={() => updateItem(item.id, { status: 'completed' })}
                                                         title="Complete"
@@ -322,7 +322,7 @@ export default function ActionsPage() {
                                                     <Button
                                                         size="sm"
                                                         variant="ghost"
-                                                        className="h-7 text-xs text-green-600 hover:text-green-700"
+                                                        className="h-7 text-xs text-green-600 hover:text-green-300"
                                                         disabled={isUpdating}
                                                         onClick={() => updateItem(item.id, { status: 'completed' })}
                                                         title="Complete"
@@ -332,7 +332,7 @@ export default function ActionsPage() {
                                                     <Button
                                                         size="sm"
                                                         variant="ghost"
-                                                        className="h-7 text-xs text-slate-400 hover:text-red-600"
+                                                        className="h-7 text-xs text-muted-foreground hover:text-red-600"
                                                         disabled={isUpdating}
                                                         onClick={() => updateItem(item.id, { status: 'cancelled' })}
                                                         title="Cancel"
@@ -356,7 +356,7 @@ export default function ActionsPage() {
             {/* Pagination */}
             {pagination.totalPages > 1 && (
                 <div className="flex items-center justify-between pt-2">
-                    <span className="text-xs text-slate-500">
+                    <span className="text-xs text-muted-foreground">
                         Page {pagination.page} of {pagination.totalPages} ({pagination.total} items)
                     </span>
                     <div className="flex gap-2">
