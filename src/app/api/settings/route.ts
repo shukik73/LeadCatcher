@@ -11,6 +11,8 @@ export const dynamic = 'force-dynamic';
 const settingsSchema = z.object({
     sms_template: z.string().min(1).max(1600).nullable().optional(),
     sms_template_closed: z.string().min(1).max(1600).nullable().optional(),
+    address: z.string().min(1).max(300).nullable().optional(),
+    services: z.string().min(1).max(1000).nullable().optional(),
     timezone: z.string().min(1).max(100).regex(/^[A-Za-z_/]+$/).optional(),
     business_hours: z.record(z.string(), z.object({
         open: z.string().regex(/^\d{2}:\d{2}$/),
@@ -28,6 +30,7 @@ const settingsSchema = z.object({
     auto_reply_enabled: z.boolean().optional(),
     daily_digest_enabled: z.boolean().optional(),
     status_updates_enabled: z.boolean().optional(),
+    followup_auto_send: z.boolean().optional(),
     booking_url: z.union([
         z.string().min(1).max(512).url(),
         z.literal(''),

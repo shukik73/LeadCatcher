@@ -53,4 +53,25 @@ describe('checkBillingStatus', () => {
         const result = await checkBillingStatus('biz-active');
         expect(result.allowed).toBe(true);
     });
+
+    // Regression: prod defaults new rows to 'trialing' with a null trial end date.
+    // A freshly onboarded shop must be able to send its first missed-call SMS.
+    it('allows a newly onboarded trialing business with no trial end date yet', async () => {
+        const recent = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+        singleSpy.mockResolvedValue({
+            data: { billing_exempt: false, stripe_status: 'trialing', stripe_trial_ends_at: null, created_at: recent },
+            error: null,
+        });
+        const result = await checkBillingStatus('biz-new');
+        expect(result.allowed).toBe(true);
+    });
+
+    it('blocks a trialing business with no trial end date once the grace window passes', async () => {
+        singleSpy.mockResolvedValue({
+            data: { billing_exempt: false, stripe_status: 'trialing', stripe_trial_ends_at: null, created_at: longAgo },
+            error: null,
+        });
+        const result = await checkBillingStatus('biz-stale-trial');
+        expect(result.allowed).toBe(false);
+    });
 });

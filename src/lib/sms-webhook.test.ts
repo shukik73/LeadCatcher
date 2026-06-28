@@ -25,11 +25,20 @@ vi.mock('@/lib/sms-rate-limit', () => ({
 }));
 
 vi.mock('@/lib/lead-qualification', () => ({
-    // Default: do nothing (no question, not qualified) so the existing tests
-    // don't accidentally pick up extra outbound messages from the qual flow.
-    qualifyLead: vi.fn().mockResolvedValue({ next_question: null, qualified: false, extracted: {} }),
     buildOwnerSummary: vi.fn().mockReturnValue(''),
     MAX_QUALIFICATION_QUESTIONS: 3,
+}));
+
+vi.mock('@/lib/ai-receptionist', () => ({
+    // Default: a reply that doesn't qualify, so the baseline tests don't pick up
+    // extra owner-summary traffic.
+    generateReceptionistReply: vi.fn().mockResolvedValue({
+        reply: '', should_reply: false, qualified: false, extracted: {}, confidence: 'low',
+    }),
+}));
+
+vi.mock('@/lib/business-hours', () => ({
+    summarizeHours: vi.fn().mockReturnValue({ isOpenNow: false, todayLine: '' }),
 }));
 
 vi.mock('@/lib/hot-lead-alert', () => ({
@@ -83,6 +92,10 @@ function mockSupabaseChain(returnValue: { data: unknown; error: unknown }) {
         in: vi.fn().mockReturnThis(),
         not: vi.fn().mockReturnThis(),
         lt: vi.fn().mockReturnThis(),
+        or: vi.fn().mockReturnThis(),
+        is: vi.fn().mockReturnThis(),
+        order: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
     };
 }
 
@@ -240,81 +253,147 @@ describe('SMS Webhook Route', () => {
     });
 });
 
-describe('SMS Webhook - AI lead qualification', () => {
+describe('SMS Webhook - AI receptionist', () => {
     beforeEach(async () => {
         vi.clearAllMocks();
         process.env.TWILIO_ACCOUNT_SID = 'sid';
         process.env.TWILIO_AUTH_TOKEN = 'tok';
         mockMessagesCreate.mockResolvedValue({});
-        // Reset the qualification mock for each scenario.
-        const qualMod = await import('@/lib/lead-qualification');
-        vi.mocked(qualMod.qualifyLead).mockResolvedValue({
-            next_question: null, qualified: false, extracted: {},
+        const recMod = await import('@/lib/ai-receptionist');
+        vi.mocked(recMod.generateReceptionistReply).mockResolvedValue({
+            reply: '', should_reply: false, qualified: false, extracted: {}, confidence: 'low',
         });
+        const qualMod = await import('@/lib/lead-qualification');
         vi.mocked(qualMod.buildOwnerSummary).mockReturnValue('');
     });
 
-    it('asks the next qualification question when the lead is not yet qualified', async () => {
+    it('answers the customer with the receptionist reply when auto-reply is on', async () => {
         vi.mocked(validateTwilioRequest).mockResolvedValue(true);
-        const qualMod = await import('@/lib/lead-qualification');
-        vi.mocked(qualMod.qualifyLead).mockResolvedValue({
-            next_question: 'What device or item needs repair?',
+        const recMod = await import('@/lib/ai-receptionist');
+        vi.mocked(recMod.generateReceptionistReply).mockResolvedValue({
+            reply: 'Yes! We fix PS5 HDMI ports. Swing by 123 Main St — first check is free.',
+            should_reply: true,
             qualified: false,
-            extracted: {},
+            extracted: { device: 'ps5', issue: 'hdmi' },
+            confidence: 'high',
         });
 
         const businessData = {
-            id: 'biz-1', owner_phone: '+15550001111', name: 'Test Biz', auto_reply_enabled: false,
-            forwarding_number: '+15559876543',
+            id: 'biz-1', owner_phone: '+15550001111', name: 'Test Biz', auto_reply_enabled: true,
+            forwarding_number: '+15559876543', address: '123 Main St', services: 'consoles', business_hours: null, timezone: 'America/New_York',
         };
         mockSupabaseFrom.mockImplementation((table: string) => {
             if (table === 'businesses') return mockSupabaseChain({ data: businessData, error: null });
             if (table === 'opt_outs') return mockSupabaseChain({ data: null, error: null });
             if (table === 'leads') return mockSupabaseChain({
-                data: { id: 'lead-1', caller_name: null, qualification_status: 'none', qualification_data: {}, qualification_step: 0 },
+                data: { id: 'lead-1', caller_name: null, qualification_status: 'none', qualification_data: {}, qualification_step: 0, qualification_summary_sent_at: null },
                 error: null,
             });
             return mockSupabaseChain({ data: null, error: null });
         });
 
-        await POST(createFormDataRequest({ From: '+15551234567', To: '+15559876543', Body: 'Hi' }));
+        await POST(createFormDataRequest({ From: '+15551234567', To: '+15559876543', Body: 'do you fix ps5 hdmi?' }));
 
-        // The qualification question must be sent BACK to the customer.
+        // The receptionist's actual answer must go BACK to the customer.
         expect(mockMessagesCreate).toHaveBeenCalledWith(
             expect.objectContaining({
                 to: '+15551234567',
-                body: 'What device or item needs repair?',
+                body: expect.stringContaining('PS5 HDMI'),
             }),
         );
     });
 
+    it('still replies when the auto-reply claim errors (degrade open — never go silent)', async () => {
+        vi.mocked(validateTwilioRequest).mockResolvedValue(true);
+        const recMod = await import('@/lib/ai-receptionist');
+        vi.mocked(recMod.generateReceptionistReply).mockResolvedValue({
+            reply: 'Yes, we fix that! Swing by and the first check is free.',
+            should_reply: true, qualified: false, extracted: { device: 'ps5' }, confidence: 'high',
+        });
+
+        const businessData = {
+            id: 'biz-1', owner_phone: '+15550001111', name: 'Test Biz', auto_reply_enabled: true,
+            forwarding_number: '+15559876543', address: '123 Main St', services: 'consoles', business_hours: null, timezone: 'America/New_York',
+        };
+        mockSupabaseFrom.mockImplementation((table: string) => {
+            if (table === 'businesses') return mockSupabaseChain({ data: businessData, error: null });
+            if (table === 'opt_outs') return mockSupabaseChain({ data: null, error: null });
+            if (table === 'leads') {
+                // Lead lookup (.single) succeeds; the claim (.maybeSingle) errors.
+                const chain = mockSupabaseChain({
+                    data: { id: 'lead-1', caller_name: null, qualification_status: 'none', qualification_data: {}, qualification_step: 0, qualification_summary_sent_at: null },
+                    error: null,
+                });
+                chain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: { message: 'claim boom' } });
+                return chain;
+            }
+            return mockSupabaseChain({ data: null, error: null });
+        });
+
+        await POST(createFormDataRequest({ From: '+15551234567', To: '+15559876543', Body: 'do you fix ps5?' }));
+
+        // The claim failed, but the customer must STILL get an answer.
+        expect(mockMessagesCreate).toHaveBeenCalledWith(
+            expect.objectContaining({ to: '+15551234567', body: expect.stringContaining('first check is free') }),
+        );
+    });
+
+    it('does not reply to the customer when auto-reply is off', async () => {
+        vi.mocked(validateTwilioRequest).mockResolvedValue(true);
+
+        const businessData = {
+            id: 'biz-1', owner_phone: '+15550001111', name: 'Test Biz', auto_reply_enabled: false,
+            forwarding_number: '+15559876543', address: null, services: null, business_hours: null, timezone: 'America/New_York',
+        };
+        mockSupabaseFrom.mockImplementation((table: string) => {
+            if (table === 'businesses') return mockSupabaseChain({ data: businessData, error: null });
+            if (table === 'opt_outs') return mockSupabaseChain({ data: null, error: null });
+            if (table === 'leads') return mockSupabaseChain({
+                data: { id: 'lead-1', caller_name: null, qualification_status: 'none', qualification_data: {}, qualification_step: 0, qualification_summary_sent_at: null },
+                error: null,
+            });
+            return mockSupabaseChain({ data: null, error: null });
+        });
+
+        await POST(createFormDataRequest({ From: '+15551234567', To: '+15559876543', Body: 'do you fix ps5?' }));
+
+        // No AI reply to the customer; only the raw owner notification fires.
+        const customerCall = mockMessagesCreate.mock.calls.find(c =>
+            (c[0] as Record<string, string>).to === '+15551234567',
+        );
+        expect(customerCall).toBeUndefined();
+    });
+
     it('forwards a structured summary to the owner once the lead is qualified', async () => {
         vi.mocked(validateTwilioRequest).mockResolvedValue(true);
-        const qualMod = await import('@/lib/lead-qualification');
-        vi.mocked(qualMod.qualifyLead).mockResolvedValue({
-            next_question: null,
+        const recMod = await import('@/lib/ai-receptionist');
+        vi.mocked(recMod.generateReceptionistReply).mockResolvedValue({
+            reply: 'Great — bring it by and we\'ll take a look!',
+            should_reply: true,
             qualified: true,
             extracted: { device: 'iphone', issue: 'screen', urgency: 'medium' },
+            confidence: 'high',
         });
+        const qualMod = await import('@/lib/lead-qualification');
         vi.mocked(qualMod.buildOwnerSummary).mockReturnValue(
             'New qualified lead (+15551234567) — Device: iphone | Issue: screen | Urgency: medium',
         );
 
         const businessData = {
-            id: 'biz-1', owner_phone: '+15550001111', name: 'Test Biz', auto_reply_enabled: false,
-            forwarding_number: '+15559876543',
+            id: 'biz-1', owner_phone: '+15550001111', name: 'Test Biz', auto_reply_enabled: true,
+            forwarding_number: '+15559876543', address: '123 Main St', services: 'phones', business_hours: null, timezone: 'America/New_York',
         };
         mockSupabaseFrom.mockImplementation((table: string) => {
             if (table === 'businesses') return mockSupabaseChain({ data: businessData, error: null });
             if (table === 'opt_outs') return mockSupabaseChain({ data: null, error: null });
             if (table === 'leads') return mockSupabaseChain({
-                data: { id: 'lead-1', caller_name: null, qualification_status: 'in_progress', qualification_data: {}, qualification_step: 2 },
+                data: { id: 'lead-1', caller_name: null, qualification_status: 'in_progress', qualification_data: {}, qualification_step: 2, qualification_summary_sent_at: null },
                 error: null,
             });
             return mockSupabaseChain({ data: null, error: null });
         });
 
-        await POST(createFormDataRequest({ From: '+15551234567', To: '+15559876543', Body: 'iphone, today asap' }));
+        await POST(createFormDataRequest({ From: '+15551234567', To: '+15559876543', Body: 'iphone cracked screen' }));
 
         // The structured summary must reach the owner.
         const ownerCall = mockMessagesCreate.mock.calls.find(c =>
