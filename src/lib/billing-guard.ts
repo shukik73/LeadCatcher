@@ -8,9 +8,11 @@ const ONBOARDING_GRACE_DAYS = 7;
  * Checks whether a business has an active subscription that allows
  * SMS-spending operations.
  *
- * Allowed statuses: 'active', 'trialing' (only if stripe_trial_ends_at is set and in the future).
- * Grace period: NULL status is allowed for 7 days after business creation (onboarding).
- * Blocked statuses: 'canceled', 'past_due', 'unpaid', or expired grace period.
+ * Allowed: billing_exempt; 'active'; 'trialing' with a future stripe_trial_ends_at.
+ * Onboarding grace: NULL status OR 'trialing' with no recorded trial end date is
+ *   allowed for 7 days after business creation (prod defaults new rows to
+ *   'trialing' with a null trial end until Stripe writes one).
+ * Blocked: 'canceled', 'past_due', 'unpaid', expired trial, or expired grace.
  *
  * Returns { allowed: true } or { allowed: false, reason: string }.
  */
@@ -47,9 +49,16 @@ export async function checkBillingStatus(businessId: string): Promise<
     return { allowed: true };
   }
 
-  // Allow SMS during onboarding grace period (7 days from creation).
-  // After that, a subscription is required.
-  if (!status && business.created_at) {
+  // Onboarding grace window (7 days from creation). A brand-new business defaults
+  // to status 'trialing' with NO stripe_trial_ends_at until Stripe records one, so
+  // we'd otherwise block its missed-call SMS during the most important window — the
+  // moment a new shop tests its first call. Treat "no usable trial end date yet"
+  // (null status OR 'trialing' with a null end date) as the onboarding window,
+  // bounded by ONBOARDING_GRACE_DAYS so it can't become an indefinite free ride.
+  // (A 'trialing' sub WITH a future end date is already allowed above; with a past
+  // date it correctly falls through to blocked.)
+  const noTrialEndYet = !business.stripe_trial_ends_at;
+  if ((!status || status === 'trialing') && noTrialEndYet && business.created_at) {
     const createdAt = new Date(business.created_at);
     const graceEnd = new Date(createdAt.getTime() + ONBOARDING_GRACE_DAYS * 24 * 60 * 60 * 1000);
     if (new Date() < graceEnd) {

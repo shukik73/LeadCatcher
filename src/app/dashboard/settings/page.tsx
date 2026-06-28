@@ -50,6 +50,9 @@ export default function SettingsPage() {
     // Form State
     const [smsTemplate, setSmsTemplate] = useState('');
     const [smsTemplateClosed, setSmsTemplateClosed] = useState('');
+    const [address, setAddress] = useState('');
+    const [services, setServices] = useState('');
+    const [savingShopInfo, setSavingShopInfo] = useState(false);
     const [editingTemplate, setEditingTemplate] = useState(false);
     const [showMoreTemplates, setShowMoreTemplates] = useState(false);
     const [timezone, setTimezone] = useState('America/New_York');
@@ -82,6 +85,7 @@ export default function SettingsPage() {
     const [autoReplyEnabled, setAutoReplyEnabled] = useState(false);
     const [dailyDigestEnabled, setDailyDigestEnabled] = useState(true);
     const [statusUpdatesEnabled, setStatusUpdatesEnabled] = useState(false);
+    const [autoSendFollowups, setAutoSendFollowups] = useState(false);
     const [bookingUrl, setBookingUrl] = useState('');
     const [googleReviewLink, setGoogleReviewLink] = useState('');
     const [savingFeatures, setSavingFeatures] = useState(false);
@@ -103,7 +107,7 @@ export default function SettingsPage() {
 
         const { data: business } = await supabase
             .from('businesses')
-            .select('id, sms_template, sms_template_closed, timezone, business_hours, repairdesk_store_url, business_phone, owner_phone, carrier, forwarding_number, auto_reply_enabled, daily_digest_enabled, status_updates_enabled, booking_url, google_review_link')
+            .select('id, sms_template, sms_template_closed, address, services, timezone, business_hours, repairdesk_store_url, business_phone, owner_phone, carrier, forwarding_number, auto_reply_enabled, daily_digest_enabled, status_updates_enabled, followup_auto_send, booking_url, google_review_link')
             .eq('user_id', user.id)
             .single();
 
@@ -116,10 +120,13 @@ export default function SettingsPage() {
             setIsConnected(!!business.forwarding_number);
             setSmsTemplate(business.sms_template || DEFAULT_TEMPLATE);
             setSmsTemplateClosed(business.sms_template_closed || MORE_CLOSED_TEMPLATES[0]);
+            setAddress(business.address || '');
+            setServices(business.services || '');
             setTimezone(business.timezone || 'America/New_York');
             setRepairDeskSubdomain(business.repairdesk_store_url || '');
             setAutoReplyEnabled(business.auto_reply_enabled ?? false);
             setDailyDigestEnabled(business.daily_digest_enabled ?? true);
+            setAutoSendFollowups(business.followup_auto_send ?? false);
             setStatusUpdatesEnabled(business.status_updates_enabled ?? false);
             setBookingUrl(business.booking_url || '');
             setGoogleReviewLink(business.google_review_link || '');
@@ -197,6 +204,20 @@ export default function SettingsPage() {
             toast.error(error instanceof Error ? error.message : 'Failed to save message');
         }
         setSavingTemplates(false);
+    };
+
+    const handleSaveShopInfo = async () => {
+        setSavingShopInfo(true);
+        try {
+            await saveSettings({
+                address: address.trim() || null,
+                services: services.trim() || null,
+            });
+            toast.success('Shop info saved!');
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Failed to save shop info');
+        }
+        setSavingShopInfo(false);
     };
 
     const handleSaveHours = async () => {
@@ -473,6 +494,50 @@ export default function SettingsPage() {
 
             {/* Test Call Forwarding — target of dashboard "Run Test Call" CTAs */}
             <TestCallCard isConnected={isConnected} />
+
+            {/* Shop Info — facts the AI receptionist uses to answer customers */}
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle>Shop Info</CardTitle>
+                            <CardDescription>
+                                The AI uses these to answer customers — &quot;where are you?&quot;, &quot;do you fix X?&quot; — instead of asking them questions.
+                            </CardDescription>
+                        </div>
+                        <Button onClick={handleSaveShopInfo} disabled={savingShopInfo} size="sm" className="gap-2">
+                            {savingShopInfo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                            Save
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="shop-address">Address</Label>
+                        <Input
+                            id="shop-address"
+                            placeholder="16263 Miramar Pkwy, Miramar, FL 33027"
+                            value={address}
+                            onChange={(e) => setAddress(e.target.value)}
+                            maxLength={300}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="shop-services">Services / what you repair</Label>
+                        <Textarea
+                            id="shop-services"
+                            placeholder="Cell phones, tablets, laptops, MacBooks, PCs, gaming PCs, game consoles (PS5/Xbox), TVs. Sometimes scooters, speakers, headphones & other electronics."
+                            value={services}
+                            onChange={(e) => setServices(e.target.value)}
+                            rows={4}
+                            maxLength={1000}
+                        />
+                        <p className="text-xs text-slate-400">
+                            List everything you service so the AI can confidently say &quot;yes, we do that.&quot;
+                        </p>
+                    </div>
+                </CardContent>
+            </Card>
 
             {/* Auto-Reply Message (Simplified Template) */}
             <Card>
@@ -764,6 +829,7 @@ export default function SettingsPage() {
                                             auto_reply_enabled: autoReplyEnabled,
                                             daily_digest_enabled: dailyDigestEnabled,
                                             status_updates_enabled: statusUpdatesEnabled,
+                                            followup_auto_send: autoSendFollowups,
                                             booking_url: bookingUrl || null,
                                             google_review_link: googleReviewLink || null,
                                         }),
@@ -812,6 +878,19 @@ export default function SettingsPage() {
                         <Switch
                             checked={statusUpdatesEnabled}
                             onCheckedChange={setStatusUpdatesEnabled}
+                        />
+                    </div>
+                    <div className="flex items-center justify-between py-2">
+                        <div className="pr-4">
+                            <p className="text-sm font-medium">Auto-send follow-ups</p>
+                            <p className="text-xs text-slate-500">
+                                When on, high-confidence follow-ups text customers automatically — no approval needed.
+                                It first checks RepairDesk and skips anyone who already came in. Off: drafts wait in your queue for approval.
+                            </p>
+                        </div>
+                        <Switch
+                            checked={autoSendFollowups}
+                            onCheckedChange={setAutoSendFollowups}
                         />
                     </div>
 
