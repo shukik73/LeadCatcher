@@ -8,6 +8,7 @@ import { buildOwnerSummary, MAX_QUALIFICATION_QUESTIONS, type QualificationData 
 import { generateReceptionistReply } from '@/lib/ai-receptionist';
 import { summarizeHours, type BusinessHours } from '@/lib/business-hours';
 import { maybeSendHotLeadAlert } from '@/lib/hot-lead-alert';
+import { isCarrierAutoReply } from '@/lib/auto-reply-bounce';
 import { logger } from '@/lib/logger';
 import twilio from 'twilio';
 
@@ -198,6 +199,20 @@ async function handleSmsWebhook(messageSid: string | null, fromRaw: string, toRa
         leadCtx = (existingLead as LeadCtx) ?? null;
     }
     const leadId: string | null = leadCtx?.id ?? null;
+
+    // Carrier / device auto-reply (e.g. "this number is not monitored — try
+    // calling") bounced back from a number we texted. It is NOT a real customer
+    // reply: log it for the record, stop re-texting a dead number, and stay
+    // silent — no owner ping, no engagement, no "Contacted" status.
+    if (isCarrierAutoReply(body)) {
+        logger.info(`[${TAG}] Carrier auto-reply ignored (not a real reply)`, { from, businessId: business.id });
+        if (leadId) {
+            await supabaseAdmin.from('messages').insert({ lead_id: leadId, direction: 'inbound', body });
+            await supabaseAdmin.from('leads').update({ follow_up_due_at: null }).eq('id', leadId);
+        }
+        if (messageSid) await markWebhookProcessed(messageSid);
+        return new Response('<Response></Response>', { headers: { 'Content-Type': 'text/xml' } });
+    }
 
     if (leadId) {
         // 3. Log Message + cancel any pending follow-up (customer replied!)

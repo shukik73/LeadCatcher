@@ -103,6 +103,14 @@ describe('Transcription Webhook Route', () => {
         process.env.TWILIO_ACCOUNT_SID = 'test-sid';
         process.env.TWILIO_AUTH_TOKEN = 'test-token';
         mockMessagesCreate.mockResolvedValue({});
+        // Reset analyzeIntent to its default (a per-test spam override must not
+        // leak forward — clearAllMocks clears calls, not implementations).
+        vi.mocked(analyzeIntent).mockResolvedValue({
+            intent: 'booking_request',
+            summary: 'Wants to book an appointment',
+            suggestedReply: 'We can schedule you for tomorrow.',
+            priority: 'high',
+        });
         // Default: medium urgency → standard owner summary path.
         mockScoreCall.mockResolvedValue({
             category: 'follow_up',
@@ -267,6 +275,36 @@ describe('Transcription Webhook Route', () => {
                 body: expect.stringContaining('Voicemail'),
             })
         );
+    });
+
+    it('stays silent on spam — no smart reply to the caller, no owner notification', async () => {
+        vi.mocked(validateTwilioRequest).mockResolvedValue(true);
+        vi.mocked(analyzeIntent).mockResolvedValue({
+            intent: 'spam',
+            summary: 'Unsolicited marketing call about a business listing',
+            suggestedReply: 'Thanks for reaching out!',
+            priority: 'low',
+        });
+
+        mockSupabaseFrom.mockImplementation((table: string) => {
+            if (table === 'leads') {
+                const chain = mockSupabaseChain({ data: { id: 'lead-1' }, error: null });
+                chain.update = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
+                return chain;
+            }
+            if (table === 'opt_outs') return mockSupabaseChain({ data: null, error: null });
+            if (table === 'businesses') return mockSupabaseChain({ data: { owner_phone: '+15550001111' }, error: null });
+            return mockSupabaseChain({ data: null, error: null });
+        });
+
+        const req = createFormDataRequest(
+            { TranscriptionText: 'Press one to claim your Google business listing', TranscriptionStatus: 'completed' },
+            { businessId: VALID_BIZ_ID, caller: '+13059307585', called: '+15559876543' }
+        );
+        await POST(req);
+
+        // Spam gets no texts at all — not to the caller, not to the owner.
+        expect(mockMessagesCreate).not.toHaveBeenCalled();
     });
 
     it('fires the hot-lead alert (not the generic summary) on high urgency', async () => {

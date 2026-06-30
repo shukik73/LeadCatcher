@@ -232,6 +232,33 @@ describe('SMS Webhook Route', () => {
         expect(res.status).toBe(200);
     });
 
+    it('ignores a carrier auto-reply bounce — does not notify the owner', async () => {
+        vi.mocked(validateTwilioRequest).mockResolvedValue(true);
+        const businessData = { id: 'biz-1', owner_phone: '+15550001111', name: 'Test Biz' };
+
+        mockSupabaseFrom.mockImplementation((table: string) => {
+            if (table === 'businesses') return mockSupabaseChain({ data: businessData, error: null });
+            if (table === 'opt_outs') return mockSupabaseChain({ data: null, error: null });
+            if (table === 'leads') return mockSupabaseChain({ data: { id: 'lead-1' }, error: null });
+            return mockSupabaseChain({ data: null, error: null });
+        });
+
+        const req = createFormDataRequest({
+            From: '+13059307585',
+            To: '+15559876543',
+            Body: 'Undelivered: SMS to this number is not monitored. Please try calling.',
+        });
+        const res = await POST(req);
+        const text = await res.text();
+        expect(text).toBe('<Response></Response>');
+
+        // A carrier bounce is not a real reply — the owner must NOT be pinged.
+        const ownerCall = mockMessagesCreate.mock.calls.find(c =>
+            (c[0] as Record<string, string>).to === '+15550001111',
+        );
+        expect(ownerCall).toBeUndefined();
+    });
+
     it('notifies owner when message is received', async () => {
         vi.mocked(validateTwilioRequest).mockResolvedValue(true);
         const businessData = { id: 'biz-1', owner_phone: '+15550001111', name: 'Test Biz' };

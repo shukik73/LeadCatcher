@@ -102,6 +102,14 @@ async function handleTranscriptionWebhook(
     // 2. AI Analysis
     const analysis = await analyzeIntent(transcriptionText, 'Voicemail Transcript');
 
+    // Spam voicemails (robocalls, listing scams, unsolicited sales) still get
+    // logged + scored for the dashboard, but we stay silent: no auto-reply to
+    // the caller (avoids a bounce loop) and no owner notification.
+    const isSpam = analysis.intent === 'spam';
+    if (isSpam) {
+        logger.info(`[${TAG}] Spam voicemail — suppressing auto-reply + owner notification`, { caller, businessId });
+    }
+
     // 3. Update Lead
     const { data: lead } = await supabaseAdmin
         .from('leads')
@@ -238,7 +246,7 @@ async function handleTranscriptionWebhook(
     const rateLimit = await checkSmsRateLimit(businessId, caller);
 
     // 6. Send Smart SMS Reply (only if billing active, not opted out, rate limit OK, AND lookup succeeded)
-    if (analysis.suggestedReply && billing.allowed && !optOutResult.optedOut && !optOutResult.error && rateLimit.allowed) {
+    if (analysis.suggestedReply && !isSpam && billing.allowed && !optOutResult.optedOut && !optOutResult.error && rateLimit.allowed) {
         const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
         try {
             await client.messages.create({
@@ -274,7 +282,7 @@ async function handleTranscriptionWebhook(
     //    leads.hot_alert_sent_at). Everything else gets the standard summary.
     //    When the hot alert is sent (or already sent) we skip the generic notice
     //    so the owner isn't texted twice for the same voicemail.
-    if (billing.allowed) {
+    if (billing.allowed && !isSpam) {
         const { data: business } = await supabaseAdmin
             .from('businesses')
             .select('owner_phone, forwarding_number')
