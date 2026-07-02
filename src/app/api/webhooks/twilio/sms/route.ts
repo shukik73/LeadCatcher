@@ -2,7 +2,7 @@ import { supabaseAdmin } from '@/lib/supabase-server';
 import { validateTwilioRequest } from '@/lib/twilio-validator';
 import { normalizePhoneNumber } from '@/lib/phone-utils';
 import { checkBillingStatus } from '@/lib/billing-guard';
-import { claimWebhookEvent, markWebhookProcessed, markWebhookFailed, markWebhookFailedIfProcessing, setWebhookBusinessId } from '@/lib/webhook-common';
+import { claimWebhookEvent, markWebhookProcessed, markWebhookFailed, markWebhookFailedIfProcessing, setWebhookBusinessId, hasWebhookSideEffect, recordWebhookSideEffect } from '@/lib/webhook-common';
 import { checkSmsRateLimit } from '@/lib/sms-rate-limit';
 import { buildOwnerSummary, MAX_QUALIFICATION_QUESTIONS, type QualificationData } from '@/lib/lead-qualification';
 import { generateReceptionistReply } from '@/lib/ai-receptionist';
@@ -326,11 +326,14 @@ async function handleSmsWebhook(messageSid: string | null, fromRaw: string, toRa
                             })
                             .eq('id', leadId);
 
-                        // Reply to the customer.
-                        if (result.should_reply && result.reply) {
+                        // Reply to the customer. Reprocessing guard: on a retry of a
+                        // failed event, don't re-text the customer (the debounce claim
+                        // only covers a 20s window; this covers later retries too).
+                        if (result.should_reply && result.reply && !(await hasWebhookSideEffect(messageSid, 'receptionist_reply'))) {
                             try {
                                 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
                                 await client.messages.create({ to: from, from: to, body: result.reply });
+                                await recordWebhookSideEffect(messageSid, 'receptionist_reply');
                                 await supabaseAdmin.from('messages').insert({
                                     lead_id: leadId,
                                     direction: 'outbound',
@@ -386,8 +389,10 @@ async function handleSmsWebhook(messageSid: string | null, fromRaw: string, toRa
 
         // 5. Notify Owner (only if billing is active and rate limit OK).
         // Skipped when the qualification flow already forwarded a structured
-        // summary so the owner doesn't get the same lead twice.
-        const summaryAlreadyForwarded = lastSummary !== '';
+        // summary so the owner doesn't get the same lead twice — either in THIS
+        // invocation (lastSummary set) or a prior one (qualification_summary_sent_at
+        // persisted), which matters when a failed event is reprocessed on retry.
+        const summaryAlreadyForwarded = lastSummary !== '' || !!leadCtx?.qualification_summary_sent_at;
         const ownerRateLimit = await checkSmsRateLimit(business.id, business.owner_phone);
         if (!summaryAlreadyForwarded && business.owner_phone && billing.allowed && ownerRateLimit.allowed) {
             const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);

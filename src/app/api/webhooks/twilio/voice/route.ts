@@ -3,7 +3,7 @@ import { validateTwilioRequest } from '@/lib/twilio-validator';
 import { normalizePhoneNumber } from '@/lib/phone-utils';
 import { isBusinessHours, type BusinessHours } from '@/lib/business-logic';
 import { checkBillingStatus } from '@/lib/billing-guard';
-import { claimWebhookEvent, markWebhookProcessed, markWebhookFailed, markWebhookFailedIfProcessing, setWebhookBusinessId, checkOptOut } from '@/lib/webhook-common';
+import { claimWebhookEvent, markWebhookProcessed, markWebhookFailed, markWebhookFailedIfProcessing, setWebhookBusinessId, checkOptOut, hasWebhookSideEffect, recordWebhookSideEffect } from '@/lib/webhook-common';
 import { signCallbackParams } from '@/lib/callback-signature';
 import { checkSmsRateLimit } from '@/lib/sms-rate-limit';
 import { renderMissedCallSms } from '@/lib/sms-template';
@@ -126,8 +126,13 @@ async function handleVoiceWebhook(callSid: string | null, callerRaw: string, cal
     // Track whether Twilio actually accepted the outbound auto-reply. We only log
     // the outbound message and schedule the follow-up after a successful send so a
     // failed Twilio call cannot show up as a "sent" message in history.
+    // autoReplyExists: an auto-reply has been sent for this call (this attempt or a
+    // prior one that we're reprocessing after a retry). sentThisInvocation: we sent
+    // it just now — only then do we log the outbound message row, so a reclaim can't
+    // double-log it.
     let autoReplyBody: string | null = null;
-    let autoReplySent = false;
+    let autoReplyExists = false;
+    let sentThisInvocation = false;
     if (billing.allowed && !optOutResult.optedOut && !optOutResult.error && rateLimit.allowed) {
         const defaultOpen = "Hi! We missed your call — we were helping another customer. How can we help you? Would you like us to give you a call back in a few?";
         const defaultClosed = "Hi! Our store is currently closed. How can we help you? Would you like us to schedule an appointment for when we open?";
@@ -140,16 +145,27 @@ async function handleVoiceWebhook(callSid: string | null, callerRaw: string, cal
         // {{token}} so no raw placeholder is ever texted to the customer.
         autoReplyBody = renderMissedCallSms(template, business);
 
-        try {
-            await client.messages.create({
-                to: caller,
-                from: called,
-                body: autoReplyBody,
-            });
-            autoReplySent = true;
-        } catch (error) {
-            logger.error(`[${TAG}] Error sending immediate ack`, error, { businessId: business.id });
-            autoReplyBody = null;
+        // Reprocessing guard: if this event already sent its auto-reply on a prior
+        // (failed-then-reclaimed) attempt, do NOT text the customer again.
+        if (await hasWebhookSideEffect(callSid, 'auto_reply')) {
+            logger.info(`[${TAG}] Auto-reply already sent on a prior attempt — skipping resend`, { callSid });
+            autoReplyExists = true;
+        } else {
+            try {
+                await client.messages.create({
+                    to: caller,
+                    from: called,
+                    body: autoReplyBody,
+                });
+                autoReplyExists = true;
+                sentThisInvocation = true;
+                // Record immediately after a successful send so any later throw in this
+                // handler cannot cause a resend on the retry.
+                await recordWebhookSideEffect(callSid, 'auto_reply');
+            } catch (error) {
+                logger.error(`[${TAG}] Error sending immediate ack`, error, { businessId: business.id });
+                autoReplyBody = null;
+            }
         }
     } else if (!billing.allowed) {
         logger.warn(`[${TAG}] Skipping SMS - billing inactive`, { businessId: business.id });
@@ -184,7 +200,7 @@ async function handleVoiceWebhook(callSid: string | null, callerRaw: string, cal
 
     // 7b. Schedule follow-up SMS in 15 minutes — only if the auto-reply was actually
     // delivered. If Twilio rejected the send, don't queue a follow-up either.
-    if (leadId && followUpCount === 0 && autoReplySent) {
+    if (leadId && followUpCount === 0 && autoReplyExists) {
         const followUpDue = new Date(Date.now() + 15 * 60 * 1000).toISOString();
         await supabaseAdmin.from('leads')
             .update({ follow_up_due_at: followUpDue })
@@ -192,8 +208,9 @@ async function handleVoiceWebhook(callSid: string | null, callerRaw: string, cal
         logger.info(`[${TAG}] Follow-up scheduled`, { leadId, followUpDue });
     }
 
-    // Log the auto-reply message ONLY if Twilio accepted it.
-    if (leadId && autoReplySent && autoReplyBody) {
+    // Log the auto-reply message ONLY if we sent it in this invocation (not on a
+    // reprocess where the send was skipped) and Twilio accepted it.
+    if (leadId && sentThisInvocation && autoReplyBody) {
         try {
             await supabaseAdmin.from('messages').insert({
                 lead_id: leadId,
