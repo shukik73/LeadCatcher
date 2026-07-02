@@ -25,6 +25,8 @@ async function sendTelnyxSms(from: string, to: string, text: string): Promise<vo
             'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify({ from, to, text }),
+        // Bound the call so a hung Telnyx request can't strand the webhook.
+        signal: AbortSignal.timeout(15_000),
     });
 
     if (!res.ok) {

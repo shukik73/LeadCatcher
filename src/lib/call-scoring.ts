@@ -4,7 +4,7 @@ import { CALL_SCORING_SYSTEM_PROMPT } from '@/lib/prompts';
 
 // Lazy-init: reuse the same pattern as ai-service.ts
 const openai = process.env.OPENAI_API_KEY
-    ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+    ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 30_000, maxRetries: 1 })
     : null;
 
 export interface CallScoringInput {

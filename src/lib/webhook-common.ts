@@ -112,6 +112,44 @@ export async function markWebhookFailedIfProcessing(eventId: string): Promise<vo
 }
 
 /**
+ * Has a given one-time side effect (e.g. 'auto_reply') already fired for this
+ * event? Used to make reprocessing (provider retry after a failed attempt)
+ * SMS-safe: reclaim resets status/processed_at, but the side_effects ledger
+ * persists, so a handler can skip re-sending an SMS it already sent.
+ */
+export async function hasWebhookSideEffect(eventId: string | null, key: string): Promise<boolean> {
+    if (!eventId) return false;
+    const { data, error } = await supabaseAdmin
+        .from('webhook_events')
+        .select('side_effects')
+        .eq('event_id', eventId)
+        .maybeSingle();
+    if (error || !data) return false;
+    const effects = (data.side_effects ?? {}) as Record<string, unknown>;
+    return key in effects;
+}
+
+/**
+ * Record that a one-time side effect fired for this event. Read-modify-write is
+ * safe because the claim guarantees a single active processor per event at a time
+ * (duplicates get 'duplicate'; reclaim only fires from the terminal 'failed' state).
+ */
+export async function recordWebhookSideEffect(eventId: string | null, key: string): Promise<void> {
+    if (!eventId) return;
+    const { data } = await supabaseAdmin
+        .from('webhook_events')
+        .select('side_effects')
+        .eq('event_id', eventId)
+        .maybeSingle();
+    const effects = { ...((data?.side_effects ?? {}) as Record<string, string>) };
+    effects[key] = new Date().toISOString();
+    await supabaseAdmin
+        .from('webhook_events')
+        .update({ side_effects: effects })
+        .eq('event_id', eventId);
+}
+
+/**
  * Associate a business_id with a claimed webhook event.
  */
 export async function setWebhookBusinessId(eventId: string, businessId: string): Promise<void> {

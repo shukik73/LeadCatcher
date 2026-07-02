@@ -234,8 +234,13 @@ export class RepairDeskClient {
 
         logger.info('[RepairDesk] API request', { endpoint, method: options.method || 'GET' });
 
+        // Bound every RepairDesk call. Without a timeout a hung upstream request
+        // rides Vercel's function limit and can strand webhook_events in
+        // 'processing' (which the reclaim path then treats as a duplicate and
+        // silently drops). 15s is generous for RepairDesk's REST API.
         const response = await fetch(url, {
             ...options,
+            signal: options.signal ?? AbortSignal.timeout(15_000),
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',

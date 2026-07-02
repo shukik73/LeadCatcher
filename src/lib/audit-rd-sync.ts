@@ -31,10 +31,14 @@ export async function syncAuditToRepairDesk(
             return { ticketId: null, synced: false };
         }
 
+        // Scope the audit fetch to the same business whose RepairDesk credentials
+        // we just loaded. Defense-in-depth: a mismatched (auditId, businessId) pair
+        // must never post tenant A's audit into tenant B's RepairDesk.
         const { data: audit } = await supabaseAdmin
             .from('call_audits')
             .select('*')
             .eq('id', auditId)
+            .eq('business_id', businessId)
             .single();
 
         if (!audit) {

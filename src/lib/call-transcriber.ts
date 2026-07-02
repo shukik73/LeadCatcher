@@ -3,7 +3,7 @@ import { fetch as undiciFetch, Agent } from 'undici';
 import { logger } from '@/lib/logger';
 
 const openai = process.env.OPENAI_API_KEY
-    ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+    ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 60_000, maxRetries: 1 })
     : null;
 
 const TAG = '[Transcriber]';

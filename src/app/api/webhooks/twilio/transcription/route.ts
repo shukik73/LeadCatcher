@@ -2,11 +2,12 @@ import { supabaseAdmin } from '@/lib/supabase-server';
 import { validateTwilioRequest } from '@/lib/twilio-validator';
 import { analyzeIntent } from '@/lib/ai-service';
 import { checkBillingStatus } from '@/lib/billing-guard';
-import { claimWebhookEvent, markWebhookProcessed, markWebhookFailedIfProcessing, checkOptOut } from '@/lib/webhook-common';
+import { claimWebhookEvent, markWebhookProcessed, markWebhookFailedIfProcessing, checkOptOut, hasWebhookSideEffect, recordWebhookSideEffect } from '@/lib/webhook-common';
 import { verifyCallbackSignature } from '@/lib/callback-signature';
 import { checkSmsRateLimit } from '@/lib/sms-rate-limit';
 import { scoreCall } from '@/lib/call-scoring';
 import { maybeSendHotLeadAlert } from '@/lib/hot-lead-alert';
+import { isBlocklisted, addToBlocklist } from '@/lib/spam-gate';
 import { logger } from '@/lib/logger';
 import twilio from 'twilio';
 
@@ -105,9 +106,15 @@ async function handleTranscriptionWebhook(
     // Spam voicemails (robocalls, listing scams, unsolicited sales) still get
     // logged + scored for the dashboard, but we stay silent: no auto-reply to
     // the caller (avoids a bounce loop) and no owner notification.
-    const isSpam = analysis.intent === 'spam';
+    // A blocklisted caller is spam regardless of AI intent (keeps the gate
+    // authoritative if a blocked number still reaches this callback).
+    const aiSpam = analysis.intent === 'spam';
+    const isSpam = aiSpam || await isBlocklisted(businessId, caller);
     if (isSpam) {
         logger.info(`[${TAG}] Spam voicemail — suppressing auto-reply + owner notification`, { caller, businessId });
+        // Auto-learn: block this number pre-SMS on the next call so the voice
+        // webhook's spam gate catches it before any text-back fires.
+        if (aiSpam) await addToBlocklist(businessId, caller, 'ai_voicemail_intent', 'auto_ai');
     }
 
     // 3. Update Lead
@@ -247,27 +254,34 @@ async function handleTranscriptionWebhook(
 
     // 6. Send Smart SMS Reply (only if billing active, not opted out, rate limit OK, AND lookup succeeded)
     if (analysis.suggestedReply && !isSpam && billing.allowed && !optOutResult.optedOut && !optOutResult.error && rateLimit.allowed) {
-        const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-        try {
-            await client.messages.create({
-                to: caller,
-                from: called,
-                body: analysis.suggestedReply,
-            });
-
-            // Log the outbound reply
-            if (lead) {
-                await supabaseAdmin.from('messages').insert({
-                    lead_id: lead.id,
-                    direction: 'outbound',
+        // Reprocessing guard: don't re-text the caller on a retry of a failed event.
+        if (await hasWebhookSideEffect(recordingSid, 'smart_reply')) {
+            logger.info(`[${TAG}] Smart reply already sent on a prior attempt — skipping resend`, { recordingSid });
+        } else {
+            const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+            try {
+                await client.messages.create({
+                    to: caller,
+                    from: called,
                     body: analysis.suggestedReply,
-                    is_ai_generated: true
                 });
-            }
+                // Record right after send so a later throw can't cause a resend.
+                await recordWebhookSideEffect(recordingSid, 'smart_reply');
 
-            logger.info('Smart Voicemail Reply Sent', { body: analysis.suggestedReply });
-        } catch (error) {
-            logger.error('Failed to send smart reply', error);
+                // Log the outbound reply
+                if (lead) {
+                    await supabaseAdmin.from('messages').insert({
+                        lead_id: lead.id,
+                        direction: 'outbound',
+                        body: analysis.suggestedReply,
+                        is_ai_generated: true
+                    });
+                }
+
+                logger.info('Smart Voicemail Reply Sent', { body: analysis.suggestedReply });
+            } catch (error) {
+                logger.error('Failed to send smart reply', error);
+            }
         }
     } else if (!billing.allowed) {
         logger.warn(`[${TAG}] Skipping auto-reply - billing inactive`, { businessId });
@@ -299,9 +313,14 @@ async function handleTranscriptionWebhook(
                 summary: `Voicemail from ${caller}: ${scoreSummary || analysis.summary}`,
                 urgency: scoreUrgency,
             });
+            if (hotAlertSent) await recordWebhookSideEffect(recordingSid, 'owner_notified');
         }
 
-        if (!hotAlertSent && business?.owner_phone) {
+        // Notify once. On a reprocess, if the owner was already alerted on the prior
+        // attempt (hot alert or generic), skip the generic notice so they aren't
+        // texted twice for the same voicemail.
+        const alreadyNotified = hotAlertSent || await hasWebhookSideEffect(recordingSid, 'owner_notified');
+        if (!alreadyNotified && business?.owner_phone) {
             const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
             try {
                 await client.messages.create({
@@ -309,6 +328,7 @@ async function handleTranscriptionWebhook(
                     from: called,
                     body: `🎙️ New Voicemail from ${caller}.\nSummary: ${analysis.summary}\nIntent: ${analysis.intent}`,
                 });
+                await recordWebhookSideEffect(recordingSid, 'owner_notified');
             } catch { /* ignore notification failure */ }
         }
     }

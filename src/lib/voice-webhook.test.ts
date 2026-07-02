@@ -14,6 +14,7 @@ vi.mock('@/lib/twilio-validator', () => ({
 
 vi.mock('@/lib/phone-utils', () => ({
     normalizePhoneNumber: vi.fn((p: string) => `+1${p.replace(/\D/g, '').slice(-10)}`),
+    safeNormalizePhoneNumber: vi.fn((p: string) => `+1${p.replace(/\D/g, '').slice(-10)}`),
 }));
 
 vi.mock('@/lib/business-logic', () => ({
@@ -202,6 +203,73 @@ describe('Voice Webhook Route', () => {
         const res = await POST(req);
         const text = await res.text();
         expect(text).toContain('Hangup');
+        expect(mockMessagesCreate).not.toHaveBeenCalled();
+    });
+
+    it('blocks an anonymous caller: no text-back, no recording, logged as spam', async () => {
+        vi.mocked(validateTwilioRequest).mockResolvedValue(true);
+        const businessData = {
+            id: 'biz-1', owner_phone: '+15550001111', name: 'Test Biz',
+            business_hours: null, timezone: 'America/New_York', sms_template: null, verification_token: null,
+        };
+        const spamInsert = vi.fn().mockResolvedValue({ data: null, error: null });
+        mockSupabaseFrom.mockImplementation((table: string) => {
+            if (table === 'businesses') return mockSupabaseChain({ data: businessData, error: null });
+            if (table === 'spam_numbers') return mockSupabaseChain({ data: null, error: null });
+            if (table === 'call_analyses') {
+                const chain = mockSupabaseChain({ data: null, error: null });
+                chain.insert = spamInsert;
+                return chain;
+            }
+            return mockSupabaseChain({ data: null, error: null });
+        });
+
+        const req = createFormDataRequest({ Caller: 'anonymous', Called: '5559876543' });
+        const res = await POST(req);
+        const text = await res.text();
+
+        // Blocked: caller not texted, no voicemail recording, polite hangup.
+        expect(mockMessagesCreate).not.toHaveBeenCalled();
+        expect(text).not.toContain('<Record/>');
+        expect(text).toContain('Goodbye');
+        // Logged as spam for the owner's audit trail.
+        expect(spamInsert).toHaveBeenCalledWith(expect.objectContaining({ category: 'spam' }));
+    });
+
+    it('does NOT resend the auto-reply when reprocessing an event that already sent it', async () => {
+        vi.mocked(validateTwilioRequest).mockResolvedValue(true);
+        const businessData = {
+            id: 'biz-1', owner_phone: '+15550001111', name: 'Test Biz',
+            business_hours: null, timezone: 'America/New_York', sms_template: null, verification_token: null,
+        };
+
+        // webhook_events row is claimable (id present, so claim succeeds) AND already
+        // carries the 'auto_reply' side-effect from the first (failed) attempt.
+        const webhookChain = {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'evt-1', side_effects: { auto_reply: '2026-07-02T00:00:00Z' } }, error: null }),
+            insert: vi.fn().mockReturnThis(),
+            update: vi.fn().mockReturnThis(),
+        };
+        mockSupabaseFrom.mockImplementation((table: string) => {
+            if (table === 'webhook_events') return webhookChain;
+            if (table === 'businesses') return mockSupabaseChain({ data: businessData, error: null });
+            if (table === 'opt_outs') return mockSupabaseChain({ data: null, error: null });
+            return mockSupabaseChain({ data: null, error: null });
+        });
+
+        const req = createFormDataRequest({
+            CallSid: 'CA-reclaimed',
+            Caller: '5551234567',
+            Called: '5559876543',
+        });
+        const res = await POST(req);
+        const text = await res.text();
+
+        // Still returns the recording TwiML (call is handled)...
+        expect(text).toContain('<Record/>');
+        // ...but the customer is NOT texted a second time.
         expect(mockMessagesCreate).not.toHaveBeenCalled();
     });
 });

@@ -5,7 +5,7 @@ import { INTENT_ANALYSIS_SYSTEM_PROMPT } from '@/lib/prompts';
 
 // Initialize OpenAI only if key is present
 const openai = process.env.OPENAI_API_KEY
-    ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+    ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 30_000, maxRetries: 1 })
     : null;
 
 interface AnalysisResult {
