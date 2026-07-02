@@ -1,7 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { normalizePhoneNumber, formatPhoneNumber, isValidPhoneNumber } from './phone-utils';
+import { normalizePhoneNumber, safeNormalizePhoneNumber, formatPhoneNumber, isValidPhoneNumber } from './phone-utils';
 
 describe('Phone Utils', () => {
+    describe('safeNormalizePhoneNumber', () => {
+        it('returns E.164 for a valid number', () => {
+            expect(safeNormalizePhoneNumber('3055550123')).toBe('+13055550123');
+        });
+        it('returns null for anonymous / empty / junk instead of throwing', () => {
+            expect(safeNormalizePhoneNumber('anonymous')).toBeNull();
+            expect(safeNormalizePhoneNumber('')).toBeNull();
+            expect(safeNormalizePhoneNumber('12345')).toBeNull();
+        });
+    });
+
     describe('normalizePhoneNumber', () => {
         it('normalizes 10-digit US number', () => {
             expect(normalizePhoneNumber('3055550123')).toBe('+13055550123');

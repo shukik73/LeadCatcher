@@ -7,6 +7,7 @@ import { verifyCallbackSignature } from '@/lib/callback-signature';
 import { checkSmsRateLimit } from '@/lib/sms-rate-limit';
 import { scoreCall } from '@/lib/call-scoring';
 import { maybeSendHotLeadAlert } from '@/lib/hot-lead-alert';
+import { isBlocklisted, addToBlocklist } from '@/lib/spam-gate';
 import { logger } from '@/lib/logger';
 import twilio from 'twilio';
 
@@ -105,9 +106,15 @@ async function handleTranscriptionWebhook(
     // Spam voicemails (robocalls, listing scams, unsolicited sales) still get
     // logged + scored for the dashboard, but we stay silent: no auto-reply to
     // the caller (avoids a bounce loop) and no owner notification.
-    const isSpam = analysis.intent === 'spam';
+    // A blocklisted caller is spam regardless of AI intent (keeps the gate
+    // authoritative if a blocked number still reaches this callback).
+    const aiSpam = analysis.intent === 'spam';
+    const isSpam = aiSpam || await isBlocklisted(businessId, caller);
     if (isSpam) {
         logger.info(`[${TAG}] Spam voicemail — suppressing auto-reply + owner notification`, { caller, businessId });
+        // Auto-learn: block this number pre-SMS on the next call so the voice
+        // webhook's spam gate catches it before any text-back fires.
+        if (aiSpam) await addToBlocklist(businessId, caller, 'ai_voicemail_intent', 'auto_ai');
     }
 
     // 3. Update Lead

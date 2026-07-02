@@ -16,6 +16,11 @@ vi.mock('@/lib/twilio-validator', () => ({
 
 vi.mock('@/lib/phone-utils', () => ({
     normalizePhoneNumber: vi.fn((p: string) => `+1${p.replace(/\D/g, '').slice(-10)}`),
+    safeNormalizePhoneNumber: vi.fn((p: string) => `+1${p.replace(/\D/g, '').slice(-10)}`),
+}));
+
+vi.mock('@/lib/spam-gate', () => ({
+    evaluateSpam: vi.fn().mockResolvedValue({ isSpam: false, reason: null, score: 0, signals: [] }),
 }));
 
 vi.mock('@/lib/business-logic', () => ({

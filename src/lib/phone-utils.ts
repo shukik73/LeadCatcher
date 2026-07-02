@@ -40,8 +40,24 @@ export function normalizePhoneNumber(phone: string): string {
 }
 
 /**
+ * Non-throwing variant of normalizePhoneNumber.
+ *
+ * @param phone - Phone number in any format (may be empty / "anonymous")
+ * @returns E.164 string, or null if it isn't a normalizable US number. Use this
+ *          on untrusted caller IDs (e.g. Twilio's withheld/anonymous callers)
+ *          where a throw would turn a spam call into a 500 + retry loop.
+ */
+export function safeNormalizePhoneNumber(phone: string): string | null {
+  try {
+    return normalizePhoneNumber(phone);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Formats a phone number for display
- * 
+ *
  * @param phone - Phone number in E.164 format
  * @returns Formatted phone number (e.g., "(305) 555-0100")
  */
