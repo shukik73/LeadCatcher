@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 import { logger } from '@/lib/logger';
 
 const openai = process.env.OPENAI_API_KEY
-    ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+    ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 30_000, maxRetries: 1 })
     : null;
 
 const TAG = '[Call Summarizer]';

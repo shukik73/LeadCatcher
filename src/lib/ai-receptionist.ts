@@ -16,7 +16,7 @@ import type { QualificationData, Urgency } from '@/lib/lead-qualification';
  */
 
 const openai = process.env.OPENAI_API_KEY
-    ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+    ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 30_000, maxRetries: 1 })
     : null;
 
 const TAG = '[AI Receptionist]';
@@ -135,11 +135,17 @@ export async function generateReceptionistReply(opts: {
         const parsed = JSON.parse(content);
         const reply = typeof parsed.reply === 'string' ? stripUrls(parsed.reply) : '';
 
+        // Strip URLs from extracted fields too, not just the customer-facing reply.
+        // These fields flow into the owner-alert SMS (buildOwnerSummary), so a caller
+        // can't inject a phishing link via the "device"/"issue" text they dictate.
+        const stripField = (v: unknown): string | null =>
+            typeof v === 'string' ? stripUrls(v) || null : null;
+
         const extracted: QualificationData = {
-            device: parsed.device ?? existing.device ?? null,
-            issue: parsed.issue ?? existing.issue ?? null,
+            device: stripField(parsed.device) ?? existing.device ?? null,
+            issue: stripField(parsed.issue) ?? existing.issue ?? null,
             urgency: normalizeUrgency(parsed.urgency) ?? existing.urgency ?? null,
-            desired_time: parsed.desired_time ?? existing.desired_time ?? null,
+            desired_time: stripField(parsed.desired_time) ?? existing.desired_time ?? null,
         };
 
         const result: ReceptionistResult = {

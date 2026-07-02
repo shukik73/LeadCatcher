@@ -154,6 +154,33 @@ describe('SMS Webhook Route', () => {
         );
     });
 
+    it('fails closed when the opt-out write fails — no false "unsubscribed" confirmation', async () => {
+        vi.mocked(validateTwilioRequest).mockResolvedValue(true);
+        const businessData = { id: 'biz-1', owner_phone: '+15550001111', name: 'Test Biz' };
+
+        // The opt_outs upsert returns an error (DB blip). We must NOT tell the caller
+        // they're unsubscribed, and we must return 500 so Twilio retries the event.
+        const upsertMock = vi.fn().mockResolvedValue({ error: { message: 'db down' } });
+        mockSupabaseFrom.mockImplementation((table: string) => {
+            if (table === 'businesses') return mockSupabaseChain({ data: businessData, error: null });
+            const chain = mockSupabaseChain({ data: null, error: null });
+            chain.upsert = upsertMock;
+            return chain;
+        });
+
+        const req = createFormDataRequest({ From: '+15551234567', To: '+15559876543', Body: 'STOP' });
+        const res = await POST(req);
+
+        expect(res.status).toBe(500);
+        expect(upsertMock).toHaveBeenCalled();
+        // No "unsubscribed" confirmation may go out on a failed persist.
+        const confirmation = mockMessagesCreate.mock.calls.find(c =>
+            typeof (c[0] as Record<string, string>).body === 'string' &&
+            (c[0] as Record<string, string>).body.includes('unsubscribed'),
+        );
+        expect(confirmation).toBeUndefined();
+    });
+
     it('handles UNSUBSCRIBE keyword for opt-out', async () => {
         vi.mocked(validateTwilioRequest).mockResolvedValue(true);
         const businessData = { id: 'biz-1', owner_phone: '+15550001111', name: 'Test Biz' };

@@ -128,6 +128,15 @@ async function provisionDedicatedNumber(): Promise<AcquireNumberResult> {
  * according to TWILIO_NUMBER_STRATEGY (shared single-tenant number by default).
  */
 export async function autoLinkTwilioNumber(): Promise<AutoLinkResult> {
+    // Server actions are publicly-invokable POST endpoints; require an authenticated
+    // user before touching the platform Twilio account (prevents anonymous probing
+    // and quota burn). Ownership is re-verified downstream in linkTwilioNumberToBusiness.
+    const authClient = await createSupabaseServerClient();
+    const { data: { user: authUser } } = await authClient.auth.getUser();
+    if (!authUser) {
+        return { success: false, error: 'You must be logged in' };
+    }
+
     const accountSid = process.env.TWILIO_ACCOUNT_SID;
     const authToken = process.env.TWILIO_AUTH_TOKEN;
 
@@ -167,6 +176,14 @@ export async function autoLinkTwilioNumber(): Promise<AutoLinkResult> {
  * and returns the SID if found.
  */
 export async function verifyTwilioPhoneNumber(phoneNumber: string): Promise<VerifyNumberResult> {
+    // Require auth before hitting the platform Twilio account — this action is a
+    // public POST endpoint and would otherwise let anyone enumerate account numbers.
+    const authClient = await createSupabaseServerClient();
+    const { data: { user: authUser } } = await authClient.auth.getUser();
+    if (!authUser) {
+        return { success: false, error: 'You must be logged in' };
+    }
+
     // 1. Validate input
     const validation = phoneNumberSchema.safeParse(phoneNumber);
     if (!validation.success) {

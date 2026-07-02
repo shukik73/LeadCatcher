@@ -112,6 +112,16 @@ export async function GET(request: Request) {
                         .lte('created_at', endOfYesterday.toISOString()),
                 ]);
 
+                // Fail closed on any stat-query error: sending "0 calls, 0 missed"
+                // to an owner whose DB read actually failed is worse than sending
+                // nothing — they'd trust a wrong number. Skip this business today.
+                const statError = callsResult.error || missedResult.error || actionsResult.error || auditResult.error;
+                if (statError) {
+                    logger.error(`${TAG} Skipping digest — stat query failed`, statError, { businessId: biz.id });
+                    results.push({ businessId: biz.id, skipped: true, reason: 'Stat query failed' });
+                    continue;
+                }
+
                 const totalCalls = callsResult.count || 0;
                 const missedCalls = missedResult.count || 0;
                 const pendingActions = actionsResult.count || 0;

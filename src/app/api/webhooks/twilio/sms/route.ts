@@ -88,8 +88,13 @@ async function handleSmsWebhook(messageSid: string | null, fromRaw: string, toRa
     if (isOptOut) {
         const optOutKeyword = stopKeywords.find(keyword => bodyUpper.startsWith(keyword)) || 'STOP';
 
-        // Add to opt-out table (upsert to handle re-opts)
-        await supabaseAdmin.from('opt_outs').upsert({
+        // Add to opt-out table (upsert to handle re-opts).
+        // TCPA: we must confirm the opt-out is PERSISTED before telling the caller
+        // they're unsubscribed. If the write fails we fail closed — skip the
+        // confirmation and return 500 so the webhook event is reclaimed and retried
+        // by Twilio, rather than sending "You have been unsubscribed" while future
+        // automated messages keep going out (direct compliance liability).
+        const { error: optOutError } = await supabaseAdmin.from('opt_outs').upsert({
             business_id: business.id,
             phone_number: from,
             opt_out_keyword: optOutKeyword,
@@ -97,6 +102,12 @@ async function handleSmsWebhook(messageSid: string | null, fromRaw: string, toRa
         }, {
             onConflict: 'business_id,phone_number'
         });
+
+        if (optOutError) {
+            logger.error(`[${TAG}] Failed to persist opt-out — failing closed`, optOutError, { from, businessId: business.id });
+            if (messageSid) await markWebhookFailed(messageSid);
+            return new Response('Internal Server Error', { status: 500 });
+        }
 
         logger.info(`[${TAG}] Opt-out registered`, { from, businessId: business.id, keyword: optOutKeyword });
 

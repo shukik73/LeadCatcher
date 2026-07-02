@@ -80,7 +80,7 @@ export async function GET(request: Request) {
                 startOfDay.setHours(0, 0, 0, 0);
 
                 // Fetch pending action items (all pending, not just today)
-                const { data: pendingActions } = await supabaseAdmin
+                const { data: pendingActions, error: actionsError } = await supabaseAdmin
                     .from('action_items')
                     .select('title, description, customer_name, customer_phone, priority, action_type')
                     .eq('business_id', biz.id)
@@ -89,18 +89,27 @@ export async function GET(request: Request) {
                     .limit(15);
 
                 // Fetch today's calls summary
-                const { count: todayCalls } = await supabaseAdmin
+                const { count: todayCalls, error: callsError } = await supabaseAdmin
                     .from('call_analyses')
                     .select('id', { count: 'exact', head: true })
                     .eq('business_id', biz.id)
                     .gte('created_at', startOfDay.toISOString());
 
-                const { count: todayMissed } = await supabaseAdmin
+                const { count: todayMissed, error: missedError } = await supabaseAdmin
                     .from('call_analyses')
                     .select('id', { count: 'exact', head: true })
                     .eq('business_id', biz.id)
                     .eq('call_status', 'missed')
                     .gte('created_at', startOfDay.toISOString());
+
+                // Fail closed: a failed stat read would otherwise send "0 calls" or a
+                // truncated action list that reads as "all caught up" — skip instead.
+                const statError = actionsError || callsError || missedError;
+                if (statError) {
+                    logger.error(`${TAG} Skipping report — stat query failed`, statError, { businessId: biz.id });
+                    results.push({ businessId: biz.id, skipped: true, reason: 'Stat query failed' });
+                    continue;
+                }
 
                 const actions = pendingActions || [];
                 const totalCalls = todayCalls || 0;

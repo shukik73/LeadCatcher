@@ -103,11 +103,15 @@ export async function middleware(request: NextRequest) {
                 response.headers.set('X-RateLimit-Reset', reset.toString());
             } catch (error) {
                 logger.error('Rate Limit Middleware Error', error);
-                // Fail closed for webhook routes (prevent abuse when Redis is down)
-                // Fail open for user-facing routes (don't break the UI)
-                if (isWebhookPath(request.nextUrl.pathname)) {
-                    // Webhooks have their own signature validation as a second line of defense,
-                    // so failing closed here is safe — legitimate providers will retry.
+                // When Redis is down we must not drop legitimate provider traffic.
+                // Every webhook/cron route has its own auth downstream (Twilio/Telnyx
+                // signature, Stripe signature, CRON_SECRET), so failing open here is
+                // safe against abuse. We only fail CLOSED for Stripe, which retries
+                // 5xx responses and benefits from the backpressure without data loss.
+                // Twilio VOICE requests do NOT retry the primary handler, so a 503
+                // here would silently drop the missed call — the one thing this
+                // product must never do. Those paths therefore fail open.
+                if (request.nextUrl.pathname.startsWith('/api/stripe/webhook')) {
                     return new NextResponse('Service Unavailable', { status: 503 });
                 }
             }
